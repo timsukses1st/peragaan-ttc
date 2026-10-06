@@ -1,0 +1,1784 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Peragaan — The Tamperan Cruise</title>
+<style>
+:root{
+  color-scheme: light;
+  --navy:#0f2557; --navy2:#0a1838; --gold:#c8a04a; --orange:#e2661a;
+  --sea:#1a7fa8; --sky:#e8f4f8; --ink:#16202e; --muted:#6b7a8f;
+  --line:#dbe3ec; --bg:#f2f6fa; --card:#fff;
+  --ok:#15803d; --okbg:#e7f6ec; --warn:#b45309; --warnbg:#fdf3e3;
+  --danger:#b91c1c; --dangerbg:#fdecec;
+  --wa:#1f9d55;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+.demo-banner{background:repeating-linear-gradient(45deg,#2a1810,#2a1810 12px,#3a2415 12px,#3a2415 24px);color:#ffd9a0;padding:9px 16px;font-size:12.5px;text-align:center;letter-spacing:.3px}
+.demo-banner b{color:#fff}
+.topnav{background:var(--navy2);display:flex;align-items:center;gap:4px;padding:0 14px;flex-wrap:wrap;position:sticky;top:0;z-index:50;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.brand{color:#fff;font-weight:700;font-size:14px;letter-spacing:1.5px;padding:14px 16px 14px 4px;white-space:nowrap}
+.brand span{color:var(--gold);font-weight:400;letter-spacing:.5px;font-size:11px;display:block;margin-top:-3px}
+.tabbtn{background:none;border:0;color:#9fb3d0;padding:15px 15px;font:inherit;font-size:13.5px;cursor:pointer;border-bottom:3px solid transparent}
+.tabbtn:hover{color:#fff}
+.tabbtn.on{color:#fff;border-bottom-color:var(--gold);background:rgba(255,255,255,.06)}
+.wrap{max-width:1140px;margin:0 auto;padding:22px 16px 70px}
+.narrow{max-width:620px}
+h1{font-size:24px;letter-spacing:-.3px;margin-bottom:5px}
+h2{font-size:18px;margin-bottom:12px}
+h3{font-size:14.5px;margin-bottom:9px}
+.sub{color:var(--muted);font-size:13.5px;margin-bottom:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+.card.tight{padding:14px}
+.row{display:flex;gap:14px;flex-wrap:wrap}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(195px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+label{display:block;font-size:12.5px;font-weight:600;color:#3d4d63;margin-bottom:5px}
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:14px;background:#fff}
+input:focus,select:focus,textarea:focus{outline:2px solid #bcd7ea;border-color:var(--sea)}
+textarea{resize:vertical;line-height:1.5}
+.fld{margin-bottom:14px}
+.hint{font-size:11.5px;color:var(--muted);margin-top:4px}
+button{font:inherit;cursor:pointer}
+.btn{background:var(--orange);color:#fff;border:0;padding:12px 22px;border-radius:8px;font-weight:600;font-size:14.5px}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:#fff;color:var(--navy);border:1px solid var(--line)}
+.btn.navy{background:var(--navy)}
+.btn.wa{background:var(--wa)}
+.btn.sm{padding:7px 13px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:11px 10px;border-bottom:1px solid #eef2f7;vertical-align:middle}
+tr:last-child td{border-bottom:0}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pill{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;letter-spacing:.3px}
+.p-ok{background:var(--okbg);color:var(--ok)}
+.p-warn{background:var(--warnbg);color:var(--warn)}
+.p-dang{background:var(--dangerbg);color:var(--danger)}
+.p-mute{background:#eef2f7;color:var(--muted)}
+.p-sea{background:var(--sky);color:var(--sea)}
+.note{border-left:3px solid var(--sea);background:var(--sky);padding:11px 14px;border-radius:0 8px 8px 0;font-size:13px;margin-bottom:16px}
+.note.w{border-color:var(--warn);background:var(--warnbg)}
+.note.d{border-color:var(--danger);background:var(--dangerbg)}
+.note b{display:block;margin-bottom:3px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:15px}
+.kpi .k{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:6px}
+.kpi .v{font-size:23px;font-weight:700;letter-spacing:-.6px;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:11.5px;color:var(--muted);margin-top:3px}
+.hero{background:linear-gradient(150deg,var(--navy) 0%,var(--sea) 100%);color:#fff;border-radius:14px;padding:30px 26px;margin-bottom:22px}
+.hero h1{font-size:27px;margin-bottom:7px}
+.hero p{opacity:.9;font-size:14px;max-width:520px}
+.hero .tag{display:inline-block;font-size:11px;letter-spacing:2px;color:var(--gold);margin-bottom:9px}
+.steps{display:flex;gap:6px;margin-bottom:22px;flex-wrap:wrap}
+.steps div{flex:1;min-width:88px;font-size:11px;padding:8px 6px;text-align:center;border-radius:7px;background:#e6ecf3;color:var(--muted);font-weight:600}
+.steps div.on{background:var(--navy);color:#fff}
+.steps div.done{background:var(--okbg);color:var(--ok)}
+.prod{border:1px solid var(--line);border-radius:12px;padding:16px;background:#fff;cursor:pointer;transition:.12s}
+.prod:hover{border-color:var(--sea);box-shadow:0 4px 14px rgba(26,127,168,.13);transform:translateY(-1px)}
+.prod .nm{font-weight:700;font-size:15px;margin-bottom:3px}
+.prod .ds{font-size:12.5px;color:var(--muted);min-height:34px;margin-bottom:10px}
+.prod .pr{font-size:19px;font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums}
+.prod .pr small{font-size:12px;font-weight:400;color:var(--muted)}
+.tierbox{display:flex;gap:10px}
+.tierbox label{flex:1;border:1.5px solid var(--line);border-radius:9px;padding:11px;cursor:pointer;font-weight:400;margin:0}
+.tierbox label.on{border-color:var(--sea);background:var(--sky)}
+.tierbox .t{font-weight:700;font-size:13.5px}
+.tierbox .p{font-size:16px;font-weight:700;color:var(--navy);font-variant-numeric:tabular-nums}
+.tierbox .n{font-size:11px;color:var(--muted)}
+.sumline{display:flex;justify-content:space-between;padding:7px 0;font-size:14px}
+.sumline.tot{border-top:1px solid var(--line);margin-top:6px;padding-top:11px;font-weight:700;font-size:17px}
+.sumline .neg{color:var(--ok)}
+.refok{background:var(--okbg);color:var(--ok);border-radius:7px;padding:9px 12px;font-size:13px;font-weight:600;margin-top:7px}
+.refbad{background:var(--dangerbg);color:var(--danger);border-radius:7px;padding:9px 12px;font-size:13px;margin-top:7px}
+.paxcard{border:1px solid var(--line);border-radius:10px;padding:13px;margin-bottom:11px;background:#fafcfe}
+.paxcard .ph{font-size:12px;font-weight:700;color:var(--sea);letter-spacing:.5px;margin-bottom:9px}
+.tl{list-style:none}
+.tl li{display:flex;gap:13px;padding-bottom:17px;position:relative}
+.tl li:before{content:"";position:absolute;left:6px;top:16px;bottom:0;width:2px;background:var(--line)}
+.tl li:last-child{padding-bottom:0}
+.tl li:last-child:before{display:none}
+.tl .dot{width:14px;height:14px;border-radius:50%;background:var(--line);flex:0 0 14px;margin-top:3px;z-index:1}
+.tl li.done .dot{background:var(--ok)}
+.tl li.now .dot{background:var(--orange);box-shadow:0 0 0 4px rgba(226,102,26,.18)}
+.tl .tt{font-weight:600;font-size:14px}
+.tl li:not(.done):not(.now) .tt{color:var(--muted);font-weight:400}
+.tl .st{font-size:12px;color:var(--muted)}
+.ticket{border:2px dashed var(--navy);border-radius:13px;padding:20px;text-align:center;background:linear-gradient(#fff,#f7fafc)}
+.qr{width:168px;height:168px;margin:0 auto 12px;background:#fff;padding:9px;border:1px solid var(--line);border-radius:8px}
+.tcode{font-family:ui-monospace,Menlo,monospace;font-size:19px;font-weight:700;letter-spacing:2.5px;color:var(--navy);margin-bottom:5px}
+.login{max-width:410px;margin:44px auto}
+.rolebtn{display:block;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:10px}
+.rolebtn:hover{border-color:var(--sea);background:var(--sky)}
+.rolebtn .r{font-weight:700;font-size:14.5px}
+.rolebtn .a{font-size:12.5px;color:var(--muted)}
+.bar{height:9px;background:#e6ecf3;border-radius:20px;overflow:hidden;margin:8px 0 5px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--sea),var(--gold));border-radius:20px}
+.rank{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #eef2f7}
+.rank:last-child{border-bottom:0}
+.rank .no{width:29px;height:29px;border-radius:50%;background:var(--navy);color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px;flex:0 0 29px}
+.rank.r1 .no{background:var(--gold)}
+.rank.r2 .no{background:#94a3b8}
+.rank.r3 .no{background:#c08552}
+.dsub{display:flex;gap:4px;margin-bottom:18px;border-bottom:1px solid var(--line);overflow-x:auto}
+.dsub button{background:none;border:0;padding:10px 14px;font-size:13.5px;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.dsub button.on{color:var(--navy);font-weight:700;border-bottom-color:var(--navy)}
+.hide{display:none !important}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;width:calc(100% - 32px);max-width:540px;background:var(--navy2);color:#e8eef7;padding:14px 18px;border-radius:11px;font-size:13px;line-height:1.55;box-shadow:0 10px 32px rgba(0,0,0,.3);z-index:99}
+.toast b{color:var(--gold)}
+.fugrp{margin-bottom:22px}
+.fugrp h3{display:flex;align-items:center;gap:8px}
+#kilat{position:fixed;inset:0;z-index:98;pointer-events:none;opacity:0;display:none;transition:opacity .45s}
+.foot{text-align:center;color:var(--muted);font-size:12px;padding:26px 16px}
+@media(max-width:560px){.brand{padding-right:8px}.hero{padding:22px 18px}.hero h1{font-size:22px}}
+</style>
+</head>
+<body>
+
+<div class="demo-banner">
+  <b>PERAGAAN / PROTOTYPE</b> &nbsp;·&nbsp; Semua nama, nomor HP, NIK, dan alamat di halaman ini adalah data karangan. Tidak ada database, tidak ada pembayaran nyata. &nbsp;·&nbsp; Blueprint v1.4
+</div>
+
+<nav class="topnav">
+  <div class="brand">THE TAMPERAN CRUISE<span>peragaan sistem penjualan</span></div>
+  <button class="tabbtn on" onclick="showTab('lp',this)">Landing Page</button>
+  <button class="tabbtn" onclick="showTab('db',this)">Dashboard</button>
+  <button class="tabbtn" onclick="showTab('sc',this)">Scan Boarding</button>
+</nav>
+
+<div id="tab-lp">
+<div class="wrap">
+  <div class="steps" id="steps">
+    <div class="on">1 · Pilih Paket</div><div>2 · Jumlah &amp; Tier</div>
+    <div>3 · Data Penumpang</div><div>4 · Pembayaran</div><div>5 · E-Ticket</div>
+  </div>
+
+  <div id="lp1">
+    <div class="hero">
+      <div class="tag">SEE PACITAN FROM THE SEA</div>
+      <h1>Pelabuhan Tamperan &rarr; Teluk Gelon</h1>
+      <p>Wisata kapal dari Pacitan menuju pulau wisata. Sudah termasuk makan dan fasilitas — relax, healthy, cruise.</p>
+    </div>
+    <div class="card">
+      <h3>Pesan sebagai apa?</h3>
+      <p class="sub" style="margin-bottom:14px">Menentukan data apa yang diminta dan bentuk tiketnya.</p>
+      <div class="tierbox">
+        <label id="tp-perorangan" class="on" onclick="setTipe('perorangan')">
+          <div class="t">Perorangan / Keluarga</div>
+          <div class="n" style="margin-top:4px">Data lengkap tiap penumpang · <b>dicek per nama</b></div>
+        </label>
+        <label id="tp-biro" onclick="setTipe('biro')">
+          <div class="t">Biro / Agen Wisata</div>
+          <div class="n" style="margin-top:4px">Data biro + daftar nama · <b>dihitung per kepala</b></div>
+        </label>
+      </div>
+      <div id="tipeInfo"></div>
+    </div>
+
+    <h2>Pilih Paket</h2>
+    <div class="grid g2" id="prodgrid"></div>
+    <div class="note" style="margin-top:18px">
+      <b>Catatan peragaan</b>
+      Harga di sini contoh dari daftar yang ada. Di sistem nyata semua harga diinput Super Admin dari dashboard, bukan ditulis di kode.
+    </div>
+  </div>
+
+  <div id="lp2" class="hide narrow">
+    <button class="btn ghost sm" onclick="goStep(1)">&larr; Kembali</button>
+    <h2 style="margin-top:14px" id="p2name"></h2>
+    <p class="sub" id="p2desc"></p>
+    <div class="card" id="tierCard">
+      <h3>Tarif</h3>
+      <div class="tierbox">
+        <label id="tl-lokal" onclick="setTier('lokal')">
+          <div class="t">Warga Pacitan</div><div class="p">Rp100.000</div>
+          <div class="n">Wajib tunjukkan KTP saat boarding</div></label>
+        <label id="tl-umum" class="on" onclick="setTier('umum')">
+          <div class="t">Umum</div><div class="p">Rp150.000</div>
+          <div class="n">Tanpa syarat</div></label>
+      </div>
+      <div class="note w" style="margin:14px 0 0">
+        <b>Foto KTP tidak diupload, tidak disimpan</b>
+        Cukup ditunjukkan ke petugas saat boarding. Kalau tidak sesuai, dikenakan selisih Rp50.000.
+      </div>
+    </div>
+    <div class="card">
+      <div class="fld" id="qtybox"></div>
+      <div class="fld" style="margin-bottom:0">
+        <label>Sewa Paddleboard + Instruktur <span style="font-weight:400;color:var(--muted)">(opsional, Rp150.000/item)</span></label>
+        <select id="padd" onchange="calc()"><option value="0">Tidak</option><option value="1">1 item</option><option value="2">2 item</option><option value="3">3 item</option></select></div>
+    </div>
+    <div class="card" id="voucherCard" style="display:none">
+      <h3>Bonus paket promo</h3>
+      <div class="row">
+        <div style="flex:1;min-width:150px;background:var(--sky);border-radius:9px;padding:12px">
+          <div style="font-size:12px;color:var(--sea);font-weight:700">VOUCHER MAKAN</div>
+          <div style="font-size:18px;font-weight:700">Rp50.000</div>
+          <div style="font-size:11.5px;color:var(--muted)">Ikan Bakar Janenake</div></div>
+        <div style="flex:1;min-width:150px;background:var(--sky);border-radius:9px;padding:12px">
+          <div style="font-size:12px;color:var(--sea);font-weight:700">VOUCHER MENGINAP</div>
+          <div style="font-size:18px;font-weight:700">Rp25.000</div>
+          <div style="font-size:11.5px;color:var(--muted)">Hotel Mitra The Tamperan</div></div>
+      </div>
+      <div class="hint" style="margin-top:11px">Diberikan sebagai <b>voucher kertas</b> di loket, distempel atau disobek kasir saat dipakai. Tidak ada pemindaian QR.</div>
+    </div>
+    <button class="btn" style="width:100%" onclick="goStep(3)">Lanjut ke Data Penumpang</button>
+  </div>
+
+  <div id="lp3" class="hide narrow">
+    <button class="btn ghost sm" onclick="goStep(2)">&larr; Kembali</button>
+    <h2 style="margin-top:14px">Data Pemesan</h2>
+    <div class="card">
+      <div class="fld"><label>Nama lengkap</label><input id="f-nama" value="Merilla Indah"></div>
+      <div class="row">
+        <div class="fld" style="flex:1;min-width:170px"><label>Nomor WhatsApp</label><input value="0812 3456 7890"></div>
+        <div class="fld" style="flex:1;min-width:170px"><label>Email</label><input value="merilla@contoh.com">
+          <div class="hint">E-ticket &amp; tautan status pesanan dikirim ke sini</div></div>
+      </div>
+      <div class="row">
+        <div class="fld" style="flex:1;min-width:170px;margin-bottom:0">
+          <label>Provinsi</label>
+          <select id="f-prov"><option selected>Jawa Timur</option><option>Jawa Tengah</option><option>DI Yogyakarta</option><option>DKI Jakarta</option><option>Jawa Barat</option><option>Bali</option><option>Lainnya</option></select>
+          <div class="hint">Dipakai untuk manifest dan untuk tahu wisatawan datang dari mana</div>
+        </div>
+        <div class="fld" style="flex:1;min-width:170px;margin-bottom:0">
+          <label>Domisili</label>
+          <select><option>Luar Pacitan</option><option>Pacitan</option></select>
+          <div class="hint">Menentukan tarif hanya untuk Cruise Daily</div>
+        </div>
+      </div>
+      <div class="fld" style="margin:14px 0 0">
+        <label>Alamat lengkap sesuai KTP</label>
+        <input id="f-alamat" value="Jl. Ahmad Yani No. 12, RT 03/RW 05, Kel. Sidoharjo, Kec. Pacitan, Kab. Pacitan, Jawa Timur">
+      </div>
+      <div class="fld" style="margin:14px 0 0">
+        <label>NIK pemesan (16 digit)</label>
+        <input id="f-nik" value="3501210498000012" maxlength="16" inputmode="numeric">
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Manifest Penumpang</h3>
+      <div class="note w" style="margin-bottom:14px">
+        <b>Disiapkan lengkap dulu — belum dikonfirmasi syahbandar</b>
+        NIK dan alamat KTP sengaja diaktifkan supaya sistem sudah siap kalau diwajibkan. Kalau owner memutuskan tidak perlu, <b>matikan dari Pengaturan → Kolom Manifest Penumpang</b> — form ini langsung memendek tanpa ubah kode.
+      </div>
+      <div id="paxlist"></div>
+      <div class="note" style="margin:4px 0 0;font-size:12.5px">
+        <b>Pemberitahuan privasi</b>
+        NIK dan alamat dikumpulkan hanya untuk manifest pelayaran dan klaim asuransi penumpang. Disimpan terenkripsi, hanya dapat dilihat Super Admin, <b>tidak dibagikan ke agen</b>, dan dihapus otomatis 12 bulan setelah tanggal keberangkatan. Foto KTP tidak pernah diminta dan tidak pernah disimpan.
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Catatan Tambahan</h3>
+      <div class="fld" style="margin:0">
+        <label>Catatan khusus <span style="font-weight:400;color:var(--muted)">(opsional)</span></label>
+        <input placeholder="mis. membawa lansia, membawa anak kecil">
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Kode Referral Agen</h3>
+      <input id="f-ref" placeholder="Contoh: BUDI2026" oninput="checkRef()" value="BUDI2026">
+      <div id="refmsg"></div>
+      <div class="hint" style="margin-top:9px">Coba ketik: <span class="mono">BUDI2026</span> · <span class="mono">SARIPACITAN</span> · <span class="mono">ANTO01</span> · atau kode yang salah. Huruf besar/kecil tidak berpengaruh.</div>
+    </div>
+
+    <div class="card"><h3>Ringkasan</h3><div id="sumbox"></div></div>
+    <button class="btn" style="width:100%" onclick="goStep(4)">Lanjut ke Pembayaran</button>
+  </div>
+
+  <div id="lp4" class="hide narrow">
+    <button class="btn ghost sm" onclick="goStep(3)">&larr; Kembali</button>
+    <h2 style="margin-top:14px">Pembayaran</h2>
+    <p class="sub">Tiga skenario yang masih dipertimbangkan. Pilih satu untuk melihat bedanya.</p>
+    <div class="card" onclick="setPay('qris')" id="pay-qris" style="cursor:pointer">
+      <div class="row" style="align-items:center;justify-content:space-between">
+        <div><div style="font-weight:700">QRIS Dinamis <span class="pill p-ok">OTOMATIS</span></div>
+        <div style="font-size:12.5px;color:var(--muted)">QR dibuat khusus pesanan ini, nominal sudah terisi. Lunas terdeteksi dalam hitungan detik.</div></div>
+        <div style="font-size:12.5px;color:var(--muted);white-space:nowrap">biaya 0,7%</div></div>
+    </div>
+    <div class="card" onclick="setPay('va')" id="pay-va" style="cursor:pointer">
+      <div class="row" style="align-items:center;justify-content:space-between">
+        <div><div style="font-weight:700">Virtual Account <span class="pill p-ok">OTOMATIS</span></div>
+        <div style="font-size:12.5px;color:var(--muted)">Nomor VA unik per pesanan. Tidak perlu nominal unik, tidak perlu kirim bukti.</div></div>
+        <div style="font-size:12.5px;color:var(--muted);white-space:nowrap">~Rp4.000</div></div>
+    </div>
+    <div class="card" onclick="setPay('static')" id="pay-static" style="cursor:pointer">
+      <div class="row" style="align-items:center;justify-content:space-between">
+        <div><div style="font-weight:700">QRIS Statis <span class="pill p-warn">MANUAL</span></div>
+        <div style="font-size:12.5px;color:var(--muted)">Rencana awal. Butuh nominal unik, kirim bukti ke WA agen, dan Super Admin menandai lunas.</div></div>
+        <div style="font-size:12.5px;color:var(--muted);white-space:nowrap">Rp0</div></div>
+    </div>
+    <div id="paydetail" style="margin-top:6px"></div>
+  </div>
+
+  <div id="lp5" class="hide narrow">
+    <h2>Status Pesanan</h2>
+    <p class="sub">Halaman ini yang tautannya dikirim ke email dan bisa disimpan konsumen selamanya.</p>
+    <div class="card" style="background:var(--okbg);border-color:#bfe3c9">
+      <div style="font-weight:700;color:var(--ok)">✓ Pembayaran dikonfirmasi</div>
+      <div style="font-size:13px;color:#2f6b45">Sampai jumpa di Pelabuhan Tamperan.</div>
+    </div>
+    <div class="card">
+      <table>
+        <tr><td style="color:var(--muted)">Nomor pesanan</td><td class="num mono"><b>TTC-7K2M9</b></td></tr>
+        <tr><td style="color:var(--muted)">Paket</td><td class="num" id="r-prod"></td></tr>
+        <tr><td style="color:var(--muted)">Jumlah penumpang</td><td class="num" id="r-qty"></td></tr>
+        <tr><td style="color:var(--muted)">Agen</td><td class="num" id="r-agen"></td></tr>
+        <tr><td style="color:var(--muted)">Total dibayar</td><td class="num" id="r-total"><b></b></td></tr>
+      </table>
+      <div class="hint" style="margin-top:8px">⬜ Terbuka: apakah harga sudah termasuk PPN? Perlu nomor invoice urut resmi?</div>
+    </div>
+    <div class="card">
+      <h3>Perjalanan Pesanan</h3>
+      <ul class="tl">
+        <li class="done"><div class="dot"></div><div><div class="tt">Pesanan dibuat</div><div class="st">21 Sep 2026, 16.05</div></div></li>
+        <li class="done"><div class="dot"></div><div><div class="tt">Pembayaran dikonfirmasi</div><div class="st">21 Sep 2026, 16.07</div></div></li>
+        <li class="now"><div class="dot"></div><div><div class="tt">Jadwal keberangkatan dikonfirmasi</div><div class="st">Kami hubungi maksimal 1x24 jam</div></div></li>
+        <li><div class="dot"></div><div><div class="tt">Sudah boarding</div><div class="st">Dicatat petugas saat naik kapal</div></div></li>
+      </ul>
+      <div class="note" style="margin:14px 0 0">
+        <b>Kenapa ada langkah "Jadwal dikonfirmasi"</b>
+        Jadwal keberangkatan belum fix. Langkah ini membuat konsumen tidak menggantung, dan TTC punya ruang mengatur jadwal belakangan.
+      </div>
+    </div>
+    <div class="card">
+      <h3>E-Ticket &mdash; Satu QR per Pesanan</h3>
+      <div class="note" style="font-size:12.5px">
+        <b>Cukup satu QR, ditunjukkan sekali</b>
+        Tidak perlu tiap orang membuka HP sendiri — di pelabuhan jam 7 pagi itu sering gagal: baterai habis, sinyal tipis, layar kena matahari tidak kebaca pemindai. QR ini hanya <b>membuka daftar</b> di layar petugas; yang meloloskan orang adalah petugasnya.
+      </div>
+      <div id="tickets"></div>
+      <div style="padding:11px;background:var(--warnbg);border-radius:8px;font-size:12.5px;color:var(--warn);font-weight:600" id="ktpwarn">
+        Tarif Warga Pacitan — wajib tunjukkan KTP asli saat boarding, nama di KTP harus cocok dengan nama di tiket
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn ghost sm" style="flex:1" onclick="toast('Peragaan — di sistem nyata tombol ini menyimpan tiket sebagai gambar atau PDF ke ponsel, supaya tetap bisa dibuka waktu sinyal di pelabuhan lemah.',9000)">⬇ Simpan tiket ke ponsel</button>
+        <button class="btn ghost sm" style="flex:1" onclick="toast('Peragaan — di sistem nyata tombol ini mengunduh file .ics berisi jadwal keberangkatan. Penting karena paket sunrise berangkat jam 05.00.',9000)">📅 Tambah ke kalender</button>
+      </div>
+      <div class="hint" style="margin-top:9px">Tiket harus bisa dibuka offline — sinyal di area pelabuhan sering lemah.</div>
+    </div>
+    <div class="card">
+      <h3>Penumpang Terdaftar</h3>
+      <div id="paxfinal"></div>
+      <div style="font-size:12.5px;color:var(--muted);margin-top:11px">
+        Nama salah? Hubungi kami lewat WhatsApp sebelum hari keberangkatan. <b>Jangan membuat pesanan baru.</b></div>
+    </div>
+    <div class="card" style="background:var(--navy2);color:#cdd9e8;border:0">
+      <div style="font-size:11px;letter-spacing:1.5px;color:var(--gold);margin-bottom:7px">CONTOH EMAIL OTOMATIS</div>
+      <div style="font-size:13px;line-height:1.7">
+        <b style="color:#fff">Subjek: Pesanan TTC-7K2M9 terkonfirmasi</b><br><br>
+        Halo Merilla Indah,<br>
+        Pembayaran Anda sudah kami terima. Pesanan Anda resmi <b style="color:var(--gold)">terkonfirmasi</b>.<br><br>
+        Simpan tautan ini — di sinilah bukti pesanan Anda:<br>
+        <span style="display:inline-block;background:var(--orange);color:#fff;padding:8px 16px;border-radius:7px;font-weight:700;margin:7px 0">Lihat pesanan saya</span><br><br>
+        <span style="opacity:.65;font-size:12px">Email ini dikirim otomatis dan tidak dibalas.</span>
+      </div>
+    </div>
+    <button class="btn ghost" style="width:100%" onclick="goStep(1)">Ulangi peragaan dari awal</button>
+  </div>
+</div>
+</div>
+
+<div id="tab-db" class="hide">
+  <div id="dblogin" class="wrap">
+    <div class="login">
+      <div class="card">
+        <h2>Masuk Dashboard</h2>
+        <p class="sub" style="margin-bottom:18px">Pilih role untuk melihat perbedaan hak aksesnya.</p>
+        <button class="rolebtn" onclick="login('super')">
+          <div class="r">Super Admin</div>
+          <div class="a">Semua akses — semua agen, semua pelanggan, NIK &amp; alamat, ubah harga &amp; komisi</div></button>
+        <button class="rolebtn" onclick="login('owner')">
+          <div class="r">Manager / Owner</div>
+          <div class="a">Lihat semua agen &amp; pelanggan, <b>tidak bisa edit apa pun</b></div></button>
+        <button class="rolebtn" onclick="login('agen')">
+          <div class="r">Agen — Budi Santoso</div>
+          <div class="a"><b>Hanya</b> pelanggan &amp; komisi miliknya. Tanpa data agen lain, tanpa NIK/alamat</div></button>
+      </div>
+      <div class="note d">
+        <b>Penyembunyian tampilan bukan keamanan</b>
+        Di peragaan ini semua data karangan ada dalam satu file, jadi tetap terbaca lewat DevTools — itu tak terhindarkan untuk mockup. Di sistem nyata penguncian harus di <b>RLS database</b>: baris agen lain tidak pernah sampai ke browser sejak awal. Ditambah role <span class="mono">anon</span> yang cuma boleh INSERT, dan GRANT ikut diperiksa.
+      </div>
+    </div>
+  </div>
+
+  <div id="dbapp" class="hide">
+    <div class="wrap">
+      <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div><h1 id="dbtitle"></h1><div class="sub" style="margin:0" id="dbrole"></div></div>
+        <button class="btn ghost sm" onclick="logout()">Keluar</button>
+      </div>
+      <div class="dsub" id="dsub"></div>
+
+      <div id="d-ring">
+        <div class="grid g4" style="margin-bottom:18px">
+          <div class="kpi"><div class="k">Omzet Bulan Ini</div><div class="v">Rp23,6jt</div><div class="d">60 tiket terjual</div></div>
+          <div class="kpi"><div class="k">Komisi Agen</div><div class="v" id="kpi-komisi"></div><div class="d">total tiga agen</div></div>
+          <div class="kpi"><div class="k">Perlu Follow-Up</div><div class="v" style="color:var(--warn)" id="kpi-fu"></div><div class="d">lead &amp; pelanggan menggantung</div></div>
+          <div class="kpi"><div class="k">Menunggu Verifikasi</div><div class="v" style="color:var(--warn)" id="kpi-wait"></div><div class="d">order belum ditandai lunas</div></div>
+        </div>
+        <div class="note d" id="findbox"></div>
+        <div class="row">
+          <div class="card" style="flex:1;min-width:290px">
+            <h3>Leaderboard Top 3 — Bulan Ini</h3>
+            <div style="font-size:11.5px;color:var(--muted);margin-bottom:9px">Diurutkan berdasarkan total rupiah</div>
+            <div id="lb"></div>
+            <div class="note w" style="margin:13px 0 0;font-size:12.5px">
+              <b>Halaman ini tetap hanya Super Admin &amp; Owner</b>
+              Agen tidak melihat panel ini. Yang dibuka untuk agen adalah kartu <b>Top Penjualan</b> terpisah di dashboardnya, dengan kedalaman yang diatur di <b>Pengaturan &rarr; Leaderboard untuk Agen</b> &mdash; bawaannya <b>angka terbuka</b>, dan bisa diturunkan ke <b>peringkat saja</b> kalau perlu.
+            </div>
+          </div>
+          <div class="card" style="flex:1;min-width:290px">
+            <h3>Penjualan per Produk</h3><div id="byprod"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="d-order" class="hide">
+        <div class="row" style="margin-bottom:14px;gap:10px">
+          <select style="max-width:180px"><option selected>September 2026</option><option>All-time</option></select>
+          <select style="max-width:180px"><option>Semua domisili</option><option>Pacitan</option><option>Luar Pacitan</option></select>
+          <select style="max-width:180px"><option>Semua agen</option><option>Budi Santoso</option><option>Sari Wulandari</option><option>Anto Prasetyo</option><option>Tanpa Agen</option></select>
+        </div>
+        <div class="card" style="padding:6px 6px 0;overflow-x:auto"><table id="ordtbl"></table></div>
+        <div class="note w">
+          <b>Status pembatalan dipisah sejak awal</b>
+          <span class="mono">cancelled_cuaca</span> tidak menurunkan tier · <span class="mono">cancelled_pembeli</span> menurunkan tier.
+          Pacitan pantai selatan — pembatalan karena gelombang tinggi pasti terjadi berulang, dan agen tidak boleh kena getahnya.
+        </div>
+      </div>
+
+      <div id="d-fu" class="hide">
+        <div class="note">
+          <b>Tiga kategori, sengaja dipisah</b>
+          Karena cara menghubunginya beda. Yang belum bayar ditawar ulang, yang sudah bayar tapi belum naik ditagih datang, yang lama tidak beli ditawari paket baru.
+        </div>
+        <div id="fubox"></div>
+      </div>
+
+      <div id="d-manifest" class="hide">
+        <div class="row" style="margin-bottom:14px;gap:10px;align-items:flex-end">
+          <div style="flex:1;min-width:200px">
+            <label>Keberangkatan</label>
+            <select><option selected>22 Sep 2026 · 05.00 · Teluk Gelon</option><option>23 Sep 2026 · 05.00 · Teluk Gelon</option></select>
+          </div>
+          <button class="btn ghost sm" id="nikbtn" onclick="NIK_TAMPIL=!NIK_TAMPIL;renderDash();toast(NIK_TAMPIL?'NIK ditampilkan penuh. Di sistem nyata tiap kali ini dibuka tercatat di audit log — siapa melihat NIK siapa, kapan.':'NIK disamarkan kembali.',8000)">👁 Tampilkan NIK penuh</button>
+          <button class="btn sm" onclick="toast('Peragaan — di sistem nyata tombol ini mengunduh manifest sebagai CSV atau PDF untuk diserahkan ke syahbandar/KSOP sebelum kapal berangkat. NIK dan alamat tampil penuh di file export, dan pengunduhannya tercatat di audit log.',11000)">⬇ Export Manifest</button>
+        </div>
+        <div class="card" style="padding:6px 6px 0;overflow-x:auto"><table id="mftbl"></table></div>
+        <div class="note w">
+          <b>NIK disamarkan secara default</b>
+          Yang tampil <span class="mono">3501 •••• •••• 0012</span> — cukup untuk mencocokkan, tanpa memajang data lengkap di layar yang bisa terlihat orang lain. Nilai penuh hanya muncul saat ditampilkan sengaja atau di file export, dan keduanya tercatat. <b>Agen tidak punya akses ke halaman ini sama sekali.</b>
+        </div>
+        <div class="note">
+          <b>Inilah gunanya data penumpang dikumpulkan</b>
+          Manifest diserahkan ke syahbandar sebelum kapal berangkat, dan jadi dasar klaim asuransi penumpang. Kalau ternyata tidak diwajibkan, kolom opsionalnya dimatikan dari Pengaturan — form pemesanan otomatis memendek.
+        </div>
+        <div class="note d">
+          <b>⬜ Masih harus dipastikan ke operasional/syahbandar</b>
+          Manifest wajib atau tidak · formatnya apa · <b>kapasitas izin kapal berapa</b> (bukan sama dengan jumlah kursi) · data apa saja yang wajib per penumpang · apakah asuransi penumpang minta NIK.
+        </div>
+      </div>
+
+      <div id="d-agen" class="hide">
+        <div class="card" style="padding:6px 6px 0;overflow-x:auto"><table id="agentbl"></table></div>
+        <div class="note">
+          <b>Kode ditentukan Super Admin, satu per agen, permanen</b>
+          Order menyimpan <b>ID agen</b>, bukan tulisan kodenya — jadi kode bisa diganti kapan saja tanpa merusak riwayat penjualan. Validasi wajib: unik, huruf besar/kecil diabaikan, hindari O/0 dan l/I/1.
+        </div>
+      </div>
+
+      <div id="d-komisi" class="hide">
+        <div class="card"><h3>Progress Tier Komisi</h3><div id="progbox"></div></div>
+        <div class="grid g3" style="margin-bottom:16px">
+          <div class="kpi"><div class="k">Komisi Berjalan</div><div class="v" id="k-berjalan"></div><div class="d">belum final, bisa berubah</div></div>
+          <div class="kpi"><div class="k">Tarif Saat Ini</div><div class="v" id="k-tarif"></div><div class="d">retroaktif ke semua tiket</div></div>
+          <div class="kpi"><div class="k">Sudah Dibayar</div><div class="v">Rp0</div><div class="d">periode belum ditutup</div></div>
+        </div>
+        <div class="note w">
+          <b>Kenapa ditulis "BERJALAN", bukan angka final</b>
+          Komisi bersifat retroaktif — begitu tembus 20 tiket, seluruh tiket ikut jadi 10%. Jadi angkanya berubah selama periode masih jalan, dan baru dikunci saat komisi dibayarkan.
+        </div>
+        <div class="card" id="lbAgenCard">
+          <h3>Top Penjualan &mdash; Bulan Ini</h3>
+          <div style="font-size:11.5px;color:var(--muted);margin-bottom:9px">Diurutkan berdasarkan total rupiah</div>
+          <div id="lbme"></div>
+        </div>
+        <div class="card" style="padding:6px 6px 0;overflow-x:auto">
+          <h3 style="padding:12px 10px 0">Pelanggan Saya</h3><table id="mytbl"></table>
+        </div>
+        <div class="note">
+          <b>Nomor lengkap, tapi hanya pelanggan sendiri</b>
+          Agen melihat nomor HP utuh supaya bisa follow up langsung. <b>Pelanggan agen lain tidak pernah muncul</b> di mode leaderboard mana pun &mdash; yang dibuka hanya angka penjualan agregat, bukan datanya. <b>NIK serta alamat KTP juga tidak pernah ditampilkan ke agen.</b>
+        </div>
+      </div>
+
+      <div id="d-set" class="hide">
+        <div class="note"><b>Semua angka di sini bisa diubah tanpa ngoding</b>Harga belum fix — makanya semuanya jadi parameter.</div>
+        <div class="card"><h3>Harga Produk</h3><div id="setprod" class="grid g2"></div></div>
+        <div class="card">
+          <h3>Diskon &amp; Komisi</h3>
+          <div class="grid g3" id="setkom"></div>
+          <div class="note w" style="margin:14px 0 0">
+            <b>⬜ Masih terbuka</b>
+            Reset tier (bulanan / per event / all-time) · tier by jumlah tiket atau omzet rupiah · komisi dihitung dari harga sebelum atau sesudah diskon · pembatalan menurunkan tier atau tidak.
+          </div>
+        </div>
+        <div class="card">
+          <h3>Kolom Manifest Penumpang</h3>
+          <p class="sub" style="margin-bottom:14px">Matikan yang tidak diwajibkan — form pemesanan otomatis jadi lebih pendek.</p>
+          <div class="grid g2" id="setmf"></div>
+          <div class="row" style="margin-top:14px">
+            <div class="fld" style="flex:1;min-width:200px;margin:0">
+              <label>Hapus otomatis NIK &amp; alamat</label>
+              <select><option selected>12 bulan setelah keberangkatan</option><option>6 bulan</option><option>24 bulan</option><option>Jangan dihapus</option></select>
+              <div class="hint">Data lain (nama, nominal, status) tetap tersimpan untuk pembukuan</div>
+            </div>
+            <div class="fld" style="flex:1;min-width:200px;margin:0">
+              <label>Siapa boleh lihat NIK penuh</label>
+              <select><option selected>Super Admin saja</option><option>Super Admin &amp; Owner</option></select>
+              <div class="hint">Agen tidak pernah, dalam opsi mana pun</div>
+            </div>
+          </div>
+          <div class="note" style="margin:14px 0 0;font-size:12.5px">
+            <b>Trade-off yang perlu kamu tahu</b>
+            Tiap kolom tambahan memperpanjang form dan menurunkan jumlah orang yang menyelesaikan pemesanan. NIK dan alamat sekarang <b>aktif</b> supaya sistem siap kalau diwajibkan — tinggal dimatikan kalau owner memutuskan tidak perlu.
+          </div>
+        </div>
+        <div class="card">
+          <h3>Kuota &amp; Jadwal</h3>
+          <div class="grid g3">
+            <div class="fld"><label>Kuota kursi per keberangkatan</label><input placeholder="belum diketahui"><div class="hint">Dikosongkan = tanpa batas</div></div>
+            <div class="fld"><label>Kapasitas izin kapal</label><input placeholder="tanya syahbandar"><div class="hint">Bukan sama dengan jumlah kursi</div></div>
+            <div class="fld"><label>Order pending ditahan</label><input value="2 jam"><div class="hint">Lewat itu kursi dilepas otomatis</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>Kedalaman Pemeriksaan Boarding</h3>
+          <div class="grid g2">
+            <div class="fld"><label>Ambang cek per nama</label>
+              <input id="ambin" type="number" min="1" max="200" step="1" value="10" inputmode="numeric"
+                style="font-size:19px;font-weight:700" onchange="setAmbang(this.value)">
+              <div class="hint">Pesanan <b>sampai <span id="ambtxt3">10</span> orang</b> dicentang per nama. Di atas itu dihitung per kepala + nama tour leader.</div>
+            </div>
+            <div class="fld"><label>Kenapa ada ambangnya</label>
+              <div class="note" style="margin:0;font-size:12.5px">Mencentang 40 nama memakan 3&ndash;4 menit untuk verifikasi yang kosong &mdash; petugas tidak mengenal satu pun dari mereka. Yang menjaga kapasitas kapal adalah hitungan fisik checker di dermaga.</div>
+            </div>
+          </div>
+          <div class="note w" style="margin-top:13px;font-size:12.5px">
+            <b>&#9744; Naikkan ambangnya kalau syahbandar mewajibkan nama per orang</b>
+            Aturan manifest belum kita dapat. Kalau ternyata wajib, isi angka besar (mis. 200) dan seluruh pesanan otomatis kembali ke cek per nama &mdash; tanpa ubah kode. Perubahan ambang tercatat di audit log.
+          </div>
+        </div>
+        <div class="card">
+          <h3>Leaderboard untuk Agen</h3>
+          <div class="grid g2">
+            <div class="fld"><label>Yang dilihat agen di dashboardnya</label>
+              <select id="lbsel" onchange="setLbAgen(this.value)">
+                <option value="off">Tidak ada leaderboard</option>
+                <option value="peringkat">Peringkat saja &mdash; nama + posisi, angka agen lain disembunyikan</option>
+                <option value="penuh" selected>Angka terbuka &mdash; omzet &amp; komisi semua agen terlihat</option>
+              </select>
+              <div class="hint">Ubah lalu masuk sebagai <b>Agen &mdash; Budi Santoso</b> untuk melihat bedanya.</div>
+            </div>
+            <div class="fld"><label>Yang dibuka dan yang tetap tertutup</label>
+              <div class="note" style="margin:0;font-size:12.5px"><b>Dibuka:</b> nama agen, omzet, jumlah tiket, komisi &mdash; angka agregat.<br><b>Tetap tertutup di semua mode:</b> nama pelanggan, nomor HP, kode pesanan, NIK, alamat. Leaderboard tidak menyentuh tabel pesanan sama sekali.</div>
+            </div>
+          </div>
+          <div class="note w" style="margin-top:13px;font-size:12.5px">
+            <b>Kalau nanti terasa kurang enak</b>
+            Omzet agen juga penghasilannya, jadi mode <b>peringkat saja</b> disediakan sebagai jalan turun &mdash; nama dan urutan tetap tampil, angka agen lain disembunyikan. Perubahan mode tercatat di audit log.
+          </div>
+        </div>
+        <div class="card">
+          <h3>Catatan Perubahan (Audit Log)</h3>
+          <div class="card tight" style="margin:0;background:#fafcfe"><table style="font-size:12.5px" id="audittbl"></table></div>
+          <div class="hint" style="margin-top:9px">Perubahan status pembayaran tidak bisa dihapus, termasuk oleh Super Admin.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="tab-sc" class="hide">
+<div class="wrap narrow">
+  <h1>Scan Boarding</h1>
+  <p class="sub">Dibuka dari HP petugas di Pelabuhan Tamperan. Role terpisah — tidak punya akses ke data penjualan.</p>
+  <div class="note">
+    <b>Satu QR per pesanan — QR membuka daftar, bukan meloloskan orang</b>
+    Customer cuma menunjukkan <b>satu</b> QR, siapa pun yang memegangnya. Layar ini lalu terbuka berisi daftar pesanan itu, dan yang meloloskan orang adalah petugas — bukan QR-nya. Jadi kalau QR difoto dan disebar, yang didapat cuma layar berisi nama, bukan izin naik.
+  </div>
+  <div class="note w">
+    <b>Kedalaman pemeriksaan mengikuti ukuran pesanan</b>
+    <div style="margin-top:8px;display:grid;gap:5px;font-size:12.5px">
+      <div><b>≤ <span id="ambtxt1">10</span> orang</b> → dicentang <b>per nama</b>. Cuma 2–6 ketukan, dan di sini risiko QR disebar memang nyata: orang tidak saling kenal.</div>
+      <div><b>&gt; <span id="ambtxt2">10</span> orang</b> → dihitung <b>per kepala</b> + nama tour leader dicatat. Rombongan 40 ≈ 1 menit, bukan 3–4 menit.</div>
+    </div>
+    <div class="hint" style="margin-top:8px">Ambangnya diatur Super Admin di tab Dashboard → Pengaturan.</div>
+  </div>
+
+
+  <div class="card">
+    <div class="fld">
+      <label>Scan QR atau ketik kode manual</label>
+      <input id="scanin" placeholder="TTC-XXXXX" style="font-family:ui-monospace,Menlo,monospace;font-size:18px;letter-spacing:2px;text-transform:uppercase">
+      <div class="hint"><b>Cek per nama:</b> <span class="mono">TTC-2BF6C</span> (4 orang, 2 sudah naik) · <span class="mono">TTC-7K2M9</span> (2 orang, belum naik)<br>
+      <b>Mode hitung:</b> <span class="mono">TTC-BRO12</span> (40 orang, 0 naik) · <span class="mono">TTC-BRO07</span> (18 orang, 11 sudah naik)<br>
+      <b>Ditolak:</b> <span class="mono">TTC-9QQQ1</span> (belum lunas) · <span class="mono">TTC-XXXXX</span> (tidak ada)</div>
+    </div>
+    <div class="row">
+      <button class="btn" style="flex:2;min-width:150px" onclick="doScan()">Periksa Tiket</button>
+      <button class="btn ghost" style="flex:1;min-width:130px" onclick="ujiTanda()">🔊 Uji Suara</button>
+    </div>
+    <div class="hint" style="margin-top:9px">Tekan <b>Uji Suara</b> di awal shift. Selain memastikan suara terdengar, ketukan pertama itu juga yang membuka izin suara di browser.</div>
+  </div>
+  <div id="scanres"></div>
+
+  <div class="note">
+    <b>Tiga umpan balik, supaya tidak perlu melihat layar</b>
+    Scanner fisik berbunyi <b>sama</b> untuk semua kode yang berhasil dibaca — dia tidak tahu hasilnya. Jadi pembedanya datang dari halaman ini:
+    <div style="margin-top:8px;display:grid;gap:5px;font-size:12.5px">
+      <div>🟢 <b>Nada tinggi pendek</b> + kilat hijau + getar singkat → boleh naik</div>
+      <div>🟡 <b>Dua nada sedang</b> + kilat kuning → perlu perhatian (mis. semua orang sudah naik, atau minta konfirmasi entri massal)</div>
+      <div>🔴 <b>Nada rendah panjang</b> + kilat merah + getar tiga kali → ditolak</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:4px">
+      <h3 style="margin:0">Daftar Boarding</h3>
+      <div style="font-size:13px" id="bcount"></div>
+    </div>
+    <div class="bar" style="margin:8px 0 12px"><i id="bbar" style="width:0%"></i></div>
+    <div class="fld">
+      <input id="bcari" placeholder="Cari nama penumpang…" oninput="renderBoard()">
+      <div class="hint">Cari nama atau nomor pesanan kalau QR hilang, HP mati, atau pemindai gagal — tidak pernah jadi jalan buntu.</div>
+    </div>
+    <div id="bdaftar"></div>
+  </div>
+
+  <div class="note w">
+    <b>Kenapa daftar ini yang jadi alat utama, bukan QR-nya</b>
+    Selalu ada penumpang yang HP-nya mati, QR-nya hilang, atau lansia yang tidak pegang HP. Kalau QR jadi satu-satunya kunci, petugas terpaksa meloloskan tanpa catatan — dan manifest jadi tidak akurat. Di sini QR cuma jalan cepat menuju daftar; daftarnya sendiri selalu bisa dibuka lewat pencarian nama.
+  </div>
+  <div class="note d">
+    <b>Inilah yang menutup "gerbang bolong"</b>
+    Bukan QR-nya, tapi <b>hitungannya</b>. Nama yang sudah dicentang tidak bisa dicentang lagi, dan hitungan berhenti otomatis di jumlah yang dibayar. Petugas selalu melihat "2 dari 4 sudah naik", jadi tidak ada yang bisa menyelip — dan QR yang difoto lalu disebar tidak menambah satu pun kursi.
+  </div>
+</div>
+</div>
+
+<div class="foot">
+  Peragaan Tamperan Cruise · Blueprint v1.4 · Divisi Delta Proxy — PT Kahfi Indo Group<br>
+  Data karangan untuk keperluan diskusi. Bukan sistem produksi.
+</div>
+
+<script>
+const TODAY = new Date('2026-09-21T12:00:00');
+const PRODUCTS = {
+  'cruise-daily':{nm:'Cruise Daily',ds:'Pelabuhan Tamperan → Teluk Gelon. Pandangan laut, kapal nyaman.',tier:true,lokal:100000,umum:150000},
+  'cruise-promo':{nm:'Cruise PROMO',ds:'Harga sama untuk semua + voucher makan 50rb & menginap 25rb.',tier:false,harga:150000,voucher:true},
+  'journey-1d':{nm:'1 Day Pacitan Journey',ds:'Sunrise to Sunset. Wellness, cruise, destinasi, makan, oleh-oleh, sunset dinner.',tier:false,harga:490000},
+  'journey-2d':{nm:'2 Day Pacitan Journey',ds:'Sunset to Sunrise. Termasuk Pantai Klayar & menginap di Hotel Mitra.',tier:false,harga:780000}
+};
+const AGENTS = {
+  'BUDI2026':{nm:'Budi Santoso',tiket:22,omzet:9120000,tarif:10,komisi:912000,wa:'081311112222'},
+  'SARIPACITAN':{nm:'Sari Wulandari',tiket:19,omzet:8950000,tarif:5,komisi:447500,wa:'081333334444'},
+  'ANTO01':{nm:'Anto Prasetyo',tiket:7,omzet:2410000,tarif:5,komisi:120500,wa:'081355556666'}
+};
+/* tipe: 'perorangan' | 'biro'. QR selalu satu per pesanan; yang membedakan
+   kedalaman cek di gerbang adalah JUMLAH pax vs AMBANG_CEK, bukan tipe ini. */
+const O = (kode,nama,hp,produk,pax,dom,agen,total,st,tgl,fu,last,tipe,naikGrup)=>
+  ({kode,nama,hp,produk,pax,dom,agen,total,st,tgl,fu:fu||'belum',last:last||'',
+    tipe:tipe||'perorangan',naikGrup:naikGrup||0});
+const ORDERS = [
+  O('TTC-BRO12','Biro Wisata Anugerah Trans','081555667788','2 Day Journey',40,'Luar','BUDI2026',29640000,'paid','2026-09-24','belum','','biro',0),
+  O('TTC-BRO07','Biro Sekar Tanjung Tour','081744556611','1 Day Journey',18,'Luar','SARIPACITAN',8377200,'paid','2026-09-23','belum','','biro',11),
+  O('TTC-7K2M9','Merilla Indah','081234567890','Cruise PROMO',2,'Luar','BUDI2026',285000,'paid','2026-09-21'),
+  O('TTC-4H8LP','Sebastian Kevin','081298765432','2 Day Journey',2,'Luar','BUDI2026',1482000,'paid','2026-09-20'),
+  O('TTC-9QQQ1','Rani Puspita','085712349876','1 Day Journey',3,'Luar','SARIPACITAN',1396500,'waiting','2026-09-21'),
+  O('TTC-2BF6C','Hendra Wijaya','081577889900','Cruise Daily (Lokal)',4,'Pacitan','SARIPACITAN',380000,'boarded','2026-09-18'),
+  O('TTC-8MJ3D','Dewi Lestari','087811223344','2 Day Journey',2,'Luar','SARIPACITAN',1482000,'paid','2026-09-19'),
+  O('TTC-3XR8P','Agus Setiawan','081344556677','Cruise PROMO',2,'Pacitan','ANTO01',285000,'boarded','2026-09-21'),
+  O('TTC-5TW7K','Nur Aini','082199887766','1 Day Journey',2,'Luar','ANTO01',931000,'paid','2026-09-20'),
+  O('TTC-6YH2L','Bambang Sutrisno','081566778899','Cruise PROMO',3,'Luar','—',450000,'cancel_cuaca','2026-09-17'),
+  O('TTC-1PK4N','Siti Rahayu','085299112233','1 Day Journey',2,'Luar','—',980000,'paid','2026-09-19'),
+  O('TTC-0ZD5R','Joko Purnomo','081255443322','Cruise PROMO',2,'Pacitan','BUDI2026',285000,'pending','2026-09-16','dihubungi','18 Sep · Budi'),
+  O('TTC-7VN8S','Lina Marlina','087755668899','2 Day Journey',2,'Luar','BUDI2026',1482000,'paid','2026-09-20'),
+  O('TTC-4CG1T','Rizky Ananda','081399001122','Cruise Daily (Umum)',2,'Luar','—',300000,'cancel_pembeli','2026-09-15'),
+  O('TTC-2WQ7E','Fajar Nugroho','081722334455','1 Day Journey',2,'Luar','BUDI2026',931000,'expired','2026-09-08'),
+  O('TTC-8LP3M','Ayu Kartika','085822446688','Cruise PROMO',4,'Luar','SARIPACITAN',570000,'pending','2026-09-05'),
+  O('TTC-5AAA1','Wahyu Hidayat','081611223344','Cruise PROMO',2,'Luar','BUDI2026',285000,'boarded','2026-06-12'),
+  O('TTC-6BBB2','Endah Sulistyo','082755443311','1 Day Journey',2,'Luar','SARIPACITAN',931000,'boarded','2026-05-03'),
+  O('TTC-7CCC3','Panji Wicaksono','081899776655','2 Day Journey',2,'Luar','ANTO01',1482000,'boarded','2026-06-28')
+];
+const BYPROD = [['Cruise PROMO',26,3900000],['2 Day Journey',18,14040000],['1 Day Journey',12,5880000],['Cruise Daily',4,400000]];
+const STATUS = {
+  paid:['LUNAS','p-ok'], waiting:['MENUNGGU VERIFIKASI','p-warn'], pending:['BELUM BAYAR','p-mute'],
+  expired:['KEDALUWARSA','p-mute'], boarded:['SUDAH NAIK','p-sea'],
+  cancel_cuaca:['BATAL — CUACA','p-mute'], cancel_pembeli:['BATAL — PEMBELI','p-dang']
+};
+const FU = {belum:['BELUM DIHUBUNGI','p-warn'],dihubungi:['SUDAH DIHUBUNGI','p-sea'],tidak:['TIDAK TERTARIK','p-mute'],jadi:['JADI','p-ok']};
+const MFCOL = {
+  nama:  {label:'Nama lengkap',wajib:true,on:true},
+  gender:{label:'Jenis kelamin',wajib:true,on:true},
+  usia:  {label:'Usia',wajib:true,on:true},
+  nik:   {label:'NIK (16 digit)',wajib:false,on:true},
+  alamat:{label:'Alamat lengkap sesuai KTP',wajib:false,on:true},
+  wn:    {label:'Kewarganegaraan',wajib:false,on:false}
+};
+const AL1='Jl. Ahmad Yani No. 12, RT 03/RW 05, Kel. Sidoharjo, Kec. Pacitan, Kab. Pacitan, Jawa Timur';
+const AL2='Perum Griya Asri Blok C7, Kel. Ploso, Kec. Pacitan, Kab. Pacitan, Jawa Timur';
+const AL3='Jl. Diponegoro No. 88, Kel. Baleharjo, Kec. Pacitan, Kab. Pacitan, Jawa Timur';
+/* Satu baris = satu ORANG, dengan kode boarding sendiri (model KAI).
+   Kode order (TTC-7K2M9) bukan lagi kode boarding — hanya pengelompokan. */
+const PAX = [
+  {kode:'TTC-7K2M9-1',order:'TTC-7K2M9',nama:'Merilla Indah',  g:'P',u:28,nik:'3501210498000012',al:AL1,prov:'Jawa Timur',naik:false,jam:'',oleh:''},
+  {kode:'TTC-7K2M9-2',order:'TTC-7K2M9',nama:'Sebastian Kevin',g:'L',u:31,nik:'3501150795000034',al:AL1,prov:'Jawa Timur',naik:false,jam:'',oleh:''},
+  {kode:'TTC-4H8LP-1',order:'TTC-4H8LP',nama:'Bayu Prasetya',  g:'L',u:34,nik:'3501120392000158',al:AL3,prov:'Jawa Timur',naik:false,jam:'',oleh:''},
+  {kode:'TTC-4H8LP-2',order:'TTC-4H8LP',nama:'Anisa Rahma',    g:'P',u:29,nik:'3501246697000170',al:AL3,prov:'Jawa Timur',naik:false,jam:'',oleh:''},
+  {kode:'TTC-2BF6C-1',order:'TTC-2BF6C',nama:'Hendra Wijaya',  g:'L',u:45,nik:'3501030381000056',al:AL2,prov:'Jawa Timur',naik:true, jam:'05.08',oleh:'Petugas 1'},
+  {kode:'TTC-2BF6C-2',order:'TTC-2BF6C',nama:'Rina Wijaya',    g:'P',u:41,nik:'3501224585000078',al:AL2,prov:'Jawa Timur',naik:true, jam:'05.09',oleh:'Petugas 1'},
+  {kode:'TTC-2BF6C-3',order:'TTC-2BF6C',nama:'Bagas Wijaya',   g:'L',u:9, nik:'3501101117000090',al:AL2,prov:'Jawa Timur',naik:false,jam:'',oleh:''},
+  {kode:'TTC-2BF6C-4',order:'TTC-2BF6C',nama:'Kirana Wijaya',  g:'P',u:6, nik:'3501285520000102',al:AL2,prov:'Jawa Timur',naik:false,jam:'',oleh:''},
+  {kode:'TTC-3XR8P-1',order:'TTC-3XR8P',nama:'Agus Setiawan',  g:'L',u:37,nik:'3501070789000124',al:AL3,prov:'Jawa Timur',naik:true, jam:'05.12',oleh:'Petugas 1'},
+  {kode:'TTC-3XR8P-2',order:'TTC-3XR8P',nama:'Yuni Setiawan',  g:'P',u:35,nik:'3501194591000146',al:AL3,prov:'Jawa Timur',naik:true, jam:'05.12',oleh:'Petugas 1'}
+];
+const ordOf = k => ORDERS.find(o=>o.kode===k);
+
+/* ============ AMBANG KEDALAMAN PEMERIKSAAN ============
+   QR = kode PESANAN, satu per pesanan. Discan sekali, lalu:
+     pax <= ambang  → dicentang per nama   (bukti per orang)
+     pax >  ambang  → dihitung per kepala  (tanggung jawab tour leader)
+   Ambang bisa diubah Super Admin karena aturan manifest dari
+   syahbandar belum diketahui. Kalau nanti wajib nama per orang,
+   ambangnya dinaikkan — tanpa ubah kode. */
+let AMBANG_CEK = 10;
+const modeCek = o => (o && o.pax > AMBANG_CEK) ? 'hitung' : 'nama';
+/* Nama PIC / tour leader yang menyatakan jumlah rombongan cocok */
+const PIC_GRUP = {};
+/* ====== LEADERBOARD UNTUK AGEN ======
+   off       : agen tidak melihat leaderboard sama sekali
+   peringkat : nama + posisi; angka agen lain TIDAK ditampilkan
+   penuh     : omzet & komisi semua agen terlihat
+   Catatan jujur: perbandingan angka apa pun bocor lewat hitungan. Kalau agen
+   tahu angkanya sendiri DAN jaraknya ke peringkat atas, dia tahu angka orang
+   itu. Jadi tidak ada mode "setengah" — peringkat saja, atau terbuka. */
+let LB_AGEN = 'penuh';
+const LBL = {off:'tidak ada', peringkat:'peringkat saja', penuh:'angka terbuka'};
+function setLbAgen(v){
+  if(!LBL[v]) return;
+  const sel=document.getElementById('lbsel');
+  if(v===LB_AGEN){ if(sel) sel.value=v; return; }
+  const lama=LB_AGEN; LB_AGEN=v;
+  if(sel) sel.value=v;
+  AUDIT.unshift([nowStr(),'Super Admin','Leaderboard agen',`${LBL[lama]} → ${LBL[v]}`]);
+  renderDash();
+  toast(`Leaderboard untuk agen: <b>${LBL[lama]} → ${LBL[v]}</b>.`+
+    (v==='penuh'
+      ? `<br><br>Mulai sekarang <b>tiap agen melihat omzet dan komisi agen lain</b>. Data pelanggan tetap tertutup. Ini keputusan owner — bisa dikembalikan kapan saja.`
+      : v==='off'
+        ? `<br><br>Agen tidak melihat peringkat apa pun. Pemicu tersisa hanya progress tarifnya sendiri.`
+        : `<br><br>Agen melihat urutan dan namanya, tapi <b>angka agen lain disembunyikan</b>. Pemicunya diambil dari jarak ke ambang tarif, bukan dari penghasilan orang lain.`),11000);
+}
+function renderLbAgen(){
+  const box=document.getElementById('lbme'), card=document.getElementById('lbAgenCard');
+  if(!box) return;
+  if(LB_AGEN==='off'){ if(card) card.style.display='none'; box.innerHTML=''; return; }
+  if(card) card.style.display='';
+  const urut=Object.entries(AGENTS).sort((a,b)=>b[1].omzet-a[1].omzet);
+  const pos=urut.findIndex(([c])=>c===AGEN_LOGIN)+1;
+  const penuh=LB_AGEN==='penuh';
+  box.innerHTML = urut.map(([c,a],i)=>{
+    const saya = c===AGEN_LOGIN;
+    const buka = penuh || saya;
+    return `<div class="rank r${i+1}"${saya?' style="background:var(--sky);margin:0 -10px;padding-left:10px;padding-right:10px;border-radius:8px"':''}>
+      <div class="no">${i+1}</div>
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:14px">${a.nm}${saya?' <span class="pill p-sea">KAMU</span>':''}</div>
+        <div style="font-size:11.5px;color:var(--muted)">${buka?`${a.tiket} tiket &middot; tarif ${a.tarif}%`:'angka tidak ditampilkan'}</div>
+      </div>
+      ${buka
+        ? `<div class="num"><div style="font-weight:700">${rp(a.omzet)}</div>
+           <div style="font-size:11.5px;color:var(--muted)">komisi ${rp(a.komisi)}</div></div>`
+        : `<div class="num" style="color:var(--muted);font-size:13px">&mdash;</div>`}
+    </div>`;
+  }).join('') +
+  (penuh
+    ? `<div class="note" style="margin:13px 0 0;font-size:12.5px"><b>Kamu peringkat ${pos} dari ${urut.length}</b>Yang ditampilkan di sini hanya <b>angka penjualan</b>. Data pelanggan agen lain &mdash; nama, nomor HP, kode pesanan &mdash; tidak pernah muncul di halaman mana pun yang bisa kamu buka.</div>`
+    : `<div class="note w" style="margin:13px 0 0;font-size:12.5px"><b>Peringkat saja &mdash; angka agen lain tidak ditampilkan</b>Kamu peringkat <b>${pos} dari ${urut.length}</b>. Target yang bisa dikejar ada di <b>Progress Tier Komisi</b> di atas: itu ambang milik TTC, bukan penghasilan orang lain.</div>`);
+}
+function setAmbang(v){
+  const n0 = parseInt(v,10);
+  /* nilai tidak sah jangan diterjemahkan jadi angka lain diam-diam */
+  if(!Number.isFinite(n0) || n0 < 1){
+    const inp=document.getElementById('ambin'); if(inp) inp.value=AMBANG_CEK;
+    toast(`Ambang harus angka minimal <b>1</b>. Dikembalikan ke <b>${AMBANG_CEK}</b>.`,7000);
+    return;
+  }
+  const n = Math.min(200, n0);
+  if(n===AMBANG_CEK){ const inp=document.getElementById('ambin'); if(inp) inp.value=n; return; }
+  const lama=AMBANG_CEK; AMBANG_CEK=n;
+  const inp=document.getElementById('ambin'); if(inp) inp.value=n;
+  ['ambtxt1','ambtxt2','ambtxt3'].forEach(id=>{ const e=document.getElementById(id); if(e) e.textContent=n; });
+  AUDIT.unshift([nowStr(),'Super Admin','Ambang cek boarding',`${lama} → ${n} orang`]);
+  const pindah=ORDERS.filter(o=>(o.st==='paid'||o.st==='boarded') &&
+    ((o.pax>lama) !== (o.pax>n))).map(o=>`${o.kode} (${o.pax})`);
+  BULK_CONFIRM=null;
+  gambarScan(); renderBoard(); renderDash();
+  toast(`Ambang cek per nama: <b>${lama} → ${n} orang</b>.`+
+    (pindah.length?`<br><br>Berpindah mode: <b>${pindah.join(' · ')}</b>.`:'<br><br>Tidak ada pesanan yang berpindah mode.')+
+    `<br><br>Orang yang sudah tercatat naik tidak berubah — catatan cara pemeriksaannya (per nama / dihitung) tetap apa adanya di manifest.`,11000);
+}
+
+/* Daftar nama per pesanan. Baris rombongan biro dibuat saat pertama
+   dibutuhkan — POOL baru dideklarasikan di bawah, jadi tidak boleh
+   dipanggil sewaktu file dimuat. naikGrup dipakai HANYA sebagai nilai awal. */
+const PAX_SIAP = {};
+function paxList(kode){
+  const o = ordOf(kode); if(!o) return [];
+  let l = PAX.filter(p=>p.order===kode);
+  if(!l.length && !PAX_SIAP[kode] && o.pax>0){
+    PAX_SIAP[kode] = true;
+    const awal = Math.min(o.pax, o.naikGrup||0);
+    daftarNamaBiro(kode,o.pax).forEach((nm,i)=>{
+      const sudah = i < awal;
+      PAX.push({kode:`${kode}-${i+1}`,order:kode,nama:nm,g:(i%2?'P':'L'),u:21+((i*7)%45),
+        nik:'',al:'',prov:'—',naik:sudah,jam:sudah?'05.30':'',
+        oleh:sudah?'Petugas 1':'',cara:sudah?'hitung':''});
+    });
+    l = PAX.filter(p=>p.order===kode);
+  }
+  return l;
+}
+const paxOf  = k => paxList(k);
+const naikOf = k => paxList(k).filter(p=>p.naik).length;
+const sisaOf = k => paxList(k).filter(p=>!p.naik);
+
+let NIK_TAMPIL = false;
+const maskNik = n => NIK_TAMPIL ? n.replace(/(\d{4})(?=\d)/g,'$1 ') : n.slice(0,4)+' •••• •••• '+n.slice(-4);
+const potong = (t,n) => t.length>n ? t.slice(0,n)+'…' : t;
+const BERLAKU = '31 Oktober 2026';
+const AUDIT = [
+  ['19 Sep 14.22','Super Admin','Harga 2 Day Journey','780.000 → 780.000'],
+  ['18 Sep 09.10','Super Admin','Harga custom TTC-4H8LP','780.000 → 650.000'],
+  ['17 Sep 16.45','Super Admin','Ambang tier','25 → 20 tiket']
+];
+const rp = n => 'Rp'+n.toLocaleString('id-ID');
+const grossOf = o => o.agen==='—' ? o.total : Math.round(o.total/0.95);
+const hariLalu = t => Math.round((TODAY-new Date(t+'T12:00:00'))/86400000);
+function nowStr(){
+  const d=new Date(), b=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  const p=n=>String(n).padStart(2,'0');
+  return `${d.getDate()} ${b[d.getMonth()]} ${p(d.getHours())}.${p(d.getMinutes())}`;
+}
+function waBtn(hp,pesan,label){
+  const url=`https://wa.me/62${hp.replace(/\D/g,'').replace(/^0/,'')}?text=${encodeURIComponent(pesan)}`;
+  return `<a href="${url}" target="_blank" rel="noopener" class="btn wa sm" style="text-decoration:none;display:inline-block">${label||'Chat WA'}</a>`;
+}
+function fmtHp(hp){ return hp.replace(/^(\d{4})(\d{4})(\d+)$/,'$1-$2-$3'); }
+
+let toastT;
+function toast(html,ms){
+  let el=document.getElementById('toastbox');
+  if(!el){ el=document.createElement('div'); el.id='toastbox'; el.className='toast'; document.body.appendChild(el); }
+  el.innerHTML=html; el.style.display='';
+  clearTimeout(toastT); toastT=setTimeout(()=>{el.style.display='none'}, ms||6000);
+}
+
+/* ===== UMPAN BALIK SUARA · GETAR · KILAT LAYAR =====
+   Scanner fisik berbunyi sama untuk semua kode yang berhasil dibaca —
+   dia tidak tahu hasilnya. Jadi pembedanya harus datang dari halaman ini. */
+let AC=null;
+function bunyi(jenis){
+  try{
+    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+    if(AC.state==='suspended') AC.resume();
+    const t=AC.currentTime;
+    const pola = jenis==='ok'    ? [[988,0,0.10]]
+              : jenis==='tolak'  ? [[196,0,0.55]]
+              :                    [[494,0,0.13],[494,0.2,0.13]];
+    pola.forEach(([f,d,l])=>{
+      const o=AC.createOscillator(), g=AC.createGain();
+      o.type='square'; o.frequency.value=f;
+      g.gain.setValueAtTime(0.0001,t+d);
+      g.gain.exponentialRampToValueAtTime(0.3,t+d+0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+d+l);
+      o.connect(g); g.connect(AC.destination);
+      o.start(t+d); o.stop(t+d+l+0.03);
+    });
+  }catch(e){}
+}
+function getar(jenis){
+  try{
+    if(!navigator.vibrate) return;
+    navigator.vibrate(jenis==='ok' ? 70 : jenis==='tolak' ? [130,90,130,90,130] : [90,70,90]);
+  }catch(e){}
+}
+function kilat(jenis){
+  let el=document.getElementById('kilat');
+  if(!el){ el=document.createElement('div'); el.id='kilat'; document.body.appendChild(el); }
+  el.style.background = jenis==='ok' ? '#15803d' : jenis==='tolak' ? '#b91c1c' : '#b45309';
+  el.style.display='block';
+  requestAnimationFrame(()=>{ el.style.opacity='0.82'; });
+  setTimeout(()=>{ el.style.opacity='0'; }, jenis==='ok'?330:520);
+  setTimeout(()=>{ el.style.display='none'; }, 1000);
+}
+function tanda(jenis){ bunyi(jenis); getar(jenis); kilat(jenis); }
+function ujiTanda(){
+  tanda('ok');
+  setTimeout(()=>tanda('warn'),900);
+  setTimeout(()=>tanda('tolak'),1800);
+  toast('Menguji tiga umpan balik: <b>nada tinggi pendek</b> = boleh naik · <b>dua nada sedang</b> = perlu perhatian · <b>nada rendah panjang</b> = ditolak. Layar juga berkilat hijau/kuning/merah, dan HP bergetar. Uji ini di awal shift — sekaligus membuka izin suara di browser.',12000);
+}
+
+let S = {prod:'cruise-promo', tier:'umum', pay:null, role:null, tipe:'perorangan'};
+const AGEN_LOGIN = 'BUDI2026';
+
+function setTipe(t){
+  S.tipe=t;
+  document.getElementById('tp-perorangan').classList.toggle('on',t==='perorangan');
+  document.getElementById('tp-biro').classList.toggle('on',t==='biro');
+  const box=document.getElementById('tipeInfo');
+  box.innerHTML = t==='biro'
+    ? `<div class="note w" style="margin:14px 0 0">
+        <b>Satu QR, discan sekali, lalu dihitung per kepala</b>
+        Biro cukup memegang <b>satu QR</b> dan menunjukkannya sekali. Layar petugas terbuka berisi daftar peserta, lalu checker menghitung kepala di dermaga dan petugas menekan angkanya — "23 dari 40". Rombongan 40 orang sekitar 1 menit, bukan 3–4 menit mencocokkan huruf.
+      </div>
+      <div class="note" style="margin:10px 0 0;font-size:12.5px">
+        Data yang diminta: nama biro, PIC + nomor WA PIC, jumlah peserta, dan <b>daftar nama peserta (wajib)</b>. Nomor telepon peserta tidak diminta — cukup PIC.
+      </div>`
+    : `<div class="note" style="margin:14px 0 0;font-size:12.5px">
+        Tiap penumpang diminta data lengkap, tapi QR-nya <b>satu untuk pesanan ini</b>. Di gerbang petugas mencentang nama satu per satu — nama yang sudah dicentang tidak bisa dicentang lagi, jadi tidak ada yang bisa dipinjamkan di antrean.
+      </div>`;
+}
+
+function orderScope(){
+  return S.role==='agen' ? ORDERS.filter(o=>o.agen===AGEN_LOGIN) : ORDERS.slice();
+}
+
+function markPaid(kode){
+  const o=ORDERS.find(x=>x.kode===kode);
+  if(!o || o.st!=='waiting') return;
+  o.st='paid';
+  let msg=`<b>${kode}</b> ditandai LUNAS. Di sistem nyata: e-ticket terbit dan email konfirmasi terkirim otomatis saat ini.`;
+  const ag=AGENTS[o.agen];
+  if(ag){
+    const tL=ag.tarif, kL=ag.komisi;
+    ag.tiket+=o.pax; ag.omzet+=grossOf(o);
+    ag.tarif = ag.tiket>=20?10:5;
+    ag.komisi = Math.round(ag.omzet*ag.tarif/100);
+    msg += (tL!==ag.tarif)
+      ? `<br><br>⚠️ <b>${ag.nm}</b> sekarang ${ag.tiket} tiket — tembus ambang 20, tarif naik ${tL}% → ${ag.tarif}% <b>RETROAKTIF</b> ke seluruh penjualannya. Komisinya melompat ${rp(kL)} → <b>${rp(ag.komisi)}</b> (+${rp(ag.komisi-kL)}) hanya karena satu order ini ditandai lunas.`
+      : `<br><br>Komisi <b>${ag.nm}</b>: ${rp(kL)} → <b>${rp(ag.komisi)}</b> · ${ag.tiket} tiket, tarif ${ag.tarif}%`;
+  }
+  AUDIT.unshift([nowStr(),'Super Admin',`Status ${kode}`,'MENUNGGU → LUNAS']);
+  renderDash(); toast(msg,12000);
+}
+function setFu(kode,val){
+  if(!val) return;
+  const o=ORDERS.find(x=>x.kode===kode);
+  if(!o) return;
+  const siapa = S.role==='agen'?AGENTS[AGEN_LOGIN].nm:'Super Admin';
+  o.fu=val; o.last = nowStr()+' · '+siapa;
+  AUDIT.unshift([nowStr(),siapa,`Follow-up ${kode}`,FU[val][0]]);
+  renderDash();
+  toast(`<b>${kode}</b> ditandai <b>${FU[val][0]}</b> oleh ${siapa}. Tercatat supaya tidak ada lead yang dihubungi dua kali atau terlewat sama sekali.`,9000);
+}
+
+function showTab(t,btn){
+  ['lp','db','sc'].forEach(x=>document.getElementById('tab-'+x).classList.toggle('hide',x!==t));
+  document.querySelectorAll('.tabbtn').forEach(b=>b.classList.remove('on'));
+  if(btn) btn.classList.add('on');
+  window.scrollTo(0,0);
+}
+
+function renderProducts(){
+  document.getElementById('prodgrid').innerHTML = Object.entries(PRODUCTS).map(([k,p])=>{
+    const price = p.tier ? `${rp(p.lokal)} <small>/ ${rp(p.umum)}</small>` : `${rp(p.harga)} <small>/pax</small>`;
+    const badge = p.tier ? '<span class="pill p-sea" style="margin-bottom:8px">2 TARIF</span>'
+                : p.voucher ? '<span class="pill p-warn" style="margin-bottom:8px">+ VOUCHER 75RB</span>'
+                : '<span class="pill p-mute" style="margin-bottom:8px">HARGA FLAT</span>';
+    return `<div class="prod" onclick="pickProd('${k}')">${badge}
+      <div class="nm">${p.nm}</div><div class="ds">${p.ds}</div><div class="pr">${price}</div></div>`;
+  }).join('');
+}
+function pickProd(k){ S.prod=k; S.tier = PRODUCTS[k].tier ? 'umum' : null; goStep(2); }
+function goStep(n){
+  [1,2,3,4,5].forEach(i=>document.getElementById('lp'+i).classList.toggle('hide',i!==n));
+  const st=document.getElementById('steps').children;
+  for(let i=0;i<5;i++){ st[i].className = (i+1===n)?'on':((i+1<n)?'done':''); }
+  const p=PRODUCTS[S.prod];
+  if(n===2){
+    document.getElementById('p2name').textContent=p.nm;
+    document.getElementById('p2desc').textContent=p.ds;
+    document.getElementById('tierCard').style.display = p.tier?'':'none';
+    document.getElementById('voucherCard').style.display = p.voucher?'':'none';
+    renderQty();
+  }
+  if(n===3){ renderPax(); checkRef(); calc(); }
+  if(n===4){ setPay(S.pay||'qris'); }
+  if(n===5){ renderTicket(); }
+  window.scrollTo(0,0);
+}
+function setTier(t){
+  S.tier=t;
+  document.getElementById('tl-lokal').classList.toggle('on',t==='lokal');
+  document.getElementById('tl-umum').classList.toggle('on',t==='umum');
+  calc();
+}
+/* Jumlah penumpang: dropdown untuk perorangan, isi bebas untuk biro */
+function renderQty(){
+  const box=document.getElementById('qtybox'); if(!box) return;
+  const lama=+(document.getElementById('qty')?.value||0);
+  if(S.tipe==='biro'){
+    const n = lama>=10 ? lama : 40;
+    box.innerHTML = `<label>Jumlah peserta rombongan</label>
+      <input id="qty" type="number" min="2" max="200" step="1" value="${n}" inputmode="numeric"
+        style="font-size:19px;font-weight:700" oninput="qtyUbah()">
+      <div class="hint" id="qtyhint"></div>`;
+  } else {
+    const n = (lama>=1 && lama<=10) ? lama : 2;
+    box.innerHTML = `<label>Jumlah penumpang</label>
+      <select id="qty" onchange="qtyUbah()">${
+        [1,2,3,4,5,6,7,8,9,10].map(i=>`<option ${i===n?'selected':''}>${i}</option>`).join('')
+      }</select>
+      <div class="hint" id="qtyhint">Rombongan lebih dari 10 orang? Pilih <b>Biro / Agen Wisata</b> di langkah sebelumnya — jumlahnya bisa diisi bebas.</div>`;
+  }
+  qtyUbah();
+}
+function qtyUbah(){
+  const el=document.getElementById('qty');
+  if(el && el.type==='number'){
+    let v=parseInt(el.value||'0',10);
+    const h=document.getElementById('qtyhint');
+    if(h) h.innerHTML = (!v||v<2)
+      ? `<span style="color:var(--warn)">Minimal 2 orang untuk pemesanan biro.</span>`
+      : `<b>${v} peserta</b> · ⬜ kapasitas izin kapal belum diketahui — nanti angka ini dibatasi otomatis supaya tidak melebihi izin.`;
+  }
+  calc();
+  if(document.getElementById('bnama')) hitungNama();
+}
+function unitPrice(){ const p=PRODUCTS[S.prod]; return p.tier ? p[S.tier] : p.harga; }
+function refAgent(){
+  const v=(document.getElementById('f-ref')?.value||'').trim().toUpperCase();
+  return AGENTS[v] ? {code:v,...AGENTS[v]} : null;
+}
+function totals(){
+  const q=Math.max(1, parseInt(document.getElementById('qty')?.value||'2',10)||1);
+  const pd=+(document.getElementById('padd')?.value||0);
+  const sub = unitPrice()*q + pd*150000;
+  const ag = refAgent();
+  const disc = ag ? Math.round(sub*0.05) : 0;
+  return {q,pd,sub,disc,total:sub-disc,ag};
+}
+function calc(){
+  const t=totals(), p=PRODUCTS[S.prod];
+  const tierTxt = p.tier ? ` (${S.tier==='lokal'?'Warga Pacitan':'Umum'})` : '';
+  let h = `<div class="sumline"><span>${p.nm}${tierTxt} × ${t.q}</span><span class="num">${rp(unitPrice()*t.q)}</span></div>`;
+  if(t.pd) h += `<div class="sumline"><span>Paddleboard + Instruktur × ${t.pd}</span><span class="num">${rp(t.pd*150000)}</span></div>`;
+  if(t.disc) h += `<div class="sumline"><span>Diskon referral 5% <span class="pill p-ok">${t.ag.code}</span></span><span class="num neg">−${rp(t.disc)}</span></div>`;
+  h += `<div class="sumline tot"><span>Total</span><span class="num">${rp(t.total)}</span></div>`;
+  if(t.ag) h += `<div class="hint" style="margin-top:8px">Komisi untuk ${t.ag.nm}: ${rp(Math.round(t.sub*t.ag.tarif/100))} (tarif ${t.ag.tarif}% — ⬜ terbuka: dihitung dari ${rp(t.sub)} atau ${rp(t.total)}?)</div>`;
+  if(p.voucher) h += `<div class="hint">+ voucher makan 50rb & menginap 25rb per pemesanan</div>`;
+  const box=document.getElementById('sumbox'); if(box) box.innerHTML=h;
+}
+function checkRef(){
+  const raw=document.getElementById('f-ref').value.trim();
+  const m=document.getElementById('refmsg');
+  if(!raw){ m.innerHTML='<div class="hint">Tidak pakai kode? Pesanan masuk kategori <b>Tanpa Agen / Langsung</b>.</div>'; calc(); return; }
+  const ag=refAgent();
+  m.innerHTML = ag ? `<div class="refok">✓ Agen: ${ag.nm}</div>`
+                   : `<div class="refbad">Kode tidak ditemukan — cek lagi dengan agen Anda.</div>`;
+  calc();
+}
+/* ===== DAFTAR NAMA PESERTA BIRO — wajib, dihitung per baris ===== */
+const POOL = ['Hartono Wibowo','Sri Mulyani','Bagus Pratama','Retno Wulandari','Slamet Riyadi',
+ 'Dewi Anggraeni','Suryono Hadi','Lastri Handayani','Bambang Irawan','Nur Hidayah',
+ 'Joko Susilo','Tuti Herawati','Gunawan Saputra','Endang Purwanti','Agus Salim',
+ 'Winarti Ningsih','Darmaji Kusuma','Sulastri Dewi','Priyo Nugroho','Maryam Zahra'];
+const namaContoh = n => Array.from({length:n},(_,i)=>POOL[i%POOL.length]).join('\n');
+function daftarNamaBiro(kode,n){
+  let seed=[...kode].reduce((a,c)=>a+c.charCodeAt(0),0);
+  return Array.from({length:n},(_,i)=>POOL[(seed+i*7)%POOL.length]+(i>=POOL.length?' '+(Math.floor(i/POOL.length)+1):''));
+}
+function hitungNama(){
+  const ta=document.getElementById('bnama'), el=document.getElementById('bhit');
+  if(!ta||!el) return;
+  const baris=ta.value.split('\n').map(x=>x.trim()).filter(Boolean).length;
+  const target=totals().q;
+  el.innerHTML = baris===target
+    ? `<span style="color:var(--ok);font-weight:600">✓ ${baris} dari ${target} nama terisi — cocok.</span>`
+    : baris<target
+      ? `<span style="color:var(--warn);font-weight:600">${baris} dari ${target} nama terisi — kurang ${target-baris} lagi.</span> Satu nama per baris.`
+      : `<span style="color:var(--danger);font-weight:600">${baris} nama, tapi jumlah peserta ${target} — kelebihan ${baris-target}.</span> Perbaiki salah satunya.`;
+}
+
+function renderPax(){
+  const t=totals();
+  if(S.tipe==='biro'){
+    document.getElementById('paxlist').innerHTML = `
+      <div class="row">
+        <div class="fld" style="flex:2;min-width:180px"><label>Nama biro / agen wisata</label><input value="Biro Wisata Anugerah Trans"></div>
+        <div class="fld" style="flex:1;min-width:120px"><label>Jumlah peserta</label><input value="${t.q}" inputmode="numeric"></div>
+      </div>
+      <div class="row">
+        <div class="fld" style="flex:2;min-width:180px"><label>Nama PIC / pemimpin rombongan</label><input value="Pak Hartono"></div>
+        <div class="fld" style="flex:1;min-width:150px"><label>Nomor WhatsApp PIC</label><input value="0815 5566 7788"></div>
+      </div>
+      <div class="fld">
+        <label>Daftar nama peserta <span style="color:var(--danger)">· wajib</span></label>
+        <textarea id="bnama" rows="7" oninput="hitungNama()" placeholder="Satu nama per baris">${namaContoh(Math.min(t.q,12))}</textarea>
+        <div class="hint" id="bhit"></div>
+      </div>
+      <div class="note" style="margin:4px 0 0">
+        <b>Cukup nama, tidak perlu nomor telepon peserta</b>
+        Nama dibutuhkan untuk manifest syahbandar dan supaya jelas siapa yang ada di kapal kalau terjadi sesuatu. Nomor telepon cukup PIC — TTC tidak akan menghubungi peserta satu per satu, dan daftar kontak peserta itu milik biro.
+      </div>
+      <div class="note w" style="margin:10px 0 0;font-size:12.5px">
+        <b>Biro hampir selalu sudah punya daftar ini</b>
+        Nama peserta sudah mereka kumpulkan untuk menjual trip-nya — tinggal ditempel ke sini. Jadi mewajibkan nama tidak menambah pekerjaan biro, cuma memindahkan yang sudah ada.
+      </div>`;
+    hitungNama();
+    return;
+  }
+  const nm=['Merilla Indah','Sebastian Kevin'], us=['28','31'], gd=['P','L'];
+  const nik=['3501210498000012','3501150795000034'];
+  let h='';
+  for(let i=1;i<=t.q;i++){
+    h += `<div class="paxcard"><div class="ph">PENUMPANG ${i}${i===1?' <span style="color:var(--muted);font-weight:400">· biasanya pemesan sendiri</span>':''}</div>`;
+    if(i===1) h+=`<button class="btn ghost sm" style="margin-bottom:11px" onclick="salinPemesan()">⤵ Sama dengan pemesan</button>`;
+    h += `<div class="row">
+      <div class="fld" style="flex:2;min-width:150px;margin:0"><label>Nama lengkap</label><input id="px-nama-${i}" value="${nm[i-1]||''}" placeholder="Sesuai identitas"></div>
+      <div class="fld" style="flex:1;min-width:95px;margin:0"><label>Jenis kelamin</label>
+        <select><option ${gd[i-1]==='L'?'selected':''}>Laki-laki</option><option ${gd[i-1]==='P'?'selected':''}>Perempuan</option></select></div>
+      <div class="fld" style="flex:1;min-width:80px;margin:0"><label>Usia</label><input value="${us[i-1]||''}" placeholder="—"></div>`;
+    if(MFCOL.nik.on) h+=`<div class="fld" style="flex:2;min-width:160px;margin:0"><label>NIK (16 digit)</label><input id="px-nik-${i}" value="${nik[i-1]||''}" maxlength="16" inputmode="numeric" placeholder="16 angka"></div>`;
+    if(MFCOL.wn.on) h+=`<div class="fld" style="flex:1;min-width:120px;margin:0"><label>Kewarganegaraan</label><select><option>Indonesia</option><option>Asing</option></select></div>`;
+    h += `</div>`;
+    if(MFCOL.alamat.on){
+      h += `<div class="fld" style="margin:11px 0 0"><label>Alamat lengkap sesuai KTP</label>
+        <input id="px-al-${i}" value="${i===1?AL1:''}" placeholder="Jalan, RT/RW, Kelurahan, Kecamatan, Kabupaten, Provinsi"></div>`;
+      if(i>1) h += `<button class="btn ghost sm" style="margin-top:9px" onclick="salinAlamat(${i})">⤵ Salin alamat dari Penumpang 1</button>`;
+    }
+    h += `</div>`;
+  }
+  const off=Object.entries(MFCOL).filter(([k,v])=>!v.wajib&&!v.on).map(([k,v])=>v.label);
+  if(off.length) h+=`<div class="hint">Kolom yang sedang dimatikan dari Pengaturan: <b>${off.join(' · ')}</b>.</div>`;
+  if(MFCOL.nik.on||MFCOL.alamat.on){
+    const n=t.q*((MFCOL.nik.on?1:0)+(MFCOL.alamat.on?1:0))+t.q*3;
+    h+=`<div class="hint" style="margin-top:9px">Form ini sekarang <b>${n} kolom</b> untuk ${t.q} penumpang. Tombol salin di atas ada supaya rombongan satu keluarga tidak mengetik alamat berulang — ini yang paling menentukan orang selesai memesan atau berhenti di tengah.</div>`;
+  }
+  document.getElementById('paxlist').innerHTML=h;
+}
+function salinPemesan(){
+  const g=id=>document.getElementById(id);
+  if(g('px-nama-1')) g('px-nama-1').value = g('f-nama')?.value||'';
+  if(g('px-nik-1'))  g('px-nik-1').value  = g('f-nik')?.value||'';
+  if(g('px-al-1'))   g('px-al-1').value   = g('f-alamat')?.value||'';
+  toast('Data pemesan disalin ke Penumpang 1. Di sistem nyata ini mengurangi pengetikan hampir separuh untuk pemesanan perorangan.',7000);
+}
+function salinAlamat(i){
+  const s=document.getElementById('px-al-1'), d=document.getElementById('px-al-'+i);
+  if(s&&d){ d.value=s.value; toast(`Alamat Penumpang 1 disalin ke Penumpang ${i}.`,5000); }
+}
+function setPay(k){
+  S.pay=k;
+  ['qris','va','static'].forEach(x=>{
+    const el=document.getElementById('pay-'+x);
+    el.style.borderColor = x===k?'var(--sea)':'var(--line)';
+    el.style.background = x===k?'var(--sky)':'#fff';
+  });
+  const t=totals(); let h='';
+  if(k==='qris'){
+    h=`<div class="card"><h3>QRIS Dinamis</h3><div style="text-align:center">${fakeQR(150)}
+      <div style="font-size:22px;font-weight:700;margin:10px 0 3px">${rp(t.total)}</div>
+      <div style="font-size:12.5px;color:var(--muted)">Nominal sudah terisi di QR — tidak bisa salah bayar</div></div>
+      <div class="note" style="margin:16px 0 0"><b>Otomatis</b>Begitu dibayar, notifikasi masuk ke server dalam hitungan detik, status jadi LUNAS, e-ticket terbit sendiri.</div>
+      <button class="btn" style="width:100%;margin-top:14px" onclick="goStep(5)">Simulasikan pembayaran berhasil →</button></div>`;
+  }
+  if(k==='va'){
+    h=`<div class="card"><h3>Virtual Account</h3>
+      <div class="card tight" style="background:var(--sky);border-color:#bfdcea;text-align:center;margin-bottom:14px">
+        <div style="font-size:11.5px;color:var(--sea);font-weight:700;letter-spacing:1px">BCA VIRTUAL ACCOUNT</div>
+        <div class="mono" style="font-size:24px;font-weight:700;letter-spacing:2px;margin:6px 0">8808 1274 5590</div>
+        <div style="font-size:13px;color:var(--muted)">a/n THE TAMPERAN CRUISE</div></div>
+      <div class="sumline tot" style="border:0;margin:0"><span>Jumlah transfer</span><span class="num">${rp(t.total)}</span></div>
+      <div class="note" style="margin:14px 0 0"><b>Nominal bulat, tanpa kode unik</b>Nomor VA-nya sendiri sudah jadi identitas pesanan. VA kedaluwarsa 2 jam, lewat itu kursi dilepas otomatis.</div>
+      <button class="btn" style="width:100%;margin-top:14px" onclick="goStep(5)">Simulasikan pembayaran berhasil →</button></div>`;
+  }
+  if(k==='static'){
+    const uniq=t.total+347;
+    h=`<div class="card"><h3>QRIS Statis — Manual</h3><div style="text-align:center">${fakeQR(140)}
+      <div style="font-size:12px;color:var(--muted);margin-top:8px">QR yang sama untuk semua pesanan</div>
+      <div style="font-size:22px;font-weight:700;margin:10px 0 3px;color:var(--orange)">${rp(uniq)}</div>
+      <div style="font-size:12.5px;color:var(--warn);font-weight:600">Transfer PERSIS sampai 3 angka terakhir</div></div>
+      <div class="note w" style="margin:16px 0 0"><b>Kenapa nominalnya ganjil</b>QRIS statis tidak punya notifikasi. Tiga digit unik di belakang (${rp(t.total)} → ${rp(uniq)}) supaya admin bisa mencocokkan mutasi.</div>
+      <div class="card tight" style="margin:14px 0 0">
+        <label>Upload bukti transfer <span style="font-weight:400;color:var(--muted)">(opsional)</span></label>
+        <div style="border:1.5px dashed var(--line);border-radius:9px;padding:20px;text-align:center;color:var(--muted);font-size:13px">📷 Pilih foto dari galeri<br><span style="font-size:11.5px">Otomatis dikompres di HP ke ~200 KB sebelum dikirim</span></div>
+      </div>
+      <div class="note d" style="margin:14px 0 0"><b>Konsekuensi jalur manual</b>Konsumen menunggu sampai Super Admin memeriksa mutasi. E-ticket tidak terbit otomatis.</div>
+      <button class="btn navy" style="width:100%;margin-top:14px" onclick="goStep(5)">Simulasikan sudah diverifikasi admin →</button></div>`;
+  }
+  document.getElementById('paydetail').innerHTML=h;
+}
+function fakeQR(size){
+  let cells='',n=21,c=size/n,seed=7;
+  for(let y=0;y<n;y++)for(let x=0;x<n;x++){
+    seed=(seed*1103515245+12345)&0x7fffffff;
+    const fin=(x<7&&y<7)||(x>13&&y<7)||(x<7&&y>13);
+    const on = fin ? ((x%6===0||y%6===0)||(x>1&&x<5&&y>1&&y<5)||(x>15&&x<19&&y>1&&y<5)||(x>1&&x<5&&y>15&&y<19)) : (seed%100<48);
+    if(on) cells+=`<rect x="${x*c}" y="${y*c}" width="${c}" height="${c}" fill="#0f2557"/>`;
+  }
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="display:block;margin:0 auto">${cells}</svg>`;
+}
+function renderTicket(){
+  const t=totals(), p=PRODUCTS[S.prod];
+  const tierTxt = p.tier ? ` (${S.tier==='lokal'?'Warga Pacitan':'Umum'})` : '';
+  document.getElementById('r-prod').textContent = p.nm+tierTxt;
+  document.getElementById('r-qty').textContent = t.q+' orang'+(t.pd?` + ${t.pd} paddleboard`:'');
+  document.getElementById('r-agen').innerHTML = t.ag ? `${t.ag.nm} <span class="pill p-ok">${t.ag.code}</span>` : '<span class="pill p-mute">TANPA AGEN</span>';
+  document.getElementById('r-total').innerHTML = '<b>'+rp(t.total)+'</b>';
+  document.getElementById('ktpwarn').style.display = (p.tier && S.tier==='lokal') ? '' : 'none';
+  const names=['Merilla Indah','Sebastian Kevin'];
+  const nm=i=>names[i]||'Penumpang '+(i+1);
+  let tk='';
+  /* ---- SATU QR PER PESANAN, apa pun tipenya ---- */
+  const biroT = S.tipe==='biro';
+  const modeT = t.q > AMBANG_CEK ? 'hitung' : 'nama';
+  const kodeT = biroT ? 'TTC-BRO12' : 'TTC-7K2M9';
+  document.getElementById('ktpwarn').style.display = (!biroT && p.tier && S.tier==='lokal') ? '' : 'none';
+  tk=`<div class="ticket" style="border-color:var(--sea);background:linear-gradient(#f7fbfd,#eef6fa)">
+    <div style="font-size:11px;letter-spacing:1px;color:var(--sea);font-weight:700;margin-bottom:6px">${biroT?'TIKET ROMBONGAN':'TIKET PESANAN'}</div>
+    <div style="font-size:19px;font-weight:700;margin-bottom:2px">${biroT?'Biro Wisata Anugerah Trans':nm(0)}</div>
+    <div style="font-size:14px;color:var(--muted);margin-bottom:12px">${biroT?'PIC Pak Hartono &middot; ':''}<b style="color:var(--navy)">${t.q} ${biroT?'peserta':'penumpang'}</b></div>
+    <div class="qr">${fakeQR(150)}</div>
+    <div class="tcode">${kodeT}</div>
+    <div style="font-size:12.5px;color:var(--muted);max-width:370px;margin:0 auto">
+      <b>Satu QR untuk seluruh pesanan.</b> Cukup ditunjukkan <b>sekali</b> di gerbang, oleh siapa pun yang memegangnya &mdash; tidak perlu tiap orang membuka HP sendiri. Kodenya tetap bisa diketik petugas kalau pemindainya gagal membaca.
+    </div>
+    <div style="margin-top:14px;padding:11px;background:var(--sky);border-radius:8px;font-size:12.5px;color:var(--sea);font-weight:600">
+      ${modeT==='nama'
+        ? `Di gerbang petugas mencentang ${t.q} nama sambil kalian lewat &mdash; sekitar ${t.q*2} detik.`
+        : `Karena ${t.q} peserta, petugas menghitung kepala di dermaga alih-alih mencentang ${t.q} nama satu per satu. ${biroT?'PIC':'Ketua rombongan'} wajib mendampingi dan memastikan hitungannya cocok.`}
+    </div>
+  </div>`;
+  if(!biroT && p.voucher){
+    const slip = (nm,nilai,kode,tempat)=>`<div style="flex:1;min-width:158px;border:2px dashed var(--gold);border-radius:9px;padding:13px;background:#fff">
+      <div style="font-size:12.5px;font-weight:700">${nm}</div>
+      <div style="font-size:20px;font-weight:700;color:var(--navy)">${nilai}</div>
+      <div class="mono" style="font-size:12px;font-weight:700;margin-top:5px">${kode}</div>
+      <div style="font-size:11px;color:var(--muted)">${tempat}</div>
+      <div style="margin-top:10px;padding:9px 6px;border:1px solid #e6dcc0;border-radius:6px;font-size:10px;letter-spacing:.5px;color:#b9a570;text-align:center">RUANG STEMPEL KASIR</div>
+    </div>`;
+    tk+=`<div class="ticket" style="margin-top:12px;border-color:var(--gold);background:linear-gradient(#fffdf7,#fdf6e8)">
+      <div style="font-size:11px;letter-spacing:1px;color:var(--gold);font-weight:700;margin-bottom:9px">BONUS PAKET PROMO &mdash; VOUCHER KERTAS</div>
+      <div class="row" style="justify-content:center;gap:14px">
+        ${slip('Voucher Makan','Rp50.000','TTC-MKN-0042','Ikan Bakar Janenake')}
+        ${slip('Voucher Menginap','Rp25.000','TTC-HTL-0043','Hotel Mitra The Tamperan')}
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:12px;max-width:400px;margin-left:auto;margin-right:auto">
+        Voucher diambil <b>dalam bentuk kertas</b> di loket Tamperan Cruise, lalu <b>distempel atau disobek kasir</b> saat dipakai &mdash; seperti tiket bioskop. Tidak discan. Berlaku sampai ${BERLAKU}.
+      </div>
+    </div>`;
+  }
+  document.getElementById('tickets').innerHTML=tk;
+  if(modeT==='hitung'){
+    document.getElementById('paxfinal').innerHTML =
+      `<div class="card tight" style="margin:0;background:#fafcfe">
+        <div style="font-size:19px;font-weight:700">0 dari ${t.q} ${biroT?'peserta':'penumpang'} sudah naik</div>
+        <div class="bar"><i style="width:0%"></i></div>
+        <div style="font-size:12.5px;color:var(--muted)">Terisi otomatis saat petugas menghitung di gerbang. ${biroT?'PIC':'Ketua rombongan'} bisa memantau dari halaman ini.</div>
+        <div class="hint" style="margin-top:9px">Daftar nama tetap terlampir di manifest TTC untuk keperluan keselamatan &mdash; hanya tidak dicentang satu per satu di gerbang.</div>
+      </div>`;
+  } else {
+    let h='<table>';
+    for(let i=0;i<t.q;i++) h+=`<tr><td>${i+1}. ${nm(i)}</td><td class="num"><span class="pill p-mute">BELUM NAIK</span></td></tr>`;
+    document.getElementById('paxfinal').innerHTML=h+'</table>';
+  }
+}
+
+const MENUS = {
+  super:[['d-ring','Ringkasan'],['d-order','Pesanan'],['d-fu','Follow-Up'],['d-manifest','Manifest'],['d-agen','Agen & Kode'],['d-set','Pengaturan']],
+  owner:[['d-ring','Ringkasan'],['d-order','Pesanan'],['d-fu','Follow-Up'],['d-manifest','Manifest'],['d-agen','Agen & Kode'],['d-set','Pengaturan']],
+  agen: [['d-komisi','Komisi & Pelanggan Saya'],['d-fu','Follow-Up Saya']]
+};
+const PANELS = ['d-ring','d-order','d-fu','d-manifest','d-agen','d-komisi','d-set'];
+function login(r){
+  S.role=r;
+  document.getElementById('dblogin').classList.add('hide');
+  document.getElementById('dbapp').classList.remove('hide');
+  const titles={
+    super:['Dashboard Super Admin','Semua akses — semua agen, semua pelanggan, bisa mengubah harga & komisi'],
+    owner:['Dashboard Owner','Lihat semua data · tombol edit dimatikan sesuai aturan role'],
+    agen:['Dashboard Agen — Budi Santoso','Kode BUDI2026 · hanya pelanggan dan komisi sendiri']};
+  document.getElementById('dbtitle').textContent=titles[r][0];
+  document.getElementById('dbrole').textContent=titles[r][1];
+  document.getElementById('dsub').innerHTML = MENUS[r].map((m,i)=>
+    `<button class="${i===0?'on':''}" onclick="dsub('${m[0]}',this)">${m[1]}</button>`).join('');
+  PANELS.forEach(x=>document.getElementById(x).classList.add('hide'));
+  document.getElementById(MENUS[r][0][0]).classList.remove('hide');
+  renderDash(); window.scrollTo(0,0);
+}
+function logout(){ S.role=null; document.getElementById('dbapp').classList.add('hide'); document.getElementById('dblogin').classList.remove('hide'); }
+function dsub(id,btn){
+  PANELS.forEach(x=>document.getElementById(x).classList.add('hide'));
+  document.getElementById(id).classList.remove('hide');
+  document.querySelectorAll('#dsub button').forEach(b=>b.classList.remove('on'));
+  btn.classList.on; btn.classList.add('on'); window.scrollTo(0,0);
+}
+
+function renderDash(){
+  const ro = S.role==='owner', isAgen = S.role==='agen';
+  const scope = orderScope();
+  const katA = scope.filter(o=>o.st==='pending'||o.st==='expired');
+  const katB = scope.filter(o=>o.st==='paid');
+  const katC = scope.filter(o=>o.st==='boarded' && hariLalu(o.tgl)>60);
+  const totFu = katA.length+katB.length+katC.length;
+
+  if(!isAgen){
+    const totKom=Object.values(AGENTS).reduce((s,a)=>s+a.komisi,0);
+    document.getElementById('kpi-komisi').textContent=rp(totKom);
+    document.getElementById('kpi-wait').textContent=ORDERS.filter(o=>o.st==='waiting').length;
+    document.getElementById('kpi-fu').textContent=totFu;
+
+    const B=AGENTS['BUDI2026'], R=AGENTS['SARIPACITAN'];
+    const dOm=(Math.abs(B.omzet-R.omzet)/Math.max(B.omzet,R.omzet)*100).toFixed(1);
+    const dKo=(Math.abs(B.komisi-R.komisi)/Math.min(B.komisi,R.komisi)*100).toFixed(0);
+    document.getElementById('findbox').innerHTML =
+      `<b>⚠️ Temuan dari data ini — tier berbasis jumlah tiket</b>
+       Budi ${rp(B.omzet)} (${B.tiket} tiket, tarif ${B.tarif}%) vs Sari ${rp(R.omzet)} (${R.tiket} tiket, tarif ${R.tarif}%).
+       Selisih omzet <b>${dOm}%</b>, selisih komisi <b>${dKo}%</b>. ` +
+      (B.tarif!==R.tarif
+        ? `Omzet nyaris sama tapi komisi beda jauh, karena satu tembus ambang 20 tiket dan satu tidak. Leaderboard mengukur rupiah, tier mengukur jumlah tiket — dua ukuran yang bertentangan.`
+        : `Sekarang tarif keduanya sama, jadi selisih komisinya proporsional dengan omzet. Inilah yang terjadi kalau tier dihitung dari omzet rupiah.`);
+
+    document.getElementById('lb').innerHTML = Object.entries(AGENTS)
+      .sort((a,b)=>b[1].omzet-a[1].omzet).map(([c,a],i)=>
+        `<div class="rank r${i+1}"><div class="no">${i+1}</div>
+         <div style="flex:1"><div style="font-weight:600;font-size:14px">${a.nm}</div>
+         <div style="font-size:11.5px;color:var(--muted)">${a.tiket} tiket · tarif ${a.tarif}%</div></div>
+         <div class="num"><div style="font-weight:700">${rp(a.omzet)}</div>
+         <div style="font-size:11.5px;color:var(--muted)">komisi ${rp(a.komisi)}</div></div></div>`).join('');
+
+    document.getElementById('byprod').innerHTML = '<table>'+BYPROD.map(([n,q,o])=>
+      `<tr><td>${n}</td><td class="num" style="color:var(--muted)">${q} tiket</td><td class="num"><b>${rp(o)}</b></td></tr>`).join('')+'</table>';
+
+    document.getElementById('audittbl').innerHTML = AUDIT.map(r=>
+      `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td class="num">${r[3]}</td></tr>`).join('');
+
+    document.getElementById('ordtbl').innerHTML =
+      `<tr><th>Kode</th><th>Pembeli</th><th>WhatsApp</th><th>Produk</th><th class="num">Pax</th><th>Agen</th><th class="num">Total</th><th>Status</th><th></th></tr>`+
+      scope.map(o=>{
+        const st=STATUS[o.st];
+        const act = o.st==='waiting'
+          ? (ro?'<span class="pill p-mute">tidak bisa edit</span>':`<button class="btn sm" onclick="markPaid('${o.kode}')">Tandai Lunas</button>`)
+          : '';
+        return `<tr><td class="mono">${o.kode}</td><td>${o.nama}</td>
+          <td><div class="mono" style="font-size:12.5px">${fmtHp(o.hp)}</div>${waBtn(o.hp,`Halo ${o.nama}, ini dari The Tamperan Cruise soal pesanan ${o.kode}.`,'Chat')}</td>
+          <td>${o.produk}</td><td class="num">${o.pax}</td>
+          <td>${o.agen==='—'?'<span class="pill p-mute">LANGSUNG</span>':o.agen}</td>
+          <td class="num">${rp(o.total)}</td><td><span class="pill ${st[1]}">${st[0]}</span></td><td>${act}</td></tr>`;
+      }).join('');
+
+    document.getElementById('agentbl').innerHTML =
+      `<tr><th>Nama</th><th>Kode</th><th>WhatsApp</th><th class="num">Tiket</th><th class="num">Omzet</th><th class="num">Tarif</th><th class="num">Komisi</th><th></th></tr>`+
+      Object.entries(AGENTS).map(([c,a])=>
+        `<tr><td><b>${a.nm}</b></td><td class="mono">${c}</td>
+         <td><div class="mono" style="font-size:12.5px">${fmtHp(a.wa)}</div>${waBtn(a.wa,`Halo ${a.nm}, ini dari The Tamperan Cruise.`,'Chat')}</td>
+         <td class="num">${a.tiket}</td><td class="num">${rp(a.omzet)}</td>
+         <td class="num"><span class="pill ${a.tarif===10?'p-ok':'p-warn'}">${a.tarif}%</span></td>
+         <td class="num"><b>${rp(a.komisi)}</b></td>
+         <td>${ro?'<span class="pill p-mute">tidak bisa edit</span>':`<button class="btn ghost sm" onclick="toast('Peragaan — form ubah nama, kode referral, dan nomor WA agen. Kode boleh diganti kapan saja karena order menyimpan <b>ID agen</b>, bukan tulisan kodenya.',10000)">Ubah</button>`}</td></tr>`).join('')+
+      `<tr><td colspan="8" style="padding-top:14px"><button class="btn sm" ${ro?'disabled':''} onclick="toast('Peragaan — form tambah agen: nama, kode referral, nomor WA. Kode divalidasi unik dan huruf besar-kecil diabaikan.',10000)">+ Tambah Agen</button>
+      ${ro?'<span class="hint" style="display:inline;margin-left:9px">Owner tidak bisa menambah agen</span>':''}</td></tr>`;
+
+    /* manifest — satu daftar untuk semua pesanan sah, jujur soal kedalaman cek */
+    const MFO = ORDERS.filter(o=>o.st==='paid'||o.st==='boarded');
+    const cols=['No','Kode','Nama','L/P','Usia']
+      .concat(MFCOL.nik.on?['NIK']:[])
+      .concat(MFCOL.alamat.on?['Alamat sesuai KTP','Provinsi']:[])
+      .concat(MFCOL.wn.on?['WN']:[]).concat(['Pesanan','Boarding']);
+    let nomorMF=0, totMF=0, naikMF=0, anakMF=0, hitungMF=0;
+    const isiMF = MFO.map(o=>{
+      const list=paxList(o.kode), mode=modeCek(o), sdhO=naikOf(o.kode);
+      totMF+=list.length; naikMF+=sdhO;
+      anakMF+=list.filter(p=>p.u<12).length;
+      if(mode==='hitung') hitungMF+=list.length;
+      const pic=(PIC_GRUP[o.kode]||'').trim();
+      const kepala=`<tr style="background:#eef6fa"><td class="num">&mdash;</td>
+        <td class="mono" style="font-size:12px">${o.kode}</td>
+        <td colspan="${Math.max(cols.length-4,1)}"><b>${o.nama}</b>
+          <div style="font-size:11px;font-weight:600;color:${mode==='nama'?'var(--ok)':'var(--sea)'}">${mode==='nama'?'&#10003; diperiksa per nama':'&#9675; dihitung per kepala'+(pic?' &middot; PIC: '+pic:' &middot; PIC belum dicatat')}</div></td>
+        <td class="mono" style="font-size:12.5px">${list.length} orang</td>
+        <td><span class="pill ${sdhO>=list.length?'p-ok':'p-warn'}">${sdhO}/${list.length} NAIK</span></td></tr>`;
+      return kepala + list.map(p=>{ nomorMF++; return `<tr><td class="num" style="color:var(--muted)">${nomorMF}</td>
+        <td class="mono" style="font-size:11px;color:var(--muted)">${p.kode}</td>
+        <td style="padding-left:16px">${p.nama}</td><td>${p.g}</td>
+        <td class="num">${p.u}${p.u<12?' <span class="pill p-warn">ANAK</span>':''}</td>
+        ${MFCOL.nik.on?`<td class="mono" style="font-size:12px;white-space:nowrap${p.nik?'':';color:var(--muted)'}">${p.nik?maskNik(p.nik):'&mdash; dari biro'}</td>`:''}
+        ${MFCOL.alamat.on?`<td style="font-size:12px;color:#4a5a6e;max-width:280px" title="${p.al}">${p.al?potong(p.al,52):'<span style="color:var(--muted)">&mdash;</span>'}</td><td style="font-size:12.5px;color:${p.prov==='—'?'var(--muted)':'inherit'}">${p.prov}</td>`:''}
+        ${MFCOL.wn.on?'<td>INA</td>':''}
+        <td class="mono" style="font-size:11.5px">${o.kode}</td>
+        <td>${p.naik
+          ? `<span class="pill ${p.cara==='hitung'?'p-mute':'p-sea'}">${p.cara==='hitung'?'DIHITUNG':'NAIK '+p.jam}</span>`
+          : '<span class="pill p-mute">BELUM</span>'}</td></tr>`; }).join('');
+    }).join('');
+    document.getElementById('mftbl').innerHTML =
+      '<tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>'+isiMF+
+      `<tr><td colspan="${cols.length}" style="padding-top:12px;color:var(--muted);font-size:12.5px">
+        <b>${totMF} penumpang</b> di ${MFO.length} pesanan sah &middot; ${anakMF} anak di bawah 12 tahun &middot; <b>${naikMF} sudah naik</b><br>
+        Diperiksa per nama: <b>${totMF-hitungMF} orang</b> &middot; dihitung per kepala: <b>${hitungMF} orang</b>
+        <span style="color:var(--warn)"> &mdash; manifest ini jujur soal kedalaman pemeriksaannya. Jangan diubah jadi seolah semua dicek satu-satu.</span></td></tr>`;
+
+    const nb=document.getElementById('nikbtn');
+    if(nb) nb.textContent = NIK_TAMPIL ? '🙈 Sembunyikan NIK' : '👁 Tampilkan NIK penuh';
+
+    document.getElementById('setprod').innerHTML = Object.entries(PRODUCTS).map(([k,p])=>{
+      const f = p.tier
+        ? `<div class="row"><div class="fld" style="flex:1;margin:0"><label>Harga Lokal</label><input value="100000" ${ro?'disabled':''}></div>
+           <div class="fld" style="flex:1;margin:0"><label>Harga Umum</label><input value="150000" ${ro?'disabled':''}></div></div>`
+        : `<div class="fld" style="margin:0"><label>Harga flat /pax</label><input value="${p.harga}" ${ro?'disabled':''}></div>`;
+      return `<div class="card tight" style="margin:0;background:#fafcfe"><h3>${p.nm}</h3>${f}
+        <div class="fld" style="margin:10px 0 0"><label>Kuota kursi</label><input placeholder="belum diketahui" ${ro?'disabled':''}></div></div>`;
+    }).join('');
+    document.getElementById('setkom').innerHTML =
+      `<div class="fld"><label>Diskon konsumen (%)</label><input value="5" ${ro?'disabled':''}></div>
+       <div class="fld"><label>Ambang tier (tiket)</label><input value="20" ${ro?'disabled':''}><div class="hint">⬜ atau ganti ke omzet rupiah?</div></div>
+       <div class="fld"><label>Komisi di bawah ambang (%)</label><input value="5" ${ro?'disabled':''}></div>
+       <div class="fld"><label>Komisi di atas ambang (%)</label><input value="10" ${ro?'disabled':''}></div>
+       <div class="fld"><label>Retroaktif</label><select ${ro?'disabled':''}><option selected>Ya — semua tiket ikut naik</option><option>Tidak</option></select></div>
+       <div class="fld"><label>Reset tier</label><select ${ro?'disabled':''}><option>Bulanan</option><option>Per event</option><option>All-time</option><option selected>⬜ belum ditentukan</option></select></div>`;
+    document.getElementById('setmf').innerHTML = Object.entries(MFCOL).map(([k,c])=>
+      `<div class="card tight" style="margin:0;background:#fafcfe">
+        <div style="font-weight:600;font-size:13.5px">${c.label}</div>
+        <div class="hint" style="margin:3px 0 8px">${c.wajib?'Wajib — tidak bisa dimatikan':'Opsional'}</div>
+        <select ${c.wajib||ro?'disabled':''} onchange="MFCOL['${k}'].on=(this.value==='on');renderDash();renderPax()">
+          <option value="on" ${c.on?'selected':''}>Diminta</option>
+          <option value="off" ${!c.on?'selected':''}>Dimatikan</option>
+        </select></div>`).join('');
+  }
+
+  if(isAgen){
+    const me=AGENTS[AGEN_LOGIN];
+    const pct=Math.min(100,Math.round(me.tiket/20*100));
+    document.getElementById('progbox').innerHTML =
+      `<div style="display:flex;justify-content:space-between;font-size:13.5px"><span><b>${me.tiket} dari 20 tiket</b></span>
+       <span class="pill ${me.tarif===10?'p-ok':'p-warn'}">TARIF ${me.tarif}%</span></div>
+       <div class="bar"><i style="width:${pct}%"></i></div>
+       <div style="font-size:12.5px;color:var(--muted)">Tarif ${me.tarif}% berlaku <b>retroaktif</b> ke seluruh ${me.tiket} tiket, bukan hanya tiket ke-20 dan sesudahnya.</div>`;
+    renderLbAgen();
+    document.getElementById('k-berjalan').innerHTML = rp(me.komisi)+' <span class="pill p-warn" style="vertical-align:middle">BERJALAN</span>';
+    document.getElementById('k-tarif').textContent = me.tarif+'%';
+    document.getElementById('mytbl').innerHTML =
+      `<tr><th>Kode</th><th>Pembeli</th><th>WhatsApp</th><th>Produk</th><th class="num">Pax</th><th class="num">Total</th><th class="num">Komisi</th><th>Status</th></tr>`+
+      scope.map(o=>{
+        const st=STATUS[o.st];
+        const kom = (o.st==='paid'||o.st==='boarded') ? rp(Math.round(grossOf(o)*me.tarif/100)) : '<span style="color:var(--muted)">—</span>';
+        return `<tr><td class="mono">${o.kode}</td><td>${o.nama}</td>
+          <td><div class="mono" style="font-size:12.5px">${fmtHp(o.hp)}</div>${waBtn(o.hp,`Halo ${o.nama}, ini ${me.nm} dari The Tamperan Cruise soal pesanan ${o.kode}.`,'Chat')}</td>
+          <td>${o.produk}</td><td class="num">${o.pax}</td><td class="num">${rp(o.total)}</td>
+          <td class="num">${kom}</td><td><span class="pill ${st[1]}">${st[0]}</span></td></tr>`;
+      }).join('');
+  }
+
+  const who = isAgen ? AGENTS[AGEN_LOGIN].nm : 'The Tamperan Cruise';
+  const grp = (judul,ket,arr,pesanFn) => {
+    if(!arr.length) return `<div class="fugrp"><h3>${judul} <span class="pill p-mute">0</span></h3><div class="hint">Tidak ada. Bagus.</div></div>`;
+    return `<div class="fugrp"><h3>${judul} <span class="pill p-warn">${arr.length}</span></h3>
+      <div class="hint" style="margin-bottom:9px">${ket}</div>
+      <div class="card" style="padding:6px 6px 0;overflow-x:auto;margin:0"><table>
+      <tr><th>Kode</th><th>Nama</th><th>WhatsApp</th><th>Produk</th><th class="num">Umur Lead</th><th>Follow-Up</th><th>Terakhir</th><th></th></tr>`+
+      arr.map(o=>`<tr><td class="mono">${o.kode}</td><td>${o.nama}</td>
+        <td><div class="mono" style="font-size:12.5px">${fmtHp(o.hp)}</div>${waBtn(o.hp,pesanFn(o),'Chat')}</td>
+        <td>${o.produk}</td><td class="num">${hariLalu(o.tgl)} hari</td>
+        <td><span class="pill ${FU[o.fu][1]}">${FU[o.fu][0]}</span></td>
+        <td style="font-size:12px;color:var(--muted)">${o.last||'—'}</td>
+        <td><select onchange="setFu('${o.kode}',this.value)" style="min-width:150px">
+          <option value="">Ubah status…</option>
+          <option value="dihubungi">Sudah dihubungi</option>
+          <option value="tidak">Tidak tertarik</option>
+          <option value="jadi">Jadi</option></select></td></tr>`).join('')+
+      `</table></div></div>`;
+  };
+  document.getElementById('fubox').innerHTML =
+    grp('A · Belum pernah bayar','Sudah isi form sampai selesai tapi tidak pernah membayar. Lead paling hangat — niatnya sudah ada.',katA,
+        o=>`Halo ${o.nama}, ini ${who}. Pesanan ${o.kode} untuk ${o.produk} belum kami terima pembayarannya. Masih berminat? Kami bantu prosesnya.`) +
+    grp('B · Sudah bayar, belum pernah naik','Uangnya sudah masuk tapi belum menikmati. Paling wajib dikejar — ini kewajiban, bukan penjualan.',katB,
+        o=>`Halo ${o.nama}, ini ${who}. Tiket ${o.kode} untuk ${o.produk} sudah lunas tapi belum digunakan. Mau kami bantu atur jadwal keberangkatannya?`) +
+    grp('C · Pernah naik, lama tidak kembali','Lebih dari 60 hari sejak terakhir berlayar. Cocok ditawari paket baru atau promo.',katC,
+        o=>`Halo ${o.nama}, ini ${who}. Terima kasih sudah berlayar bersama kami ${hariLalu(o.tgl)} hari lalu. Ada paket baru yang mungkin cocok — boleh kami kirimkan?`) +
+    `<div class="note w"><b>Kenapa ada kolom Follow-Up dan Terakhir</b>
+      Tanpa dua kolom ini, satu lead bisa dihubungi tiga orang di hari yang sama, atau tidak ada yang menghubungi karena semua mengira sudah ada yang urus. Tombol Chat membuka WhatsApp dengan pesan yang sudah disiapkan sesuai kategori.</div>` +
+    (isAgen ? `<div class="note"><b>Hanya lead milikmu</b>Pelanggan agen lain tidak muncul di sini. NIK dan alamat KTP juga tidak pernah ditampilkan ke agen. Filter ini di sistem nyata dikunci di RLS database, bukan di tampilan.</div>` : '');
+}
+
+function grupInfo(p){
+  const o=ordOf(p.order), tot=paxOf(p.order).length, sdh=naikOf(p.order);
+  const sisa=paxOf(p.order).filter(x=>!x.naik);
+  let h=`<div class="card tight" style="margin:12px 0 0;background:#fafcfe">
+    <div style="font-size:12px;letter-spacing:.5px;color:var(--muted);font-weight:700">ROMBONGAN PESANAN ${p.order}</div>
+    <div style="font-size:19px;font-weight:700;margin:5px 0 3px">${sdh} dari ${tot} sudah naik</div>
+    <div class="bar"><i style="width:${Math.round(sdh/tot*100)}%"></i></div>`;
+  if(sisa.length) h+=`<div style="font-size:12.5px;color:var(--warn);font-weight:600">Belum naik: ${sisa.map(x=>x.nama).join(' · ')}</div>`;
+  else h+=`<div style="font-size:12.5px;color:var(--ok);font-weight:600">Rombongan lengkap.</div>`;
+  return h+`</div>`;
+}
+/* ===== STATE SCAN BOARDING ===== */
+let SCAN_AKTIF=null, SOROT=null, BULK_CONFIRM=null;
+function doScan(){
+  const c=document.getElementById('scanin').value.trim().toUpperCase();
+  const box=document.getElementById('scanres');
+  if(!c){ box.innerHTML=''; SCAN_AKTIF=null; SOROT=null; return; }
+
+  /* Kode per orang (TTC-XXXXX-3) tetap diterima: sebagian penumpang bisa
+     masih memegang e-ticket versi lama, dan itu jangan sampai jadi jalan buntu. */
+  const p = PAX.find(x=>x.kode===c);
+  const kode = p ? p.order : c.replace(/-\d+$/,'');
+  const o = ordOf(kode);
+
+  if(!o){
+    tanda('tolak'); SCAN_AKTIF=null; SOROT=null;
+    box.innerHTML=`<div class="card" style="background:var(--dangerbg);border-color:#f0c3c3">
+      <div style="font-weight:700;color:var(--danger);font-size:17px">&#10005; TIKET TIDAK DITEMUKAN</div>
+      <div style="font-size:13px;color:#8f3232">Kode <span class="mono">${c}</span> tidak ada di sistem. Jangan izinkan naik.</div></div>`;
+    return;
+  }
+  if(o.st!=='paid' && o.st!=='boarded'){
+    tanda('tolak'); SCAN_AKTIF=null; SOROT=null;
+    const st=STATUS[o.st];
+    box.innerHTML=`<div class="card" style="background:var(--dangerbg);border-color:#f0c3c3">
+      <div style="font-weight:700;color:var(--danger);font-size:17px">&#10005; BELUM LUNAS</div>
+      <div style="font-size:19px;font-weight:700;margin:6px 0 2px">${o.nama}</div>
+      <div style="font-size:13px;color:#8f3232">Pesanan <span class="mono">${o.kode}</span> berstatus <span class="pill ${st[1]}">${st[0]}</span> &mdash; jangan izinkan naik, arahkan ke admin.</div></div>`;
+    return;
+  }
+  SOROT = p ? p.kode : null;
+  SCAN_AKTIF = o.kode;
+  tanda((paxList(o.kode).length - naikOf(o.kode)) > 0 ? 'ok' : 'warn');
+  gambarScan();
+}
+
+/* Menggambar ulang panel tanpa membunyikan nada lagi */
+function gambarScan(){
+  const box=document.getElementById('scanres'); if(!box) return;
+  const o = SCAN_AKTIF && ordOf(SCAN_AKTIF);
+  box.innerHTML = o ? panelOrder(o) : '';
+}
+function bukaPanel(kode){
+  const o=ordOf(kode); if(!o) return;
+  const si=document.getElementById('scanin'); if(si) si.value=kode;
+  SCAN_AKTIF=kode; SOROT=null;
+  tanda((paxList(kode).length - naikOf(kode)) > 0 ? 'ok' : 'warn');
+  gambarScan();
+  window.scrollTo(0,0);
+}
+
+/* ===== PANEL SATU PESANAN ===== */
+function panelOrder(o){
+  const list=paxList(o.kode), tot=list.length, sdh=naikOf(o.kode), sisa=tot-sdh;
+  const penuh=sisa<=0, mode=modeCek(o), lokal=o.produk.includes('Lokal');
+  const kepala=`
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-weight:700;color:${penuh?'var(--warn)':'var(--ok)'};font-size:15px">${penuh?'&#9888; SEMUA SUDAH NAIK':'&#10003; PESANAN SAH &mdash; LANJUT PERIKSA'}</div>
+        <div style="font-size:23px;font-weight:700;letter-spacing:-.4px;margin:4px 0 2px">${o.nama}</div>
+        <div style="font-size:13px;color:var(--muted)">${o.produk} &middot; <span class="mono">${o.kode}</span> &middot; ${tot} orang</div>
+      </div>
+      <span class="pill ${mode==='nama'?'p-ok':'p-sea'}" style="white-space:nowrap">${mode==='nama'?'CEK PER NAMA':'MODE HITUNG'}</span>
+    </div>
+    <div class="card tight" style="margin:12px 0 0;background:#fff">
+      <div style="font-size:30px;font-weight:700;letter-spacing:-1px;color:var(--navy)">${sdh} <span style="font-size:18px;color:var(--muted);font-weight:400">dari ${tot}</span></div>
+      <div class="bar"><i style="width:${Math.round(sdh/Math.max(tot,1)*100)}%"></i></div>
+      <div style="font-size:13px;font-weight:600;color:${penuh?'var(--ok)':'var(--warn)'}">${penuh?'Hitungan lengkap.':`Masih menunggu ${sisa} orang.`}</div>
+    </div>
+    ${lokal?`<div style="margin-top:12px;padding:11px;background:var(--warnbg);border-radius:8px;font-size:13px;color:var(--warn);font-weight:700">&#9888; TARIF WARGA PACITAN &mdash; PERIKSA KTP ASLI<br><span style="font-weight:400;font-size:12px">Cocokkan nama di KTP dengan nama di daftar. Kalau tidak sesuai, tagih selisih Rp50.000</span></div>`:''}`;
+  return `<div class="card" style="background:${penuh?'var(--warnbg)':'var(--okbg)'};border-color:${penuh?'#ecd9b0':'#bfe3c9'}">
+    ${kepala}
+    ${mode==='nama' ? blokNama(o,list,sisa) : blokHitung(o,list,sisa)}
+  </div>` + catatanMode(o,mode,tot);
+}
+function barisNama(p,sorot){
+  return `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-top:1px solid #eef2f7">
+    <div><div style="font-weight:600;font-size:14.5px">${p.nama}${sorot?' <span class="pill p-warn">QR INI</span>':''}</div>
+      <div style="font-size:11.5px;color:var(--muted)">${p.g==='L'?'Laki-laki':'Perempuan'} &middot; ${p.u} th${p.u<12?' &middot; ANAK':''}</div></div>
+    ${p.naik
+      ? `<span class="pill ${p.cara==='hitung'?'p-mute':'p-sea'}" style="white-space:nowrap">${p.cara==='hitung'?'DIHITUNG':'NAIK '+p.jam}</span>`
+      : `<button class="btn sm" style="white-space:nowrap;min-width:74px" onclick="naikkan('${p.kode}')">Naik</button>`}
+  </div>`;
+}
+function blokNama(o,list,sisa){
+  const daftar=`<div class="card tight" style="margin:12px 0 0;background:#fff">
+    <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.3px">DAFTAR PESANAN INI &mdash; centang sambil orang lewat</div>
+    ${list.map(p=>barisNama(p,SOROT===p.kode)).join('')}
+  </div>`;
+  if(sisa<=0) return daftar+`<div class="note d" style="margin:14px 0 0;font-size:12.5px"><b>Jangan tambah lagi</b>Seluruh ${list.length} orang sudah tercatat naik. Kalau masih ada yang mengaku ikut pesanan ini, arahkan ke admin &mdash; jangan diloloskan.</div>`;
+  return daftar+`
+    <div class="row" style="margin-top:11px">
+      ${BULK_CONFIRM===o.kode
+        ? `<button class="btn" style="flex:1;background:var(--danger)" onclick="tambahNaik('${o.kode}',${sisa},true)">Yakin? Tekan lagi</button>`
+        : `<button class="btn ghost sm" style="flex:1" onclick="mintaKonfirmasi('${o.kode}')">Semua hadir (+${sisa})</button>`}
+    </div>
+    ${BULK_CONFIRM===o.kode
+      ? `<div class="note d" style="margin:11px 0 0;font-size:12.5px"><b>Menandai ${sisa} orang sekaligus</b>Tidak ada bukti per orang, dan ini tercatat di audit log sebagai entri massal. Lakukan hanya kalau kamu benar-benar melihat ${sisa} orang lewat.</div>`
+      : `<div class="hint" style="margin-top:9px">${list.length} nama = ${list.length} ketukan, sekitar ${list.length*2} detik. Tombol &ldquo;Semua hadir&rdquo; ada untuk keadaan mendesak, bukan kebiasaan.</div>`}`;
+}
+function ringkasNama(list){
+  return `<div style="font-size:12.5px;line-height:1.8">${list.map((p,i)=>
+    `${i+1}. ${p.nama}${p.naik?` <span class="pill ${p.cara==='hitung'?'p-mute':'p-sea'}">${p.cara==='hitung'?'dihitung':'naik'}</span>`:''}`).join('<br>')}</div>`;
+}
+function blokHitung(o,list,sisa){
+  const pic=(PIC_GRUP[o.kode]||'');
+  const rujukan=`<div class="card tight" style="margin:13px 0 0;background:#fff">
+    <div style="font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.3px;margin-bottom:7px">DAFTAR NAMA DARI BIRO &mdash; rujukan, tidak dicentang satu-satu</div>
+    ${ringkasNama(list)}
+  </div>`;
+  if(sisa<=0) return rujukan+`<div class="note d" style="margin:14px 0 0;font-size:12.5px"><b>Jangan tambah lagi</b>Hitungan sudah mencapai ${list.length} orang. Kalau masih ada yang mengaku peserta, cek ke PIC &mdash; jangan diloloskan.</div>`;
+  return `
+    <div class="fld" style="margin:13px 0 0">
+      <label>Nama tour leader / PIC yang mendampingi</label>
+      <input id="picin" value="${pic.replace(/"/g,'&quot;')}" placeholder="mis. Pak Sugeng &mdash; Anugerah Trans"
+        oninput="PIC_GRUP['${o.kode}']=this.value;picBerubah()">
+      <div class="hint" id="pichint">${pic.trim()?'Tercatat di audit log sebagai penanggung jawab jumlah.':'Wajib diisi sebelum bisa menandai banyak orang sekaligus.'}</div>
+    </div>
+    <button class="btn" style="width:100%;font-size:17px;padding:15px;margin-top:11px" onclick="tambahNaik('${o.kode}',1)">+1 Orang Naik</button>
+    <div class="row" style="margin-top:9px">
+      <button class="btn ghost sm" style="flex:1" onclick="tambahNaik('${o.kode}',5)">+5</button>
+      <button class="btn ghost sm" style="flex:1" onclick="tambahNaik('${o.kode}',10)">+10</button>
+      ${BULK_CONFIRM===o.kode
+        ? `<button class="btn" style="flex:1;background:var(--danger)" onclick="tambahNaik('${o.kode}',${sisa},true)">Yakin? Tekan lagi</button>`
+        : `<button class="btn ghost sm" style="flex:1" onclick="mintaKonfirmasi('${o.kode}')">Semua (+${sisa})</button>`}
+    </div>
+    ${BULK_CONFIRM===o.kode
+      ? `<div class="note d" style="margin:11px 0 0;font-size:12.5px"><b>Menandai ${sisa} orang sekaligus atas pernyataan ${pic.trim()||'PIC'}</b>Tidak ada bukti per orang. Lakukan hanya setelah checker menghitung fisik di dermaga dan menyatakan cocok.</div>`
+      : `<div class="hint" style="margin-top:9px">Checker menghitung kepala di dermaga, petugas menekan angkanya di sini. Rombongan ${list.length} orang &asymp; 1 menit.</div>`}
+    ${rujukan}`;
+}
+function picBerubah(){
+  const o = SCAN_AKTIF && ordOf(SCAN_AKTIF); if(!o) return;
+  const h=document.getElementById('pichint'); if(!h) return;
+  h.innerHTML = (PIC_GRUP[o.kode]||'').trim()
+    ? 'Tercatat di audit log sebagai penanggung jawab jumlah.'
+    : 'Wajib diisi sebelum bisa menandai banyak orang sekaligus.';
+}
+function catatanMode(o,mode,tot){
+  if(mode==='nama') return `<div class="note d"><b>Kenapa QR-nya boleh satu untuk ${tot} orang</b>QR hanya <b>membuka daftar</b> ini. Yang meloloskan orang adalah ketukan petugas, satu per nama, dan nama yang sudah dicentang tidak bisa dicentang lagi. Jadi QR yang difoto dan disebar tidak menambah satu pun kursi.</div>`;
+  return `<div class="note d"><b>Kenapa ${tot} nama tidak dicentang satu-satu</b>Petugas TTC tidak mengenal satu pun dari ${tot} orang itu &mdash; mencocokkan huruf di layar dengan huruf yang diucapkan bukan verifikasi, tapi memakan 3&ndash;4 menit. Uangnya sudah masuk untuk ${tot} orang, jadi peserta pengganti tidak merugikan TTC. Kapasitas kapal dijaga oleh <b>hitungan fisik checker di dermaga</b> &mdash; satu-satunya angka yang tidak bisa dibohongi layar. Tanggung jawab atas siapa yang naik ada di biro, tercatat atas nama PIC di audit log.</div>
+  <div class="note"><b>&#9744; Belum diputuskan</b>Rombongan tidak lengkap sampai jam berangkat &mdash; kapal tetap jalan atau ditunggu? Sistem sudah memberi angkanya, keputusannya kebijakan.</div>`;
+}
+
+/* ===== TANDAI NAIK ===== */
+function naikkan(kode){
+  const p=PAX.find(x=>x.kode===kode);
+  if(!p || p.naik) return;
+  const o=ordOf(p.order);
+  if(!o || (o.st!=='paid' && o.st!=='boarded')) return;
+  const jam=nowStr().split(' ').pop();
+  p.naik=true; p.jam=jam; p.oleh='Petugas Boarding'; p.cara='nama';
+  const sdh=naikOf(p.order), tot=paxList(p.order).length;
+  if(sdh>=tot) o.st='boarded';
+  AUDIT.unshift([nowStr(),'Petugas Boarding',`Boarding ${p.order}`,`${p.nama} naik (${sdh}/${tot}) &middot; dicentang per nama`]);
+  tanda(sdh<tot?'ok':'warn');
+  toast(`<b>${p.nama}</b> ditandai SUDAH NAIK jam ${jam}.<br><br>Pesanan ${p.order}: <b>${sdh} dari ${tot}</b> sudah naik.`+
+    (sdh<tot?` Masih menunggu: ${sisaOf(p.order).map(x=>x.nama).join(', ')}.`:` Lengkap.`),9000);
+  SOROT=null; BULK_CONFIRM=null;
+  gambarScan(); renderBoard();
+}
+function mintaKonfirmasi(kode){
+  const o=ordOf(kode); if(!o) return;
+  BULK_CONFIRM=kode;
+  if(SCAN_AKTIF!==kode){ SCAN_AKTIF=kode; SOROT=null; const si=document.getElementById('scanin'); if(si) si.value=kode; }
+  tanda('warn');
+  gambarScan(); renderBoard();
+  toast('Menandai seluruh sisa peserta <b>sekaligus</b> berarti tidak ada bukti per orang. Tekan sekali lagi kalau kamu benar-benar melihat mereka lewat'+
+    (modeCek(o)==='hitung'?' <b>dan</b> nama PIC sudah diisi':'')+'.',9000);
+  window.scrollTo(0,0);
+}
+function tambahNaik(kode,n,bulk){
+  const o=ordOf(kode); if(!o) return;
+  if(o.st!=='paid' && o.st!=='boarded'){ BULK_CONFIRM=null; return; }
+  const belum=sisaOf(kode);
+  if(!belum.length){ BULK_CONFIRM=null; gambarScan(); return; }
+  const jml=Math.max(0, Math.min(parseInt(n,10)||0, belum.length));
+  if(jml<=0){ BULK_CONFIRM=null; gambarScan(); return; }
+  const pic=(PIC_GRUP[kode]||'').trim();
+  /* Entri massal di mode hitung wajib punya penanggung jawab bernama */
+  if(bulk && modeCek(o)==='hitung' && !pic){
+    BULK_CONFIRM=null; tanda('tolak');
+    toast('Isi dulu <b>nama tour leader / PIC</b> yang menyatakan jumlahnya cocok. Entri massal tanpa penanggung jawab tidak bisa dipertanggungjawabkan ke siapa pun.',9000);
+    gambarScan(); return;
+  }
+  const jam=nowStr().split(' ').pop();
+  belum.slice(0,jml).forEach(p=>{ p.naik=true; p.jam=jam; p.oleh='Petugas Boarding'; p.cara='hitung'; });
+  BULK_CONFIRM=null;
+  const sdh=naikOf(kode), tot=paxList(kode).length, sisa=tot-sdh;
+  if(sisa<=0) o.st='boarded';
+  AUDIT.unshift([nowStr(),'Petugas Boarding',`Boarding ${kode}`,
+    `+${jml} orang (${sdh}/${tot}) &middot; dihitung${bulk?', ENTRI MASSAL':''}${pic?' &middot; PIC: '+pic:''}`]);
+  tanda(sisa>0?'ok':'warn');
+  toast(`<b>${o.nama}</b> &middot; +${jml} orang naik${bulk?' <b>sekaligus</b>':''}.<br><br><b>${sdh} dari ${tot}</b> sudah naik.`+
+    (sisa?` Masih menunggu <b>${sisa} orang</b>.`:` Lengkap &mdash; hitungan berhenti di sini, tambahan berikutnya ditolak.`)+
+    (bulk?`<br><br>Tercatat di audit log sebagai <b>entri massal</b> atas pernyataan <b>${pic}</b>, bukan hitungan per orang.`:''),10000);
+  gambarScan(); renderBoard();
+}
+
+/* ===== DAFTAR BOARDING — semua pesanan sah hari itu ===== */
+function renderBoard(){
+  const q=(document.getElementById('bcari')?.value||'').trim().toLowerCase();
+  const box=document.getElementById('bdaftar'); if(!box) return;
+  const sah=ORDERS.filter(o=>o.st==='paid'||o.st==='boarded');
+  let tot=0, sdh=0;
+  sah.forEach(o=>{ tot+=paxList(o.kode).length; sdh+=naikOf(o.kode); });
+  const kk=document.getElementById('bcount');
+  if(kk) kk.innerHTML=`<b>${sdh} dari ${tot}</b> penumpang sudah naik`;
+  const bar=document.getElementById('bbar');
+  if(bar) bar.style.width=Math.round(sdh/Math.max(tot,1)*100)+'%';
+
+  const tampil=sah.filter(o=>!q || o.nama.toLowerCase().includes(q) || o.kode.toLowerCase().includes(q)
+    || paxList(o.kode).some(p=>p.nama.toLowerCase().includes(q)));
+  if(!tampil.length){ box.innerHTML=`<div class="hint">Tidak ada yang cocok dengan &ldquo;${q}&rdquo;.</div>`; return; }
+
+  box.innerHTML = tampil.map(o=>{
+    const list=paxList(o.kode), t=list.length, s=naikOf(o.kode), sisa=t-s, penuh=sisa<=0;
+    const mode=modeCek(o);
+    const cocok = q ? list.filter(p=>p.nama.toLowerCase().includes(q)) : [];
+    const pakai = cocok.length ? cocok : list;
+    const isi = mode==='nama'
+      ? pakai.map(p=>barisNama(p,false)).join('')
+      : (penuh
+        ? `<div style="font-size:12.5px;color:var(--ok);font-weight:600;padding-top:9px">Lengkap.</div>`
+        : `<div class="row" style="padding-top:10px">
+            <button class="btn sm" style="flex:2" onclick="tambahNaik('${o.kode}',1)">+1 Naik</button>
+            <button class="btn ghost sm" style="flex:1" onclick="tambahNaik('${o.kode}',5)">+5</button>
+            <button class="btn ghost sm" style="flex:1" onclick="bukaPanel('${o.kode}')">Buka</button>
+          </div>`);
+    return `<div class="card tight" style="background:${penuh?'#f3faf5':'#fff'}">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:6px">
+        <div><span class="mono" style="font-size:12.5px;font-weight:700">${o.kode}</span>
+          <span class="pill ${mode==='nama'?'p-ok':'p-sea'}" style="margin-left:6px">${mode==='nama'?'PER NAMA':'HITUNG'}</span>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:3px">${o.nama} &middot; ${o.produk}</div></div>
+        <span class="pill ${penuh?'p-ok':'p-warn'}" style="white-space:nowrap">${s}/${t} NAIK</span>
+      </div>
+      <div class="bar" style="margin:4px 0 0"><i style="width:${Math.round(s/Math.max(t,1)*100)}%"></i></div>
+      ${isi}
+    </div>`;
+  }).join('');
+}
+
+
+renderProducts();
+setTipe('perorangan');
+renderBoard();
+document.getElementById('scanin').addEventListener('keydown',e=>{if(e.key==='Enter')doScan()});
+</script>
+</body>
+</html>
