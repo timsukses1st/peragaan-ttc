@@ -48,16 +48,21 @@ h1{font-size:25px;letter-spacing:-.5px;margin:0 0 3px}
   font-weight:700;margin-bottom:6px}
 .kpi .v{font-size:23px;font-weight:700;letter-spacing:-.6px;font-variant-numeric:tabular-nums}
 .kpi .d{font-size:12px;color:var(--muted);margin-top:3px}
-table{width:100%;border-collapse:collapse;font-size:13.5px}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:13.5px}
 th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;
    color:#1e293b;font-weight:700;background:#dde6f0;
-   padding:9px 8px;border-bottom:2px solid #475569;white-space:nowrap}
+   padding:9px 8px;border-bottom:2px solid #475569;white-space:nowrap;
+   position:sticky;top:0;z-index:3}
 td{padding:9px 8px;border-bottom:1.5px solid var(--garis-h);vertical-align:middle}
 /* Garis pemisah antarkolom — tipis saja, cukup untuk memandu mata ke bawah
    tanpa bikin tabel tampak seperti kotak-kotak. Tidak dipasang di kolom pertama
    supaya tepi kiri tabel tetap bersih. */
 th+th,td+td{border-left:1.5px solid var(--garis-v)}
 th:last-child,td:last-child{padding-right:16px}
+/* Kepala tabel menempel di atas saat daftar panjang digulir — ini yang terbukti
+   jalan. Kolom menempel di kanan sempat kucoba lalu kubuang: tidak bisa kupastikan
+   bekerja di semua browser, dan masalahnya sudah selesai dengan menukar urutan
+   kolom (aksi tidak lagi di kolom paling kanan). */
 td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 tr:last-child td{border-bottom:0}
 tbody tr:hover td,table tr:hover td{background:#e3eefa}
@@ -347,13 +352,15 @@ async function tabPesanan(){
     <div class="card scrollx">
       <h3>Pesanan <span class="pill p-mute">${data.length}</span></h3>
       <table>
-        <tr><th class="nw">Kode</th><th class="nw">Berangkat</th><th>Pembeli</th><th class="nw">WhatsApp</th>
-            <th class="nw">Produk</th><th class="num">Pax</th><th class="nw">Agen</th>
-            <th class="num">Total</th><th class="nw">Status</th></tr>
+        <tr><th class="nw">Kode</th><th class="nw">Dipesan</th><th class="nw">Berangkat</th>
+            <th>Pembeli</th><th class="nw">WhatsApp</th><th class="nw">Produk</th>
+            <th class="num">Pax</th><th class="nw">Agen</th>
+            <th class="nw">Status</th><th class="num">Total</th></tr>
         ${data.map(o=>{
           const st = STATUS[o.status]||[o.status,'p-mute'];
           return `<tr>
             <td class="mono nw">${esc(o.kode)}</td>
+            <td class="nw" style="color:var(--muted)">${tgl(o.dibuat)}</td>
             <td class="nw">${o.tanggal_berangkat
               ? `${tgl(o.tanggal_berangkat)}${o.kapal?.nama
                    ? ` <span class="pill p-sea">${esc(o.kapal.nama.replace(/^Kapal\s*/i,'K'))}</span>`
@@ -367,11 +374,11 @@ async function tabPesanan(){
             <td class="num nw">${o.pax}${o.anak?` <span class="pill p-warn">${o.anak} anak</span>`:''}</td>
             <td class="nw">${o.agen?`<span class="nama" style="max-width:130px" title="${esc(o.agen.nama)}">${esc(o.agen.nama)}</span>`
               :'<span class="pill p-mute">LANGSUNG</span>'}</td>
-            <td class="num nw">${rp(o.total)}</td>
             <td class="nw"><span class="sel2"><span class="pill ${st[1]}">${st[0]}</span>${
               o.status==='waiting' && S.peran==='super'
                 ? `<a class="aksi ghost" href="#" data-lunas="${esc(o.kode)}">Lunas</a>` : ''
-              }</span></td></tr>`;
+              }</span></td>
+            <td class="num nw">${rp(o.total)}</td></tr>`;
         }).join('')}
       </table>
     </div>`;
