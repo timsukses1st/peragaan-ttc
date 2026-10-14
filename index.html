@@ -191,14 +191,10 @@ footer{margin-top:40px;padding:22px 0 40px;border-top:1px solid var(--line);
             <label for="f-produk">Pelayaran</label>
             <select id="f-produk"></select>
           </div>
-          <div class="fld" id="fld-tier">
-            <label for="f-tier">Domisili penumpang</label>
-            <select id="f-tier">
-              <option value="luar">Luar Pacitan</option>
-              <option value="pacitan">Warga Pacitan</option>
-            </select>
-            <div class="hint">Beberapa paket punya harga khusus warga Pacitan.
-              Siapkan KTP saat boarding.</div>
+          <div class="fld">
+            <label for="f-tgl">Tanggal keberangkatan</label>
+            <input id="f-tgl" type="date">
+            <div class="hint">Pilih tanggal rencana berlayar.</div>
           </div>
         </div>
 
@@ -213,6 +209,25 @@ footer{margin-top:40px;padding:22px 0 40px;border-top:1px solid var(--line);
             <div class="hint">Dipakai untuk menyiapkan life jacket ukuran anak.</div>
           </div>
         </div>
+
+        <!-- Kode voucher: terpisah dari kode agen. Agen membagikannya lewat chat. -->
+        <div class="fld" id="fld-voucher">
+          <label for="f-vou">Kode voucher <span style="font-weight:400;color:var(--muted)">(kalau ada)</span></label>
+          <div class="sel2" style="display:flex;gap:8px;align-items:flex-start">
+            <input id="f-vou" class="mono" placeholder="Opsional" autocomplete="off" spellcheck="false"
+                   style="flex:1">
+            <button type="button" class="btn ghost" id="vcek" style="padding:9px 16px">Periksa</button>
+          </div>
+          <div class="hint" id="vou-ket">Kosongkan kalau tidak punya.</div>
+        </div>
+      </div>
+
+      <!-- Add-on, diambil dari tabel tambahan -->
+      <div class="card sembunyi" id="kartu-tambahan">
+        <h3 style="margin:0 0 4px;font-size:16.5px">Tambahan</h3>
+        <p class="sub" style="margin-bottom:12px">Opsional. Bisa ditambahkan sekarang atau
+          dibicarakan lagi dengan agen.</p>
+        <div id="daftar-tambahan"></div>
       </div>
 
       <div class="card">
@@ -331,7 +346,11 @@ const S = {
   agenNama: null,
   agenWa: null,         /* nomor tujuan WhatsApp — milik agen pemilik kode */
   bolehBiro: false,
-  diskonPersen: 0
+  diskonPersen: 0,
+  vouOk: false,          /* voucher: true hanya setelah diperiksa & sah */
+  vouKode: null,
+  tambahan: [],          /* daftar add-on dari database */
+  tambahanPilih: []      /* slug yang dicentang */
 };
 
 /* Kode referral dari tautan agen: ?ref=KODE */
@@ -340,10 +359,11 @@ if (qs.get('ref')) S.kodeRef = qs.get('ref').trim();
 
 /* ====================== MUAT PRODUK & PENGATURAN ====================== */
 async function muat(){
-  const [{data:prod, error:e1}, {data:atur}] = await Promise.all([
+  const [{data:prod, error:e1}, {data:atur}, {data:tamb}] = await Promise.all([
     sb.from('produk').select('slug,nama,deskripsi,bertingkat,harga_lokal,harga_umum,harga_flat,dapat_voucher')
       .eq('aktif', true).order('urutan'),
-    sb.from('pengaturan').select('diskon_persen').maybeSingle()
+    sb.from('pengaturan').select('diskon_persen').maybeSingle(),
+    sb.from('tambahan').select('slug,nama,ket,harga,satuan').eq('aktif', true).order('urutan')
   ]);
 
   if (e1 || !prod){
@@ -353,16 +373,17 @@ async function muat(){
       atau hubungi kami lewat WhatsApp.</div></div>`;
     return;
   }
-  S.produk = prod;
+  S.produk   = prod;
+  S.tambahan = tamb || [];
   /* pengaturan bisa saja tertutup RLS untuk pengunjung — jangan anggap itu galat.
      Kalau tidak terbaca, diskon tampil 0 dan angka finalnya tetap dihitung server. */
   S.diskonPersen = Number(atur?.diskon_persen || 0);
 
   $('produk').innerHTML = prod.map(p => {
-    const harga = p.bertingkat
-      ? `<div class="harga">${rp(p.harga_lokal)} <span class="per">/ orang · warga Pacitan</span></div>
-         <div class="dua">${rp(p.harga_umum)} / orang · luar Pacitan</div>`
-      : `<div class="harga">${rp(p.harga_flat)} <span class="per">/ orang</span></div>`;
+    /* Satu harga saja yang ditampilkan. Harga khusus warga Pacitan tidak
+       diumumkan di sini — agen yang membagikan kode vouchernya lewat chat. */
+    const harga = `<div class="harga">${rp(p.bertingkat ? p.harga_umum : p.harga_flat)}
+         <span class="per">/ orang</span></div>`;
     return `<div class="prod">
       <h3>${esc(p.nama)} ${p.dapat_voucher?'<span class="pill p-ok">+ VOUCHER</span>':''}</h3>
       <p class="ket">${esc(p.deskripsi || '')}</p>${harga}</div>`;
@@ -370,6 +391,15 @@ async function muat(){
 
   $('f-produk').innerHTML = prod.map(p =>
     `<option value="${esc(p.slug)}">${esc(p.nama)}</option>`).join('');
+
+  /* Tanggal: minimal hari ini, maksimal setahun ke depan — sama dengan batas
+     yang dijaga buat_pesanan(), supaya penolakan tidak datang belakangan. */
+  const hariIni = new Date(); hariIni.setMinutes(hariIni.getMinutes() - hariIni.getTimezoneOffset());
+  const setahun = new Date(hariIni); setahun.setFullYear(setahun.getFullYear() + 1);
+  $('f-tgl').min = hariIni.toISOString().slice(0,10);
+  $('f-tgl').max = setahun.toISOString().slice(0,10);
+
+  gambarTambahan();
 
   /* Tautan agen (?ref=KODE): isi kolomnya dan periksa otomatis, supaya pelanggan
      tidak perlu mengetik ulang kode yang sudah ada di tautannya. */
@@ -452,15 +482,79 @@ const pax = () => {
   return Number.isFinite(n) && n > 0 ? Math.min(n, 200) : 0;
 };
 const produkTerpilih = () => S.produk.find(p => p.slug === $('f-produk').value);
-const domisili = () => $('f-tier').value === 'pacitan' ? 'pacitan' : 'luar';
-const tier     = () => domisili() === 'pacitan' ? 'lokal' : 'umum';
+
+/* ====================== VOUCHER ====================== */
+/* Voucher hanya membuka harga warga Pacitan. Nilainya tidak pernah dikirim dari
+   sini — server yang mengambilnya dari produk.harga_lokal. */
+function lepasVoucher(kabar){
+  S.vouOk = false; S.vouKode = null;
+  $('f-vou').value = '';
+  $('vou-ket').textContent = 'Kosongkan kalau tidak punya.';
+  if (kabar) pesan(kabar);
+  ringkasan();
+}
+
+async function cekVoucher(){
+  const k = $('f-vou').value.trim();
+  if (!k) return lepasVoucher();
+  $('vcek').disabled = true;
+  $('vou-ket').textContent = 'Memeriksa…';
+  const { data, error } = await sb.rpc('cek_voucher', { p_kode: k });
+  $('vcek').disabled = false;
+  if (error){
+    $('vou-ket').textContent = 'Gagal memeriksa.';
+    return pesan('<b>Gagal</b> ' + esc(error.message), 9000);
+  }
+  const r = Array.isArray(data) ? data[0] : data;
+  if (r?.valid){
+    S.vouOk = true; S.vouKode = k;
+    $('vou-ket').innerHTML = `<span class="pill p-ok">BERLAKU</span> ${
+      esc(r.keterangan || 'Harga khusus diterapkan.')}`;
+  } else {
+    S.vouOk = false; S.vouKode = null;
+    const sebab = {
+      tidak_terdaftar: 'Kode voucher ini tidak terdaftar.',
+      tidak_aktif:     'Kode voucher ini sudah tidak berlaku.'
+    }[r?.alasan] || 'Voucher tidak bisa dipakai.';
+    $('vou-ket').innerHTML = `<span class="pill p-dang">DITOLAK</span> ${esc(sebab)}`;
+  }
+  ringkasan();
+}
+
+/* ====================== ADD-ON ====================== */
+function gambarTambahan(){
+  const kartu = $('kartu-tambahan');
+  if (!S.tambahan.length){ kartu.classList.add('sembunyi'); return; }
+  kartu.classList.remove('sembunyi');
+  $('daftar-tambahan').innerHTML = S.tambahan.map(t => `
+    <label class="fld" style="display:flex;gap:11px;align-items:flex-start;cursor:pointer;
+           border:1.5px solid var(--line);border-radius:9px;padding:12px;font-weight:400">
+      <input type="checkbox" data-tambahan="${esc(t.slug)}" style="width:19px;height:19px;margin-top:2px;flex:none">
+      <span style="flex:1">
+        <b style="font-size:15px">${esc(t.nama)}</b>
+        <span class="pill p-sea">${rp(t.harga)}${t.satuan === 'orang' ? ' / orang' : ''}</span>
+        ${t.ket ? `<div class="hint" style="margin-top:3px">${esc(t.ket)}</div>` : ''}
+      </span></label>`).join('');
+
+  $('daftar-tambahan').querySelectorAll('[data-tambahan]').forEach(c => c.onchange = () => {
+    const slug = c.dataset.tambahan;
+    S.tambahanPilih = c.checked
+      ? [...new Set([...S.tambahanPilih, slug])]
+      : S.tambahanPilih.filter(x => x !== slug);
+    ringkasan();
+  });
+}
 
 function gambarUlang(){
   const p = produkTerpilih();
   const n = pax();
 
-  /* kolom tier hanya relevan untuk produk bertingkat */
-  $('fld-tier').style.display = p?.bertingkat ? '' : 'none';
+  /* Voucher hanya berguna untuk produk bertingkat. Pada paket harga tunggal
+     database akan menolaknya, jadi kolomnya disembunyikan sekalian — dan kalau
+     sudah terlanjur terisi, dilepas supaya tidak ikut terkirim. */
+  const pakaiVou = !!p?.bertingkat;
+  $('fld-voucher').style.display = pakaiVou ? '' : 'none';
+  if (!pakaiVou && S.vouOk) lepasVoucher('Paket ini berharga sama untuk semua, voucher dilepas.');
 
   /* --- baris penumpang --- */
   if (S.tipe === 'biro'){
@@ -517,19 +611,31 @@ function hitungAnak(){
 function ringkasan(){
   const p = produkTerpilih(), n = pax();
   if (!p || !n){ $('ringkas').innerHTML = '<div class="hint">Lengkapi pilihan di atas.</div>'; return; }
-  const satuan = p.bertingkat
-    ? ($('f-tier').value === 'pacitan' ? p.harga_lokal : p.harga_umum)
-    : p.harga_flat;
+  /* Tingkat harga ditentukan voucher yang SUDAH diperiksa, bukan pilihan pemesan. */
+  const pakaiVou = p.bertingkat && S.vouOk;
+  const satuan = p.bertingkat ? (pakaiVou ? p.harga_lokal : p.harga_umum) : p.harga_flat;
   const sub = satuan * n;
   const persen = S.kodeOk ? S.diskonPersen : 0;
   const pot = Math.round(sub * persen / 100);
   const anak = hitungAnak();
 
+  /* Add-on bersatuan 'orang' dikali pax — sama persis dengan hitungan server. */
+  const tamb = S.tambahanPilih.map(slug => {
+    const t = S.tambahan.find(x => x.slug === slug);
+    if (!t) return null;
+    const jml = t.satuan === 'orang' ? n : 1;
+    return { nama: t.nama, jml, total: t.harga * jml };
+  }).filter(Boolean);
+  const totalTamb = tamb.reduce((a,b) => a + b.total, 0);
+
   $('ringkas').innerHTML =
-    `<div class="rk"><span>${esc(p.nama)} — ${rp(satuan)} × ${n} orang</span><span>${rp(sub)}</span></div>`
-    + (persen ? `<div class="rk"><span>Potongan kode referral (${persen}%)</span><span>− ${rp(pot)}</span></div>` : '')
+    `<div class="rk"><span>${esc(p.nama)} — ${rp(satuan)} × ${n} orang${
+       pakaiVou ? ' <span class="pill p-ok">HARGA VOUCHER</span>' : ''}</span><span>${rp(sub)}</span></div>`
+    + (persen ? `<div class="rk"><span>Potongan kode agen (${persen}%)</span><span>− ${rp(pot)}</span></div>` : '')
+    + tamb.map(t => `<div class="rk"><span>${esc(t.nama)}${
+         t.jml > 1 ? ` × ${t.jml}` : ''}</span><span>+ ${rp(t.total)}</span></div>`).join('')
     + (anak ? `<div class="rk"><span>Anak di bawah 12 tahun</span><span>${anak} orang · life jacket anak</span></div>` : '')
-    + `<div class="rk"><span>Perkiraan total</span><span>${rp(sub - pot)}</span></div>`;
+    + `<div class="rk"><span>Perkiraan total</span><span>${rp(sub - pot + totalTamb)}</span></div>`;
 }
 
 /* ====================== KIRIM ====================== */
@@ -541,6 +647,19 @@ async function kirim(){
          Penolakan yang sebenarnya tetap terjadi di database. --- */
   if (!p)  return pesan('Pilih pelayarannya dulu.');
   if (!n)  return pesan('Jumlah penumpang belum masuk akal.');
+
+  /* Tanggal diperiksa di sini juga, bukan hanya di server — supaya pemesan tidak
+     mengisi seluruh daftar nama dulu baru ditolak. */
+  const tgl = $('f-tgl').value;
+  if (!tgl) return pesan('Tanggal keberangkatan belum diisi.');
+  if (tgl < $('f-tgl').min) return pesan('Tanggal keberangkatan sudah lewat.');
+  if (tgl > $('f-tgl').max) return pesan('Tanggal keberangkatan terlalu jauh ke depan.');
+
+  /* Voucher terisi tapi belum diperiksa → periksa dulu, jangan dikirim mentah. */
+  if ($('f-vou').value.trim() && !S.vouOk){
+    await cekVoucher();
+    if (!S.vouOk) return pesan('Kode voucher belum sah. Perbaiki atau kosongkan dulu.');
+  }
 
   const nama = $('f-nama').value.trim();
   const hp   = $('f-hp').value.replace(/\D/g,'');
@@ -592,13 +711,14 @@ async function kirim(){
   tombol.innerHTML = '<span class="spin"></span> Menyimpan…';
 
   const { data, error } = await sb.rpc('buat_pesanan', {
-    p_produk_slug:  p.slug,
-    p_tier:         p.bertingkat ? tier() : null,
-    p_tipe:         S.tipe,
-    p_pax:          n,
-    p_anak:         anak,
-    p_domisili:     domisili(),
+    p_produk_slug:   p.slug,
+    p_tipe:          S.tipe,
+    p_pax:           n,
+    p_anak:          anak,
+    p_tanggal:       $('f-tgl').value,
     p_kode_referral: S.kodeRef,
+    p_kode_voucher:  (p.bertingkat && S.vouOk) ? S.vouKode : null,
+    p_tambahan:      S.tambahanPilih.length ? S.tambahanPilih : null,
     p_pemesan: {
       nama, hp,
       email:    $('f-email').value.trim() || null,
@@ -739,8 +859,14 @@ $('tb-biro').onclick = () => setTipe('biro');
 $('bcek').onclick    = () => cekKodeAgen();
 $('bkode').onkeydown = e => { if (e.key === 'Enter'){ e.preventDefault(); cekKodeAgen(); } };
 $('f-produk').onchange = gambarUlang;
-$('f-tier').onchange   = ringkasan;
 $('f-pax').oninput     = gambarUlang;
+$('f-tgl').onchange    = ringkasan;
+$('vcek').onclick      = cekVoucher;
+$('f-vou').onkeydown   = e => { if (e.key === 'Enter'){ e.preventDefault(); cekVoucher(); } };
+/* Mengetik ulang kode melepas status 'berlaku' — supaya tidak ada voucher sah
+   yang nyangkut dari kode sebelumnya. */
+$('f-vou').oninput     = () => { if (S.vouOk) { S.vouOk=false; S.vouKode=null;
+  $('vou-ket').textContent='Tekan Periksa untuk memeriksa kode ini.'; ringkasan(); } };
 $('f-anak').oninput    = ringkasan;
 $('kirim').onclick     = kirim;
 

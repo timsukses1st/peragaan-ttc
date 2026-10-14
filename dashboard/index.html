@@ -174,6 +174,14 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const tgl = s => s ? new Date(s).toLocaleDateString('id-ID',{day:'numeric',month:'short'}) : '—';
 const jam = s => s ? new Date(s).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+/* Untuk judul keberangkatan: hari + tanggal lengkap. Petugas dermaga membaca
+   "Sabtu, 18 Oktober 2026" jauh lebih cepat daripada "2026-10-18". */
+const tglPanjang = d => {
+  if (!d) return '—';
+  const t = new Date(d + 'T00:00:00');
+  return isNaN(t) ? String(d)
+    : t.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+};
 
 let TIMER;
 const pesan = (t, ms=6000) => {
@@ -191,11 +199,12 @@ const FU = {belum:['BELUM','p-warn'], dihubungi:['DIHUBUNGI','p-sea'],
 const JUDUL = {
   super:['Dashboard Super Admin','Semua akses — semua agen, semua pelanggan, bisa mengubah harga & komisi'],
   owner:['Dashboard Owner','Lihat semua data, tidak bisa mengubah apa pun'],
+  admin:['Dashboard Admin','Pembagian kapal & keberangkatan — tanpa akses harga, komisi, atau kontak agen'],
   agen:['Dashboard Agen','Hanya pelanggan & komisi milikmu'],
   boarding:['Petugas Boarding','Tanpa akses ke data penjualan maupun komisi']
 };
 
-const S = { peran:null, agenId:null, email:null, atur:null };
+const S = { peran:null, agenId:null, email:null, atur:null, kapal:[] };
 
 /* ============ LOGIN ============ */
 $('tblMasuk').onclick = async () => {
@@ -230,8 +239,10 @@ async function mulai(){
 
   const menu = peran==='agen'     ? [['komisi','Komisi & Pelanggan Saya'],['fu','Follow-Up Saya']]
              : peran==='boarding' ? [['boarding','Daftar Boarding']]
-             : [['ringkas','Ringkasan'],['pesanan','Pesanan'],['fu','Follow-Up'],
-                ['manifest','Manifest'],['agen','Agen & Kode'],['atur','Pengaturan']];
+             : peran==='admin'    ? [['kapal','Pembagian Kapal'],['berangkat','Keberangkatan']]
+             : [['ringkas','Ringkasan'],['pesanan','Pesanan'],['berangkat','Keberangkatan'],
+                ['kapal','Pembagian Kapal'],['fu','Follow-Up'],['manifest','Manifest'],
+                ['agen','Agen & Kode'],['voucher','Voucher'],['atur','Pengaturan']];
 
   $('navTab').innerHTML = menu.map(([k,l],i)=>
     `<button class="dbtab${i?'':' on'}" data-tab="${k}">${l}</button>`).join('');
@@ -246,7 +257,8 @@ function buka(tab){
   $('isi').innerHTML = `<div class="card"><span class="spin"
     style="border-color:#ccc;border-top-color:var(--sea)"></span> Memuat…</div>`;
   ({ringkas:tabRingkas, pesanan:tabPesanan, fu:tabFollowUp, manifest:tabManifest,
-    agen:tabAgen, atur:tabAtur, komisi:tabKomisi, boarding:tabBoarding}[tab] || (()=>{}))();
+    agen:tabAgen, atur:tabAtur, komisi:tabKomisi, boarding:tabBoarding,
+    kapal:tabKapal, berangkat:tabBerangkat, voucher:tabVoucher}[tab] || (()=>{}))();
 }
 
 /* ============ RINGKASAN ============ */
@@ -326,7 +338,8 @@ async function tabRingkas(){
 /* ============ PESANAN ============ */
 async function tabPesanan(){
   const { data, error } = await sb.from('pesanan')
-    .select('kode,tipe,pax,anak,total,status,dibuat,pemesan_nama,pemesan_hp,produk(nama),agen(nama)')
+    .select('kode,tipe,pax,anak,total,status,dibuat,tanggal_berangkat,kode_voucher_beku,'
+           + 'pemesan_nama,pemesan_hp,produk(nama),agen(nama),kapal(nama)')
     .order('dibuat',{ascending:false}).limit(300);
   if (error) return gagal(error);
 
@@ -334,16 +347,21 @@ async function tabPesanan(){
     <div class="card scrollx">
       <h3>Pesanan <span class="pill p-mute">${data.length}</span></h3>
       <table>
-        <tr><th class="nw">Kode</th><th class="nw">Tgl</th><th>Pembeli</th><th class="nw">WhatsApp</th>
+        <tr><th class="nw">Kode</th><th class="nw">Berangkat</th><th>Pembeli</th><th class="nw">WhatsApp</th>
             <th class="nw">Produk</th><th class="num">Pax</th><th class="nw">Agen</th>
             <th class="num">Total</th><th class="nw">Status</th></tr>
         ${data.map(o=>{
           const st = STATUS[o.status]||[o.status,'p-mute'];
           return `<tr>
             <td class="mono nw">${esc(o.kode)}</td>
-            <td class="nw" style="color:var(--muted)">${tgl(o.dibuat)}</td>
+            <td class="nw">${o.tanggal_berangkat
+              ? `${tgl(o.tanggal_berangkat)}${o.kapal?.nama
+                   ? ` <span class="pill p-sea">${esc(o.kapal.nama.replace(/^Kapal\s*/i,'K'))}</span>`
+                   : ' <span class="pill p-warn">belum</span>'}`
+              : '<span style="color:var(--muted)">—</span>'}</td>
             <td class="nw"><span class="nama" title="${esc(o.pemesan_nama)}">${esc(o.pemesan_nama)}</span>${
-              o.tipe==='biro'?' <span class="pill p-sea">BIRO</span>':''}</td>
+              o.tipe==='biro'?' <span class="pill p-sea">BIRO</span>':''}${
+              o.kode_voucher_beku?' <span class="pill p-ok">VOUCHER</span>':''}</td>
             <td class="nw">${selWa(o.pemesan_hp, `Halo ${o.pemesan_nama}, ini dari The Tamperan Cruise soal pesanan ${o.kode}.`)}</td>
             <td class="nw">${esc(o.produk?.nama)}</td>
             <td class="num nw">${o.pax}${o.anak?` <span class="pill p-warn">${o.anak} anak</span>`:''}</td>
@@ -709,6 +727,222 @@ async function simpanKode(id, kodeLama, nama, inp, tutup){
   tabAgen();
 }
 
+/* ============ KEBERANGKATAN (laporan per tanggal) ============ */
+async function tabBerangkat(){
+  const { data, error } = await sb.rpc('keberangkatan', { p_dari: null, p_sampai: null });
+  if (error) return gagal(error);
+  const baris = data || [];
+  const tot = baris.reduce((a,b)=>({
+    pes: a.pes + b.jml_pesanan, pax: a.pax + b.jml_pax,
+    anak: a.anak + b.jml_anak, omzet: a.omzet + Number(b.omzet),
+    belum: a.belum + b.belum_kapal
+  }), {pes:0,pax:0,anak:0,omzet:0,belum:0});
+
+  $('isi').innerHTML = `
+    <div class="grid g4">
+      <div class="kpi"><div class="k">Tanggal berangkat</div><div class="v">${baris.length}</div>
+        <div class="d">yang punya pesanan</div></div>
+      <div class="kpi"><div class="k">Total penumpang</div><div class="v">${tot.pax}</div>
+        <div class="d">${tot.pes} pesanan${tot.anak?` · ${tot.anak} anak`:''}</div></div>
+      <div class="kpi"><div class="k">Belum dapat kapal</div>
+        <div class="v" style="color:${tot.belum?'var(--warn)':'var(--ok)'}">${tot.belum}</div>
+        <div class="d">pesanan</div></div>
+      ${S.peran==='admin' ? '' : `<div class="kpi"><div class="k">Nilai</div>
+        <div class="v">${rp(tot.omzet)}</div><div class="d">semua tanggal</div></div>`}
+    </div>
+    <div class="card scrollx">
+      <h3>Tiket Terjual per Tanggal Keberangkatan</h3>
+      <table>
+        <thead><tr><th class="nw">Tanggal</th><th class="nw">Pelayaran</th>
+          <th class="num">Pesanan</th><th class="num">Pax</th><th class="num">Anak</th>
+          <th class="num">Belum berkapal</th>
+          ${S.peran==='admin' ? '' : '<th class="num">Nilai</th>'}</tr></thead>
+        <tbody>${baris.length ? baris.map(b=>`<tr>
+          <td class="nw"><b>${tglPanjang(b.tanggal)}</b></td>
+          <td class="nw">${esc(b.produk)}</td>
+          <td class="num">${b.jml_pesanan}</td>
+          <td class="num">${b.jml_pax}</td>
+          <td class="num">${b.jml_anak || '—'}</td>
+          <td class="num">${b.belum_kapal
+            ? `<span class="pill p-warn">${b.belum_kapal}</span>` : '<span class="pill p-ok">0</span>'}</td>
+          ${S.peran==='admin' ? '' : `<td class="num nw">${rp(b.omzet)}</td>`}
+        </tr>`).join('') : `<tr><td colspan="7"><div class="hint">
+          Belum ada pesanan yang punya tanggal keberangkatan.</div></td></tr>`}</tbody>
+      </table>
+      <div class="note"><b>Pesanan lama tidak punya tanggal</b>
+        Tanggal keberangkatan baru dikumpulkan sejak fitur ini dipasang. Pesanan
+        sebelum itu tidak muncul di sini — bukan hilang, memang tanggalnya tidak
+        pernah ditanyakan.</div>
+    </div>`;
+}
+
+/* ============ PEMBAGIAN KAPAL ============ */
+async function tabKapal(){
+  const [{data:kapal, error:e1}, {data:pes, error:e2}] = await Promise.all([
+    sb.from('kapal').select('id,nama,kapasitas,aktif').eq('aktif', true).order('urutan'),
+    sb.from('pesanan')
+      .select('id,kode,pax,anak,status,tanggal_berangkat,kapal_id,pemesan_nama,tipe,produk:produk_id(nama)')
+      .not('tanggal_berangkat','is',null)
+      .in('status',['pending','waiting','paid','boarded'])
+      .order('tanggal_berangkat')
+  ]);
+  if (e1) return gagal(e1);
+  if (e2) return gagal(e2);
+  S.kapal = kapal || [];
+
+  /* Dikelompokkan per tanggal: admin bekerja per keberangkatan, bukan per pesanan
+     lepas. Kapasitas dihitung ulang tiap kali supaya langsung terlihat penuh/tidak. */
+  const perTgl = {};
+  (pes||[]).forEach(o => { (perTgl[o.tanggal_berangkat] ||= []).push(o); });
+  const tanggal = Object.keys(perTgl).sort();
+
+  $('isi').innerHTML = tanggal.length ? tanggal.map(tg => {
+    const daftar = perTgl[tg];
+    const muat = {};
+    S.kapal.forEach(k => muat[k.id] = daftar.filter(o=>o.kapal_id===k.id)
+                                            .reduce((a,b)=>a+b.pax, 0));
+    const belum = daftar.filter(o => !o.kapal_id);
+    const belumPax = belum.reduce((a,b)=>a+b.pax,0);
+
+    return `<div class="card scrollx">
+      <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;margin-bottom:4px">
+        <h3 style="margin:0">${tglPanjang(tg)}</h3>
+        ${belum.length
+          ? `<span class="pill p-warn">${belum.length} pesanan · ${belumPax} orang belum berkapal</span>`
+          : '<span class="pill p-ok">SEMUA SUDAH BERKAPAL</span>'}
+      </div>
+      <div class="grid g2" style="margin:12px 0">
+        ${S.kapal.map(k => {
+          const isi = muat[k.id] || 0;
+          const penuh = k.kapasitas && isi > k.kapasitas;
+          return `<div class="kpi" ${penuh?'style="border-color:var(--danger)"':''}>
+            <div class="k">${esc(k.nama)}</div>
+            <div class="v" ${penuh?'style="color:var(--danger)"':''}>${isi}</div>
+            <div class="d">${k.kapasitas
+              ? `dari kapasitas ${k.kapasitas}${penuh?' — MELEBIHI':''}`
+              : 'kapasitas belum diisi'}</div></div>`;
+        }).join('')}
+      </div>
+      <table>
+        <thead><tr><th class="nw">Kode</th><th class="nw">Pemesan</th><th class="nw">Pelayaran</th>
+          <th class="num">Pax</th><th class="nw">Status</th><th class="nw">Kapal</th></tr></thead>
+        <tbody>${daftar.map(o=>{
+          const st = STATUS[o.status]||[o.status,'p-mute'];
+          return `<tr>
+            <td class="mono nw">${esc(o.kode)}</td>
+            <td class="nw"><span class="nama" title="${esc(o.pemesan_nama)}">${esc(o.pemesan_nama)}</span>${
+              o.tipe==='biro'?' <span class="pill p-sea">BIRO</span>':''}</td>
+            <td class="nw">${esc(o.produk?.nama)}</td>
+            <td class="num nw">${o.pax}${o.anak?` <span class="pill p-warn">${o.anak} anak</span>`:''}</td>
+            <td class="nw"><span class="pill ${st[1]}">${st[0]}</span></td>
+            <td class="nw"><select data-kapal="${o.id}" data-lama="${o.kapal_id || ''}"
+              style="width:132px;padding:5px 7px;font-size:13px">
+              <option value="">— belum —</option>
+              ${S.kapal.map(k=>`<option value="${k.id}"${
+                 k.id===o.kapal_id?' selected':''}>${esc(k.nama)}</option>`).join('')}
+            </select></td></tr>`;
+        }).join('')}</tbody>
+      </table></div>`;
+  }).join('') + `
+    <div class="note"><b>Kenapa admin tidak bisa mengubah harga</b>
+      RLS menjaga per baris, bukan per kolom. Kalau peran admin diberi izin menulis
+      ke tabel pesanan, dia bisa mengubah kolom apa pun termasuk total. Jadi
+      pembagian kapal lewat satu fungsi khusus yang hanya menyentuh kolom kapal,
+      dan setiap perubahannya tercatat di audit.</div>`
+  : `<div class="card"><div class="note w"><b>Belum ada keberangkatan</b>
+      Belum ada pesanan sah yang punya tanggal keberangkatan. Tanggal baru
+      dikumpulkan dari pesanan yang masuk lewat halaman pemesanan versi terbaru.</div></div>`;
+
+  $('isi').querySelectorAll('[data-kapal]').forEach(sel => sel.onchange = async () => {
+    const asal = sel.dataset.lama ?? '';
+    sel.disabled = true;
+    const { error } = await sb.rpc('atur_kapal', {
+      p_pesanan_id: sel.dataset.kapal,
+      p_kapal_id:   sel.value || null
+    });
+    sel.disabled = false;
+    if (error){ sel.value = asal; return gagalPesan(error); }
+    pesan(sel.value
+      ? `Ditempatkan ke ${esc(S.kapal.find(k=>k.id===sel.value)?.nama || 'kapal')}.`
+      : 'Penempatan kapal dikosongkan.');
+    tabKapal();
+  });
+}
+
+/* ============ VOUCHER ============ */
+async function tabVoucher(){
+  const { data, error } = await sb.from('kode_voucher')
+    .select('id,kode,keterangan,aktif,dibuat').order('dibuat', {ascending:false});
+  if (error) return gagal(error);
+  const bisa = S.peran === 'super';
+
+  $('isi').innerHTML = `
+    ${bisa ? `<div class="card">
+      <h3>Terbitkan kode voucher</h3>
+      <div class="grid g2">
+        <div class="fld"><label for="v-kode">Kode</label>
+          <input id="v-kode" class="mono" placeholder="mis. PACITAN2026" maxlength="32" spellcheck="false">
+          <div class="hint">3–32 karakter: huruf, angka, titik, garis bawah, strip.</div></div>
+        <div class="fld"><label for="v-ket">Keterangan</label>
+          <input id="v-ket" placeholder="mis. Harga warga Pacitan">
+          <div class="hint">Muncul di halaman pemesanan saat kode diperiksa.</div></div>
+      </div>
+      <button type="button" class="btn" id="v-buat">Terbitkan</button>
+    </div>` : ''}
+    <div class="card scrollx">
+      <h3>Kode Voucher</h3>
+      <table>
+        <thead><tr><th class="nw">Kode</th><th>Keterangan</th><th class="nw">Status</th>
+          <th class="nw">Dibuat</th><th></th></tr></thead>
+        <tbody>${(data||[]).length ? data.map(v=>`<tr>
+          <td class="mono nw"><b>${esc(v.kode)}</b></td>
+          <td>${esc(v.keterangan || '—')}</td>
+          <td class="nw">${v.aktif
+            ? '<span class="pill p-ok">AKTIF</span>' : '<span class="pill p-mute">NONAKTIF</span>'}</td>
+          <td class="nw" style="color:var(--muted)">${tgl(v.dibuat)}</td>
+          <td class="nw">${bisa
+            ? `<a class="aksi ghost" href="#" data-vaktif="${v.id}" data-nilai="${v.aktif?0:1}">${
+                 v.aktif?'Nonaktifkan':'Aktifkan'}</a>`
+            : '<span style="color:var(--muted);font-size:11.5px">tidak bisa edit</span>'}</td>
+        </tr>`).join('') : `<tr><td colspan="5"><div class="hint">Belum ada kode voucher.</div></td></tr>`}</tbody>
+      </table>
+      <div class="note"><b>Voucher ini membuka harga warga Pacitan</b>
+        Nilainya tidak disimpan di kode voucher — diambil dari harga lokal di tabel
+        produk saat pemesanan. Jadi kalau harga warga Pacitan berubah, cukup diubah
+        di satu tempat dan semua voucher ikut.</div>
+      <div class="note w"><b>Jangan tertukar dengan voucher Cruise PROMO</b>
+        Yang di tabel ini adalah kode yang <b>diketik pemesan</b> untuk mendapat harga
+        khusus. Voucher makan &amp; menginap yang <b>diberikan ke pembeli</b> Cruise PROMO
+        itu hal lain — kertasnya disobek kasir, tidak diurus di sini.</div>
+    </div>`;
+
+  if (bisa){
+    $('v-buat').onclick = async () => {
+      const kode = $('v-kode').value.trim();
+      if (!/^[A-Za-z0-9._-]{3,32}$/.test(kode))
+        return pesan('<b>Ditolak</b> Kode harus 3–32 karakter: huruf, angka, titik, garis bawah, atau strip.', 9000);
+      $('v-buat').disabled = true;
+      const { error } = await sb.from('kode_voucher')
+        .insert({ kode, keterangan: $('v-ket').value.trim() || null });
+      $('v-buat').disabled = false;
+      if (error){
+        if (error.code === '23505') return pesan(`<b>Ditolak</b> Kode <b>${esc(kode)}</b> sudah ada.`, 9000);
+        return gagalPesan(error);
+      }
+      pesan(`Kode ${esc(kode)} diterbitkan dan langsung bisa dipakai di halaman pemesanan.`);
+      tabVoucher();
+    };
+    $('isi').querySelectorAll('[data-vaktif]').forEach(b => b.onclick = async e => {
+      e.preventDefault(); b.style.pointerEvents='none';
+      const { error } = await sb.from('kode_voucher')
+        .update({ aktif: b.dataset.nilai==='1', diubah: new Date().toISOString() })
+        .eq('id', b.dataset.vaktif);
+      if (error){ b.style.pointerEvents=''; return gagalPesan(error); }
+      pesan('Status voucher diperbarui.'); tabVoucher();
+    });
+  }
+}
+
 /* ============ PENGATURAN ============ */
 async function tabAtur(){
   const { data, error } = await sb.from('pengaturan').select('*').single();
@@ -845,19 +1079,30 @@ async function tabKomisi(){
 /* ============ BOARDING ============ */
 async function tabBoarding(){
   const { data, error } = await sb.from('pesanan')
-    .select('kode,pax,anak,tipe,status,pemesan_nama,produk(nama),penumpang(naik)')
-    .in('status',['paid','boarded']).order('dibuat');
+    .select('kode,pax,anak,tipe,status,tanggal_berangkat,pemesan_nama,'
+          + 'produk(nama),kapal(nama),penumpang(naik)')
+    .in('status',['paid','boarded']).order('tanggal_berangkat');
   if (error) return gagal(error);
   $('isi').innerHTML = `
     <div class="card scrollx"><h3>Daftar Boarding</h3>
       <table>
-        <tr><th>Kode</th><th>Pemesan</th><th>Produk</th><th class="num">Pax</th>
-            <th class="num">Naik</th><th>Status</th></tr>
+        <tr><th class="nw">Berangkat</th><th class="nw">Kapal</th><th class="nw">Kode</th>
+            <th>Pemesan</th><th class="nw">Produk</th><th class="num">Pax</th>
+            <th class="num">Naik</th><th class="nw">Status</th></tr>
         ${(data||[]).map(o=>{
           const sdh=(o.penumpang||[]).filter(p=>p.naik).length;
-          return `<tr><td class="mono">${esc(o.kode)}</td>
-            <td>${esc(o.pemesan_nama)}${o.tipe==='biro'?' <span class="pill p-sea">BIRO</span>':''}</td>
-            <td>${esc(o.produk?.nama)}</td>
+          const hariIni = new Date().toISOString().slice(0,10);
+          return `<tr>
+            <td class="nw">${o.tanggal_berangkat
+              ? `${tgl(o.tanggal_berangkat)}${o.tanggal_berangkat===hariIni
+                   ? ' <span class="pill p-ok">HARI INI</span>' : ''}`
+              : '<span style="color:var(--muted)">—</span>'}</td>
+            <td class="nw">${o.kapal?.nama
+              ? esc(o.kapal.nama) : '<span class="pill p-warn">belum</span>'}</td>
+            <td class="mono nw">${esc(o.kode)}</td>
+            <td class="nw"><span class="nama" title="${esc(o.pemesan_nama)}">${esc(o.pemesan_nama)}</span>${
+              o.tipe==='biro'?' <span class="pill p-sea">BIRO</span>':''}</td>
+            <td class="nw">${esc(o.produk?.nama)}</td>
             <td class="num">${o.pax}${o.anak?`<div style="font-size:10.5px;color:var(--warn)">${o.anak} anak</div>`:''}</td>
             <td class="num"><span class="pill ${sdh>=o.pax?'p-ok':'p-warn'}">${sdh}/${o.pax}</span></td>
             <td><span class="pill ${(STATUS[o.status]||['','p-mute'])[1]}">${(STATUS[o.status]||[o.status])[0]}</span></td>
