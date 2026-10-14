@@ -204,7 +204,7 @@ const FU = {belum:['BELUM','p-warn'], dihubungi:['DIHUBUNGI','p-sea'],
 const JUDUL = {
   super:['Dashboard Super Admin','Semua akses — semua agen, semua pelanggan, bisa mengubah harga & komisi'],
   owner:['Dashboard Owner','Lihat semua data, tidak bisa mengubah apa pun'],
-  admin:['Dashboard Admin','Pembagian kapal & keberangkatan — tanpa akses harga, komisi, atau kontak agen'],
+  admin:['Dashboard Admin','Konfirmasi pembayaran, pembagian kapal & keberangkatan — tidak bisa mengubah harga, tidak melihat komisi maupun kontak agen'],
   agen:['Dashboard Agen','Hanya pelanggan & komisi milikmu'],
   boarding:['Petugas Boarding','Tanpa akses ke data penjualan maupun komisi']
 };
@@ -244,7 +244,8 @@ async function mulai(){
 
   const menu = peran==='agen'     ? [['komisi','Komisi & Pelanggan Saya'],['fu','Follow-Up Saya']]
              : peran==='boarding' ? [['boarding','Daftar Boarding']]
-             : peran==='admin'    ? [['kapal','Pembagian Kapal'],['berangkat','Keberangkatan']]
+             : peran==='admin'    ? [['pesanan','Pesanan'],['kapal','Pembagian Kapal'],
+                                      ['berangkat','Keberangkatan']]
              : [['ringkas','Ringkasan'],['pesanan','Pesanan'],['berangkat','Keberangkatan'],
                 ['kapal','Pembagian Kapal'],['fu','Follow-Up'],['manifest','Manifest'],
                 ['agen','Agen & Kode'],['voucher','Voucher & Tambahan'],['atur','Pengaturan']];
@@ -375,15 +376,73 @@ async function tabPesanan(){
             <td class="nw">${o.agen?`<span class="nama" style="max-width:130px" title="${esc(o.agen.nama)}">${esc(o.agen.nama)}</span>`
               :'<span class="pill p-mute">LANGSUNG</span>'}</td>
             <td class="nw"><span class="sel2"><span class="pill ${st[1]}">${st[0]}</span>${
-              o.status==='waiting' && S.peran==='super'
-                ? `<a class="aksi ghost" href="#" data-lunas="${esc(o.kode)}">Lunas</a>` : ''
-              }</span></td>
+              aksiStatus(o)}</span></td>
             <td class="num nw">${rp(o.total)}</td></tr>`;
         }).join('')}
       </table>
     </div>`;
-  $('isi').querySelectorAll('[data-lunas]').forEach(b => b.onclick = e => {
-    e.preventDefault(); tandaiLunas(b.dataset.lunas, b); });
+  pasangAksiStatus(tabPesanan);
+}
+
+/* ---- Aksi status pesanan ----
+   Super admin & admin boleh mengonfirmasi pembayaran dan membatalkan. Keduanya
+   lewat fungsi ubah_status_pesanan() di database, bukan UPDATE langsung — admin
+   tidak boleh punya akses tulis ke tabel pesanan karena RLS menjaga per baris,
+   bukan per kolom (dia bisa ikut mengubah kolom total). */
+const BOLEH_UBAH_STATUS = ['super','admin'];
+
+function aksiStatus(o){
+  if (!BOLEH_UBAH_STATUS.includes(S.peran)) return '';
+  const t = [];
+  /* 'waiting' tetap ditangani walau sudah tidak dipakai di alur baru —
+     masih ada baris lama yang berstatus itu. */
+  if (['pending','waiting'].includes(o.status))
+    t.push(`<a class="aksi ghost" href="#" data-status="${esc(o.kode)}" data-ke="paid">Lunas</a>`);
+  if (['pending','waiting','paid'].includes(o.status))
+    t.push(`<a class="aksi" href="#" data-status="${esc(o.kode)}" data-ke="cancel_pembeli"
+       style="background:var(--dangerbg);color:var(--danger);border-color:#e3a8a2">Batal</a>`);
+  /* Menghidupkan ulang pesanan batal sengaja hanya untuk super admin — database
+     juga menolaknya untuk admin, ini cuma menyembunyikan tombol yang pasti gagal. */
+  if (['cancel_pembeli','cancel_cuaca','expired'].includes(o.status) && S.peran === 'super')
+    t.push(`<a class="aksi ghost" href="#" data-status="${esc(o.kode)}" data-ke="pending">Aktifkan lagi</a>`);
+  return t.join(' ');
+}
+
+function pasangAksiStatus(muatUlang){
+  $('isi').querySelectorAll('[data-status]').forEach(b => b.onclick = async e => {
+    e.preventDefault();
+    const kode = b.dataset.status, ke = b.dataset.ke;
+    let alasan = null;
+
+    if (ke === 'paid'){
+      if (!confirm(`Tandai ${kode} LUNAS?\n\n`
+        + `Pastikan uangnya benar-benar sudah masuk. Perubahan ini tercatat di audit `
+        + `lengkap dengan nama Anda dan tidak bisa dihapus.`)) return;
+    } else if (ke === 'pending'){
+      if (!confirm(`Aktifkan lagi pesanan ${kode}?\n\n`
+        + `Pesanan kembali berstatus BELUM BAYAR dan masuk hitungan keberangkatan.`)) return;
+    } else {
+      /* Database menolak pembatalan tanpa alasan — diminta di sini supaya
+         penolakannya tidak datang belakangan. */
+      alasan = prompt(`Batalkan pesanan ${kode}.\n\nAlasan pembatalan (wajib):`, '');
+      if (alasan === null) return;
+      if (!alasan.trim()) return pesan('<b>Dibatalkan</b> Alasan pembatalan wajib diisi.', 9000);
+    }
+
+    const teksAsal = b.textContent;
+    b.style.pointerEvents = 'none'; b.textContent = '…';
+    const { error } = await sb.rpc('ubah_status_pesanan', {
+      p_kode: kode, p_status: ke, p_alasan: alasan
+    });
+    if (error){
+      b.style.pointerEvents = ''; b.textContent = teksAsal;
+      return gagalPesan(error);
+    }
+    const kabar = { paid:'ditandai LUNAS', pending:'diaktifkan lagi',
+                    cancel_pembeli:'dibatalkan' }[ke] || 'diperbarui';
+    pesan(`<b>${esc(kode)}</b> ${kabar}. Tercatat di audit atas nama Anda.`, 9000);
+    muatUlang();
+  });
 }
 
 /* Satu sel: nomor + tautan chat, sebaris, tidak pernah membuat baris jadi dua tingkat */
@@ -395,17 +454,6 @@ const fmtHp = hp => {
   const d = String(hp||'').replace(/\D/g,'');
   return d.length>9 ? d.replace(/^(\d{4})(\d{4})(\d+)$/,'$1-$2-$3') : d;
 };
-
-async function tandaiLunas(kode, btn){
-  const asal = btn.textContent; btn.style.pointerEvents='none'; btn.textContent='menyimpan…';
-  const { error } = await sb.from('pesanan')
-    .update({status:'paid', diubah:new Date().toISOString()}).eq('kode',kode);
-  if (error){ btn.style.pointerEvents=''; btn.textContent=asal; return gagalPesan(error); }
-  await sb.from('audit').insert({aktor_nama:S.email, aksi:'Status pembayaran',
-    objek:kode, dari:'waiting', ke:'paid'});
-  pesan(`<b>${esc(kode)}</b> ditandai LUNAS. Tercatat di audit log dan tidak bisa dihapus siapa pun.`,9000);
-  tabPesanan();
-}
 
 /* ============ FOLLOW-UP ============ */
 async function tabFollowUp(){
