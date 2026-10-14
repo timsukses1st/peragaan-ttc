@@ -209,7 +209,8 @@ const JUDUL = {
   boarding:['Petugas Boarding','Tanpa akses ke data penjualan maupun komisi']
 };
 
-const S = { peran:null, agenId:null, email:null, atur:null, kapal:[] };
+const S = { peran:null, agenId:null, email:null, uid:null, atur:null,
+             kapal:[], pengguna:[], agenList:[] };
 
 /* ============ LOGIN ============ */
 $('tblMasuk').onclick = async () => {
@@ -235,7 +236,7 @@ async function mulai(){
       Akun ini belum punya profil atau sedang nonaktif. Minta Super Admin menautkannya.</span>`;
     await sb.auth.signOut(); return;
   }
-  S.peran=peran; S.agenId=agenId; S.email=user.email;
+  S.peran=peran; S.agenId=agenId; S.email=user.email; S.uid=user.id;
   $('labelUser').textContent = user.email;
   $('judul').textContent    = JUDUL[peran][0];
   $('subjudul').textContent = JUDUL[peran][1];
@@ -248,7 +249,8 @@ async function mulai(){
                                       ['berangkat','Keberangkatan']]
              : [['ringkas','Ringkasan'],['pesanan','Pesanan'],['berangkat','Keberangkatan'],
                 ['kapal','Pembagian Kapal'],['fu','Follow-Up'],['manifest','Manifest'],
-                ['agen','Agen & Kode'],['voucher','Voucher & Tambahan'],['atur','Pengaturan']];
+                ['agen','Agen & Kode'],['voucher','Voucher & Tambahan'],
+                ['akses','Kelola Akses'],['atur','Pengaturan']];
 
   $('navTab').innerHTML = menu.map(([k,l],i)=>
     `<button class="dbtab${i?'':' on'}" data-tab="${k}">${l}</button>`).join('');
@@ -264,7 +266,8 @@ function buka(tab){
     style="border-color:#ccc;border-top-color:var(--sea)"></span> Memuat…</div>`;
   ({ringkas:tabRingkas, pesanan:tabPesanan, fu:tabFollowUp, manifest:tabManifest,
     agen:tabAgen, atur:tabAtur, komisi:tabKomisi, boarding:tabBoarding,
-    kapal:tabKapal, berangkat:tabBerangkat, voucher:tabVoucher}[tab] || (()=>{}))();
+    kapal:tabKapal, berangkat:tabBerangkat, voucher:tabVoucher,
+    akses:tabAkses}[tab] || (()=>{}))();
 }
 
 /* ============ RINGKASAN ============ */
@@ -1095,6 +1098,211 @@ async function simpanHarga(t, inp, tutup){
   if (error) return gagalPesan(error);
   pesan(`Harga ${esc(t.nama)} jadi ${rp(baru)}. Tercatat di audit.`, 9000);
   tabVoucher();
+}
+
+/* ============ KELOLA AKSES ============
+   SOP dashboard KIG: kelola akses, atur izin, ganti password, reset password.
+   Semua harus bisa dijalankan dari layar — yang cuma bisa lewat SQL tidak
+   dihitung selesai. */
+const PERAN_LABEL = {
+  super:   ['Super Admin','Semua akses, pemegang master'],
+  owner:   ['Owner','Lihat semua, tidak bisa mengubah'],
+  admin:   ['Admin','Konfirmasi bayar & bagi kapal'],
+  agen:    ['Agen','Hanya pelanggan & komisi sendiri'],
+  boarding:['Petugas Boarding','Hanya daftar boarding']
+};
+
+async function tabAkses(){
+  const [{ data:orang, error:e1 }, { data:agen, error:e2 }] = await Promise.all([
+    sb.rpc('daftar_pengguna'),
+    sb.from('agen').select('id,nama,kode').order('nama')
+  ]);
+  if (e1) return gagal(e1);
+  if (e2) return gagal(e2);
+  S.pengguna = orang || [];
+  S.agenList = agen || [];
+  const bisa = S.peran === 'super';
+
+  $('isi').innerHTML = `
+    <div class="card">
+      <h3 style="margin:0 0 12px">Akun Saya</h3>
+      <div class="grid g2">
+        <div class="fld"><label for="pw-baru">Ganti password</label>
+          <input id="pw-baru" type="password" autocomplete="new-password" placeholder="Minimal 8 karakter">
+          <div class="hint">Berlaku untuk akun yang sedang login: ${esc(S.email)}</div></div>
+        <div class="fld"><label for="pw-ulang">Ulangi password baru</label>
+          <input id="pw-ulang" type="password" autocomplete="new-password">
+          <div class="hint" id="pw-ket">Keduanya harus sama persis.</div></div>
+      </div>
+      <button type="button" class="btn" id="pw-simpan">Simpan password baru</button>
+    </div>
+
+    <div class="card scrollx">
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        <h3 style="margin:0">Pengguna <span class="pill p-mute">${S.pengguna.length}</span></h3>
+        <input id="cari-akses" placeholder="Cari nama, email, atau peran…" autocomplete="off"
+               style="margin-left:auto;max-width:280px">
+      </div>
+      <table>
+        <thead><tr><th class="nw">Nama</th><th class="nw">Email</th><th class="nw">Peran</th>
+          <th class="nw">Agen</th><th class="nw">Masuk terakhir</th><th class="nw">Status</th>
+          <th></th></tr></thead>
+        <tbody id="baris-akses"></tbody>
+      </table>
+      <div class="note"><b>Menonaktifkan, bukan menghapus</b>
+        Akun yang dinonaktifkan langsung kehilangan seluruh akses — fungsi
+        <span class="mono">peran()</span> hanya mengembalikan peran untuk profil aktif.
+        Jejak pekerjaannya di audit tetap punya pemilik, itu sebabnya tidak dihapus.</div>
+      ${bisa ? `<div class="note w"><b>Menambah akun baru belum bisa dari sini</b>
+        Membuat akun butuh kunci admin Supabase yang tidak boleh ditaruh di browser.
+        Untuk sekarang: buat akunnya di Supabase → Authentication → Add user, lalu
+        atur perannya di tabel ini.</div>` : ''}
+    </div>`;
+
+  const gambar = () => {
+    const q = ($('cari-akses').value || '').trim().toLowerCase();
+    const baris = S.pengguna.filter(u => !q
+      || [u.nama, u.email, u.peran, PERAN_LABEL[u.peran]?.[0], u.agen_nama]
+           .some(v => String(v||'').toLowerCase().includes(q)));
+
+    $('baris-akses').innerHTML = baris.length ? baris.map(u => {
+      const sendiri = u.id === S.uid;
+      const pl = PERAN_LABEL[u.peran] || [u.peran,''];
+      return `<tr>
+        <td class="nw"><b class="nama" title="${esc(u.nama)}">${esc(u.nama)}</b>${
+          sendiri ? ' <span class="pill p-sea">ANDA</span>' : ''}</td>
+        <td class="nw"><span class="nama" style="max-width:190px" title="${esc(u.email)}">${esc(u.email)}</span></td>
+        <td class="nw">${bisa
+          ? `<select data-peran="${u.id}" style="width:155px;padding:5px 7px;font-size:13px">
+               ${Object.entries(PERAN_LABEL).map(([k,v]) =>
+                 `<option value="${k}"${k===u.peran?' selected':''}>${esc(v[0])}</option>`).join('')}
+             </select>`
+          : `<span class="pill p-mute">${esc(pl[0])}</span>`}
+          <div class="hint">${esc(pl[1])}</div></td>
+        <td class="nw">${u.peran === 'agen'
+          ? (bisa
+             ? `<select data-agen="${u.id}" style="width:148px;padding:5px 7px;font-size:13px">
+                  ${S.agenList.map(a => `<option value="${a.id}"${
+                    a.nama===u.agen_nama?' selected':''}>${esc(a.nama)}</option>`).join('')}
+                </select>`
+             : esc(u.agen_nama || '—'))
+          : '<span style="color:var(--muted)">—</span>'}</td>
+        <td class="nw" style="color:var(--muted)">${u.masuk_terakhir ? jam(u.masuk_terakhir) : 'belum pernah'}</td>
+        <td class="nw">${u.aktif
+          ? '<span class="pill p-ok">AKTIF</span>' : '<span class="pill p-dang">NONAKTIF</span>'}</td>
+        <td class="nw">${bisa ? `
+          <span class="sel2">
+            <a class="aksi ghost" href="#" data-reset="${esc(u.email)}">Reset password</a>
+            ${sendiri ? '' : `<a class="aksi" href="#" data-aktif="${u.id}" data-ke="${u.aktif?0:1}"
+               style="${u.aktif
+                 ? 'background:var(--dangerbg);color:var(--danger);border-color:#e3a8a2'
+                 : 'background:var(--okbg);color:var(--ok);border-color:#a7d8bd'}">${
+                 u.aktif ? 'Nonaktifkan' : 'Aktifkan'}</a>`}
+          </span>` : '<span style="color:var(--muted);font-size:11.5px">tidak bisa edit</span>'}</td>
+      </tr>`;
+    }).join('') : `<tr><td colspan="7"><div class="hint">
+      Tidak ada pengguna yang cocok dengan pencarian.</div></td></tr>`;
+
+    if (!bisa) return;
+
+    /* --- atur izin: ubah peran --- */
+    $('baris-akses').querySelectorAll('[data-peran]').forEach(sel => sel.onchange = async () => {
+      const id = sel.dataset.peran, ke = sel.value;
+      const u  = S.pengguna.find(x => x.id === id);
+      let agenId = null;
+
+      /* Peran agen wajib bertaut ke satu data agen — ini dijaga CHECK
+         profil_agen_konsisten di database, jadi harus dipilih di sini juga. */
+      if (ke === 'agen'){
+        const cocok = S.agenList.find(a => a.nama === u?.agen_nama);
+        if (!cocok){
+          if (!S.agenList.length){
+            sel.value = u.peran;
+            return pesan('<b>Ditolak</b> Belum ada data agen untuk ditautkan.', 9000);
+          }
+          const pilih = prompt('Peran agen wajib ditautkan ke satu agen.\n\n'
+            + S.agenList.map((a,i) => `${i+1}. ${a.nama} (${a.kode})`).join('\n')
+            + '\n\nKetik nomornya:', '1');
+          if (pilih === null){ sel.value = u.peran; return; }
+          const idx = parseInt(pilih,10) - 1;
+          if (!(idx >= 0 && idx < S.agenList.length)){
+            sel.value = u.peran;
+            return pesan('<b>Dibatalkan</b> Nomor agen tidak dikenali.', 9000);
+          }
+          agenId = S.agenList[idx].id;
+        } else agenId = cocok.id;
+      }
+
+      if (!confirm(`Ubah peran ${u?.nama}: ${PERAN_LABEL[u?.peran]?.[0]} → ${PERAN_LABEL[ke]?.[0]}?`)){
+        sel.value = u.peran; return;
+      }
+      sel.disabled = true;
+      const { error } = await sb.rpc('ubah_peran',
+        { p_user: id, p_peran: ke, p_agen: agenId });
+      sel.disabled = false;
+      if (error){ sel.value = u.peran; return gagalPesan(error); }
+      pesan(`Peran ${esc(u?.nama)} jadi ${esc(PERAN_LABEL[ke]?.[0])}. Tercatat di audit.`, 9000);
+      tabAkses();
+    });
+
+    /* --- pindah agen --- */
+    $('baris-akses').querySelectorAll('[data-agen]').forEach(sel => sel.onchange = async () => {
+      sel.disabled = true;
+      const { error } = await sb.rpc('tautkan_agen',
+        { p_user: sel.dataset.agen, p_agen: sel.value });
+      sel.disabled = false;
+      if (error) return gagalPesan(error);
+      pesan('Tautan agen diperbarui. Tercatat di audit.'); tabAkses();
+    });
+
+    /* --- aktif / nonaktif --- */
+    $('baris-akses').querySelectorAll('[data-aktif]').forEach(b => b.onclick = async e => {
+      e.preventDefault();
+      const u = S.pengguna.find(x => x.id === b.dataset.aktif);
+      const nonaktif = b.dataset.ke === '0';
+      if (!confirm(nonaktif
+        ? `Nonaktifkan ${u?.nama}?\n\nAksesnya dicabut seketika. Dia tidak bisa login lagi sampai diaktifkan kembali.`
+        : `Aktifkan kembali ${u?.nama}?`)) return;
+      b.style.pointerEvents = 'none';
+      const { error } = await sb.rpc('ubah_aktif_pengguna',
+        { p_user: b.dataset.aktif, p_aktif: !nonaktif });
+      if (error){ b.style.pointerEvents = ''; return gagalPesan(error); }
+      pesan(`${esc(u?.nama)} ${nonaktif ? 'dinonaktifkan' : 'diaktifkan'}. Tercatat di audit.`, 9000);
+      tabAkses();
+    });
+
+    /* --- reset password: kirim tautan ke email pengguna --- */
+    $('baris-akses').querySelectorAll('[data-reset]').forEach(b => b.onclick = async e => {
+      e.preventDefault();
+      const email = b.dataset.reset;
+      if (!confirm(`Kirim tautan reset password ke ${email}?\n\n`
+        + `Password lama tetap berlaku sampai pemiliknya membuat yang baru lewat tautan itu.`)) return;
+      const teksAsal = b.textContent;
+      b.style.pointerEvents = 'none'; b.textContent = 'mengirim…';
+      const { error } = await sb.auth.resetPasswordForEmail(email, {
+        redirectTo: location.origin + location.pathname
+      });
+      b.style.pointerEvents = ''; b.textContent = teksAsal;
+      if (error) return gagalPesan(error);
+      pesan(`Tautan reset dikirim ke <b>${esc(email)}</b>. Cek folder spam kalau tidak muncul.`, 10000);
+    });
+  };
+
+  $('cari-akses').oninput = gambar;
+  gambar();
+
+  /* --- ganti password sendiri --- */
+  $('pw-simpan').onclick = async () => {
+    const a = $('pw-baru').value, b = $('pw-ulang').value;
+    if (a.length < 8) return pesan('<b>Ditolak</b> Password minimal 8 karakter.', 9000);
+    if (a !== b)      return pesan('<b>Ditolak</b> Dua kolom password belum sama.', 9000);
+    $('pw-simpan').disabled = true;
+    const { error } = await sb.auth.updateUser({ password: a });
+    $('pw-simpan').disabled = false;
+    if (error) return gagalPesan(error);
+    $('pw-baru').value = ''; $('pw-ulang').value = '';
+    pesan('Password diperbarui. Pakai yang baru untuk login berikutnya.', 9000);
+  };
 }
 
 /* ============ PENGATURAN ============ */
