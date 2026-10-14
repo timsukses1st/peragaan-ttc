@@ -156,32 +156,34 @@ footer{margin-top:40px;padding:22px 0 40px;border-top:1px solid var(--line);
 
   <div id="form-area">
 
-    <div class="card">
+    <!-- ============ GERBANG KODE AGEN ============
+         Semua pelanggan datang lewat agen; tidak ada jalur organik. Kode
+         diperiksa di sini, dan diwajibkan lagi oleh database saat menyimpan. -->
+    <div class="card" id="gate">
       <div class="fld">
-        <label>Jenis pemesanan</label>
-        <div class="seg">
-          <button type="button" id="tb-per" class="on">Perorangan / Keluarga</button>
-          <button type="button" id="tb-biro">Biro / Travel</button>
-        </div>
-        <div class="hint" id="tipe-ket">Untuk rombongan pribadi, keluarga, atau sendiri.</div>
+        <label for="bkode">Kode agen</label>
+        <input id="bkode" class="mono" placeholder="mis. BUDI2026" autocomplete="off" spellcheck="false">
+        <div class="hint" id="bkode-ket">Tekan Enter atau klik Periksa.</div>
       </div>
-
-      <!-- gerbang biro -->
-      <div id="gate" class="sembunyi">
-        <div class="note w"><b>Jalur biro butuh kode terdaftar</b>
-          Masukkan kode biro Anda. Kalau belum punya, hubungi kami lewat WhatsApp
-          — jalur ini hanya untuk biro/travel yang sudah bekerja sama.</div>
-        <div class="fld">
-          <label for="bkode">Kode biro</label>
-          <input id="bkode" class="mono" placeholder="mis. BUDI2026" autocomplete="off" spellcheck="false">
-          <div class="hint" id="bkode-ket">Tekan Enter atau klik Periksa.</div>
-        </div>
-        <button type="button" class="btn ghost" id="bcek">Periksa kode</button>
-      </div>
+      <button type="button" class="btn" id="bcek">Periksa kode</button>
+      <div class="note"><b>Belum punya kode?</b>
+        Pemesanan di The Tamperan Cruise dilayani lewat agen resmi kami.
+        Hubungi agen tempat Anda mendapat informasi ini untuk memperoleh kodenya.</div>
     </div>
 
-    <!-- isi utama (disembunyikan sampai gerbang biro lolos, kalau jalur biro) -->
-    <div id="utama">
+    <!-- isi utama: tersembunyi sampai kode agen terbukti sah -->
+    <div id="utama" class="sembunyi">
+
+      <div class="card">
+        <div class="fld">
+          <label>Jenis pemesanan</label>
+          <div class="seg">
+            <button type="button" id="tb-per" class="on">Perorangan / Keluarga</button>
+            <button type="button" id="tb-biro">Biro / Travel</button>
+          </div>
+          <div class="hint" id="tipe-ket">Untuk rombongan pribadi, keluarga, atau sendiri.</div>
+        </div>
+      </div>
 
       <div class="card">
         <div class="grid g2">
@@ -292,7 +294,7 @@ import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js
    Nomor WhatsApp tujuan konfirmasi pesanan. Format internasional tanpa '+'.
    Contoh: 081234567890 ditulis 6281234567890
    ==================================================================== */
-const WA_ADMIN = '6281235383398';          // <-- GANTI NOMOR INI
+const WA_ADMIN = '6281234567890';          // <-- GANTI NOMOR INI
 const WA_PLACEHOLDER = '6281234567890';    // pembanding; jangan diubah
 
 /* Kunci publishable memang untuk dipakai di browser. Yang menjaga data bukan
@@ -306,6 +308,14 @@ const $  = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const rp = n => 'Rp' + Number(n||0).toLocaleString('id-ID');
+/* 081234567890 -> 6281234567890. Nomor tersimpan dalam format lokal di
+   agen_kontak; wa.me butuh format internasional tanpa tanda plus. */
+const wa62 = hp => {
+  const d = String(hp||'').replace(/\D/g,'');
+  if (!d) return '';
+  if (d.startsWith('62')) return d;
+  return '62' + d.replace(/^0+/, '');
+};
 let TIMER;
 const pesan = (t, ms=6000) => {
   const el = $('pesan-bar'); el.innerHTML = t; el.style.display='block';
@@ -316,9 +326,11 @@ const pesan = (t, ms=6000) => {
 const S = {
   produk: [],
   tipe: 'perorangan',
-  biroOk: false,        /* gerbang biro: hanya true setelah kode diperiksa & sah */
-  biroNama: null,
+  kodeOk: false,        /* gerbang: true hanya setelah kode agen diperiksa & sah */
   kodeRef: null,
+  agenNama: null,
+  agenWa: null,         /* nomor tujuan WhatsApp — milik agen pemilik kode */
+  bolehBiro: false,
   diskonPersen: 0
 };
 
@@ -359,70 +371,79 @@ async function muat(){
   $('f-produk').innerHTML = prod.map(p =>
     `<option value="${esc(p.slug)}">${esc(p.nama)}</option>`).join('');
 
-  if (S.kodeRef) {
-    pesan(`Kode referral <b class="mono">${esc(S.kodeRef)}</b> terpasang.
-      Potongan diperiksa ulang oleh sistem saat pesanan disimpan.`, 8000);
+  /* Tautan agen (?ref=KODE): isi kolomnya dan periksa otomatis, supaya pelanggan
+     tidak perlu mengetik ulang kode yang sudah ada di tautannya. */
+  if (S.kodeRef){
+    $('bkode').value = S.kodeRef;
+    await cekKodeAgen(true);
   }
   gambarUlang();
 }
 
 /* ====================== JENIS PEMESANAN ====================== */
 function setTipe(t){
-  /* Gerbang SELALU ditutup ulang di awal — termasuk saat tombol Biro diklik lagi.
-     Kalau hanya ditutup waktu pindah ke 'perorangan', mengeklik Biro dua kali
-     akan mengosongkan kolom kode tapi membiarkan gerbangnya terbuka. */
-  S.biroOk = false;
-  S.biroNama = null;
-  $('bkode').value = '';
-  $('bkode-ket').textContent = 'Tekan Enter atau klik Periksa.';
-
+  /* Jalur biro hanya untuk agen yang diberi akses. Kalau kodenya bukan biro,
+     tombolnya tetap bisa diklik tapi langsung dipantulkan dengan alasan jelas —
+     lebih baik daripada tombol mati tanpa penjelasan. */
+  if (t === 'biro' && !S.bolehBiro){
+    pesan('<b>Tidak tersedia</b> Kode ini belum diberi akses jalur biro. '
+        + 'Pakai jalur perorangan, atau hubungi kami untuk mengaktifkannya.', 9000);
+    return;
+  }
   S.tipe = t;
   $('tb-per').classList.toggle('on', t==='perorangan');
   $('tb-biro').classList.toggle('on', t==='biro');
-  $('gate').classList.toggle('sembunyi', t!=='biro');
   $('kartu-biro').classList.toggle('sembunyi', t!=='biro');
   $('tipe-ket').textContent = t==='biro'
-    ? 'Khusus biro/travel terdaftar. Kode biro diperiksa dulu.'
+    ? 'Rombongan biro/travel. Daftar nama boleh disetor menyusul.'
     : 'Untuk rombongan pribadi, keluarga, atau sendiri.';
-  terapkanGerbang();
   gambarUlang();
 }
 
-/* Jalur biro: isi form dikunci sampai kode terbukti sah. */
+/* Isi form dikunci sampai kode agen terbukti sah. */
 function terapkanGerbang(){
-  const kunci = (S.tipe === 'biro') && !S.biroOk;
-  $('utama').classList.toggle('sembunyi', kunci);
+  $('utama').classList.toggle('sembunyi', !S.kodeOk);
 }
 
-async function cekKodeBiro(){
+async function cekKodeAgen(otomatis = false){
   const k = $('bkode').value.trim();
-  if (!k) return pesan('Isi dulu kode bironya.');
+  if (!k){ if (!otomatis) pesan('Isi dulu kode agennya.'); return; }
   $('bcek').disabled = true;
   $('bkode-ket').textContent = 'Memeriksa…';
-  const { data, error } = await sb.rpc('cek_kode_biro', { p_kode: k });
+
+  const { data, error } = await sb.rpc('cek_kode', { p_kode: k });
   $('bcek').disabled = false;
   if (error){
     $('bkode-ket').textContent = 'Gagal memeriksa.';
     return pesan('<b>Gagal</b> ' + esc(error.message), 9000);
   }
   const r = Array.isArray(data) ? data[0] : data;
+
   if (r?.valid){
-    S.biroOk   = true;
-    S.biroNama = r.nama;
-    S.kodeRef  = k;
-    $('bkode-ket').innerHTML = `<span class="pill p-ok">SAH</span> Terdaftar atas nama <b>${esc(r.nama)}</b>.`;
-    if (!$('f-bnama').value) $('f-bnama').value = r.nama;
-    pesan('Kode biro sah. Silakan lanjut mengisi pesanan.');
+    S.kodeOk    = true;
+    S.kodeRef   = k;
+    S.agenNama  = r.nama;
+    /* Nomor tujuan diambil dari agen_kontak lewat cek_kode. Boleh kosong —
+       kalau agen belum punya nomor, nanti jatuh ke nomor pusat. */
+    S.agenWa    = r.wa ? String(r.wa).replace(/\D/g,'') : null;
+    S.bolehBiro = !!r.boleh_biro;
+    $('bkode-ket').innerHTML =
+      `<span class="pill p-ok">SAH</span> Agen Anda: <b>${esc(r.nama)}</b>.`;
+    $('tb-biro').style.opacity = S.bolehBiro ? '' : '.5';
+    if (S.bolehBiro && !$('f-bnama').value) $('f-bnama').value = r.nama;
+    if (!otomatis) pesan(`Kode sah atas nama ${esc(r.nama)}. Silakan lanjut mengisi pesanan.`);
   } else {
-    S.biroOk = false;
+    /* Gerbang ditutup ulang supaya kode sah yang lama tidak nyangkut. */
+    S.kodeOk = false; S.kodeRef = null; S.agenNama = null;
+    S.agenWa = null;  S.bolehBiro = false;
     const sebab = {
       tidak_terdaftar: 'Kode ini tidak terdaftar.',
-      tidak_aktif:     'Kode ini sudah tidak aktif.',
-      bukan_biro:      'Kode ini terdaftar, tapi belum diberi akses jalur biro.'
+      tidak_aktif:     'Kode ini sudah tidak aktif.'
     }[r?.alasan] || 'Kode tidak bisa dipakai.';
     $('bkode-ket').innerHTML = `<span class="pill p-dang">DITOLAK</span> ${esc(sebab)}`;
   }
   terapkanGerbang();
+  if (S.kodeOk) { setTipe('perorangan'); gambarUlang(); }
 }
 
 /* ====================== PENUMPANG & RINGKASAN ====================== */
@@ -500,7 +521,7 @@ function ringkasan(){
     ? ($('f-tier').value === 'pacitan' ? p.harga_lokal : p.harga_umum)
     : p.harga_flat;
   const sub = satuan * n;
-  const persen = S.kodeRef ? S.diskonPersen : 0;
+  const persen = S.kodeOk ? S.diskonPersen : 0;
   const pot = Math.round(sub * persen / 100);
   const anak = hitungAnak();
 
@@ -526,8 +547,9 @@ async function kirim(){
   if (nama.length < 2)                 return pesan('Nama pemesan belum diisi.');
   if (hp.length < 9 || hp.length > 15) return pesan('Nomor WhatsApp belum benar.');
 
+  if (!S.kodeOk || !S.kodeRef) return pesan('Kode agen belum diperiksa.');
   if (S.tipe === 'biro'){
-    if (!S.biroOk) return pesan('Kode biro belum diperiksa.');
+    if (!S.bolehBiro) return pesan('Kode ini tidak punya akses jalur biro.');
     if (!$('f-bnama').value.trim() || !$('f-bpic').value.trim() || !$('f-bwa').value.trim())
       return pesan('Data biro belum lengkap: nama biro, PIC, dan WhatsApp PIC wajib diisi.');
   }
@@ -597,6 +619,13 @@ async function kirim(){
     /* 54000 = pembatas laju. Pesannya sudah ramah dari sananya, tampilkan apa adanya. */
     if (error.code === '54000' || /terlalu banyak|batas pemesanan/i.test(error.message||''))
       return pesan('<b>Ditahan sementara</b> ' + esc(error.message), 12000);
+    /* 22023 = kode agen wajib / tidak terdaftar. Kodenya mungkin baru dinonaktifkan
+       setelah pemeriksaan tadi — tutup gerbangnya lagi supaya pemesan memeriksa ulang. */
+    if (error.code === '22023'){
+      S.kodeOk = false; terapkanGerbang();
+      $('bkode-ket').innerHTML = `<span class="pill p-dang">DITOLAK</span> ${esc(error.message)}`;
+      return pesan('<b>Pesanan ditolak</b> ' + esc(error.message), 12000);
+    }
     return pesan('<b>Pesanan ditolak</b> ' + esc(error.message), 12000);
   }
 
@@ -611,9 +640,14 @@ function tampilkanHasil(kode, token, nama){
   document.querySelector('#pesan').scrollIntoView({behavior:'smooth'});
 
   const tautanStatus = `${location.origin}${location.pathname}?t=${encodeURIComponent(token)}`;
-  const teksWa = `Halo The Tamperan Cruise, saya ${nama}. `
+  /* Pelanggan dicari agen, jadi dia balik ke AGEN-nya, bukan ke nomor pusat.
+     Nomor pusat hanya cadangan kalau agen itu belum punya nomor terdaftar. */
+  const keAgen  = !!S.agenWa;
+  const tujuan  = keAgen ? wa62(S.agenWa) : WA_ADMIN;
+  const sapaan  = keAgen ? `Halo ${S.agenNama}` : 'Halo The Tamperan Cruise';
+  const teksWa  = `${sapaan}, saya ${nama}. `
     + `Saya baru membuat pesanan dengan kode ${kode}. Mohon dibantu konfirmasi dan pembayarannya.`;
-  const waSiap = WA_ADMIN && WA_ADMIN !== WA_PLACEHOLDER;
+  const waSiap  = keAgen || (WA_ADMIN && WA_ADMIN !== WA_PLACEHOLDER);
 
   $('hasil').classList.remove('sembunyi');
   $('hasil').innerHTML = `
@@ -624,12 +658,15 @@ function tampilkanHasil(kode, token, nama){
          kami konfirmasi lewat WhatsApp.</p>
 
       ${waSiap
-        ? `<a class="btn wa blok" href="https://wa.me/${WA_ADMIN}?text=${encodeURIComponent(teksWa)}"
-              target="_blank" rel="noopener">Lanjut ke WhatsApp sekarang</a>`
-        : `<div class="note d"><b>Nomor WhatsApp admin belum diisi</b>
-             Halaman ini masih memakai nomor contoh, jadi tombolnya sengaja tidak
-             diaktifkan supaya tidak mengarahkan pemesan ke nomor yang salah.
-             Ganti nilai <span class="mono">WA_ADMIN</span> di berkas ini.</div>`}
+        ? `<a class="btn wa blok" href="https://wa.me/${tujuan}?text=${encodeURIComponent(teksWa)}"
+              target="_blank" rel="noopener">Lanjut ke WhatsApp ${
+              keAgen ? esc(S.agenNama) : 'kami'}</a>
+           ${keAgen ? '' : `<div class="hint" style="text-align:center;margin-top:7px">
+              Agen Anda belum punya nomor terdaftar, jadi diarahkan ke layanan pusat.</div>`}`
+        : `<div class="note d"><b>Nomor WhatsApp belum tersedia</b>
+             Agen Anda belum punya nomor terdaftar dan nomor pusat masih nomor contoh,
+             jadi tombolnya sengaja tidak diaktifkan supaya Anda tidak diarahkan ke
+             nomor yang salah. Simpan kode pesanan di atas dan hubungi agen Anda langsung.</div>`}
 
       <div class="note"><b>Cek status pesanan kapan saja</b>
         Buka tautan ini — tidak perlu login:<br>
@@ -674,6 +711,8 @@ async function cekStatus(token){
     cancel_pembeli:['BATAL · PEMBELI','p-dang','Pesanan dibatalkan.']
   };
   const s = ST[o.status] || [o.status,'p-mute',''];
+  /* Halaman status dibuka dari tautan, tanpa keadaan gerbang — nomor agennya
+     tidak diketahui di sini, jadi memang ke nomor pusat. */
   const waSiap = WA_ADMIN && WA_ADMIN !== WA_PLACEHOLDER;
   const teksWa = `Halo The Tamperan Cruise, saya ingin menanyakan pesanan ${o.kode}.`;
 
@@ -697,8 +736,8 @@ async function cekStatus(token){
 /* ====================== PASANG ====================== */
 $('tb-per').onclick  = () => setTipe('perorangan');
 $('tb-biro').onclick = () => setTipe('biro');
-$('bcek').onclick    = cekKodeBiro;
-$('bkode').onkeydown = e => { if (e.key === 'Enter'){ e.preventDefault(); cekKodeBiro(); } };
+$('bcek').onclick    = () => cekKodeAgen();
+$('bkode').onkeydown = e => { if (e.key === 'Enter'){ e.preventDefault(); cekKodeAgen(); } };
 $('f-produk').onchange = gambarUlang;
 $('f-tier').onchange   = ringkasan;
 $('f-pax').oninput     = gambarUlang;

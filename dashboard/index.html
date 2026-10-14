@@ -542,9 +542,7 @@ async function tabAgen(){
         ${agen.map(a=>`<tr>
           <td class="nw"><b class="nama" title="${esc(a.nama)}">${esc(a.nama)}</b></td>
           <td class="mono nw" data-sel-kode="${a.id}">${selKode(a)}</td>
-          <td class="nw">${waOf[a.id]
-            ? selWa(waOf[a.id], `Halo ${a.nama}, ini dari The Tamperan Cruise.`)
-            : '<span style="color:var(--muted);font-size:12px">— tidak terlihat di peran ini</span>'}</td>
+          <td class="nw" data-sel-wa="${a.id}">${selWaAgen(a, waOf[a.id])}</td>
           <td class="nw">${a.boleh_biro?'<span class="pill p-sea">BOLEH</span>':'<span class="pill p-mute">TIDAK</span>'}</td>
           <td class="nw">${a.aktif?'<span class="pill p-ok">AKTIF</span>':'<span class="pill p-mute">NONAKTIF</span>'}</td>
           <td class="nw">${S.peran==='super'
@@ -554,6 +552,11 @@ async function tabAgen(){
         </tr>`).join('')}
       </table>
     </div>
+    <div class="note"><b>Nomor WhatsApp ini dipakai halaman pemesanan</b>
+      Pelanggan yang memakai kode seorang agen akan diarahkan ke nomor agen itu setelah
+      pesanannya tersimpan. Perubahan di sini <b>langsung berlaku</b> di situs — tidak perlu
+      deploy ulang. Agen yang nomornya kosong, pelanggannya jatuh ke nomor pusat.
+      Setiap perubahan tercatat di audit.</div>
     <div class="note"><b>Kenapa nomor WA ada di tabel terpisah</b>
       RLS bekerja per baris, bukan per kolom. Agen boleh melihat nama agen lain untuk leaderboard —
       kalau nomornya ikut di baris yang sama, nomornya ikut terbaca. Jadi kolomnya dipisah ke tabel
@@ -570,6 +573,82 @@ async function tabAgen(){
   });
 
   pasangEditorKode();
+  pasangEditorWa();
+}
+
+/* ---- Editor nomor WhatsApp agen (hanya super) ----
+   Nomor ini menentukan ke mana pelanggan diarahkan dari halaman publik:
+   cek_kode(kode) membacanya langsung, jadi perubahan di sini LANGSUNG berlaku
+   di situs tanpa deploy ulang apa pun. Karena itu perubahannya diaudit di
+   database (trg_agen_kontak_audit) dan formatnya dijaga CHECK agen_kontak_wa_format. */
+const WA_POLA = /^[0-9]{9,15}$/;    /* sama persis dengan CHECK di database */
+
+function selWaAgen(a, wa){
+  const bisaUbah = S.peran === 'super';
+  if (!wa){
+    /* Peran agen memang tidak boleh melihat nomor agen lain — bedakan "tidak
+       berhak lihat" dari "memang belum diisi", supaya tidak menyesatkan. */
+    if (!bisaUbah && S.peran !== 'owner')
+      return '<span style="color:var(--muted);font-size:12px">— tidak terlihat di peran ini</span>';
+    return `<span class="sel2"><span class="pill p-warn">BELUM DIISI</span>${
+      bisaUbah ? `<a class="aksi ghost" href="#" data-ubah-wa="${a.id}" data-wa=""
+         data-nama="${esc(a.nama)}">Isi nomor</a>` : ''}</span>`;
+  }
+  const chat = selWa(wa, `Halo ${a.nama}, ini dari The Tamperan Cruise.`);
+  return bisaUbah
+    ? `<span class="sel2">${chat}<a class="aksi ghost" href="#" data-ubah-wa="${a.id}"
+         data-wa="${esc(wa)}" data-nama="${esc(a.nama)}">Ubah</a></span>`
+    : chat;
+}
+
+function pasangEditorWa(){
+  $('isi').querySelectorAll('[data-ubah-wa]').forEach(t => t.onclick = e => {
+    e.preventDefault();
+    const sel = $('isi').querySelector(`[data-sel-wa="${t.dataset.ubahWa}"]`);
+    sel.innerHTML = `<span class="sel2">
+      <input class="kode-in" style="width:134px" inputmode="tel" maxlength="15"
+             placeholder="08xxxxxxxxxx" value="${esc(t.dataset.wa)}">
+      <a class="aksi ghost" href="#" data-simpan-wa>Simpan</a>
+      <a class="aksi" href="#" data-batal-wa style="color:var(--muted)">Batal</a></span>`;
+    const inp = sel.querySelector('.kode-in');
+    inp.focus(); inp.select();
+    const tutup = () => {
+      sel.innerHTML = selWaAgen({id:t.dataset.ubahWa, nama:t.dataset.nama}, t.dataset.wa || null);
+      pasangEditorWa();
+    };
+    sel.querySelector('[data-batal-wa]').onclick = ev => { ev.preventDefault(); tutup(); };
+    sel.querySelector('[data-simpan-wa]').onclick = ev => {
+      ev.preventDefault(); simpanWa(t.dataset.ubahWa, t.dataset.wa, t.dataset.nama, inp, tutup);
+    };
+    inp.onkeydown = ev => {
+      if (ev.key === 'Enter')  sel.querySelector('[data-simpan-wa]').onclick(ev);
+      if (ev.key === 'Escape') tutup();
+    };
+  });
+}
+
+async function simpanWa(id, waLama, nama, inp, tutup){
+  /* Angka saja — pemisah dan spasi dibuang di sini supaya operator boleh
+     mengetik '0857-9999-8888' tanpa ditolak. */
+  const baru = inp.value.replace(/\D/g, '');
+  if (baru === (waLama || '')) return tutup();
+  if (baru !== '' && !WA_POLA.test(baru))
+    return pesan('<b>Ditolak</b> Nomor WhatsApp harus 9–15 digit angka.', 9000);
+
+  inp.disabled = true;
+  /* upsert: agen yang baru dibuat belum tentu punya baris di agen_kontak. */
+  const { error } = await sb.from('agen_kontak')
+    .upsert({ agen_id: id, wa: baru || null }, { onConflict: 'agen_id' });
+  inp.disabled = false;
+  if (error){
+    if (error.code === '23514')
+      return pesan('<b>Ditolak</b> Format nomor ditolak database.', 9000);
+    return gagalPesan(error);
+  }
+  pesan(baru
+    ? `Nomor ${esc(nama)} diubah ke ${esc(baru)}. Pelanggan yang memakai kode ${esc(nama)} langsung diarahkan ke nomor ini.`
+    : `Nomor ${esc(nama)} dikosongkan. Pelanggannya akan diarahkan ke nomor pusat.`, 9000);
+  tabAgen();
 }
 
 /* ---- Editor kode referral (hanya super) ----
