@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Dashboard — The Tamperan Cruise</title>
+<style>
+:root{
+  /* Palet kontras-tinggi. Dashboard ini dipakai di dermaga, layar kena matahari
+     langsung — abu-abu muda hilang total di sana. Semua warna sekunder digelapkan
+     sampai minimal 4.5:1 terhadap latar putih, garis tabel dinaikkan ke abu sedang. */
+  --navy:#0f2744; --sea:#15688a; --sky:#d6ebf3; --ink:#0d1621; --muted:#475569;
+  --line:#9fb0c4; --bg:#f1f5f9; --card:#fff; --ok:#15603a; --okbg:#d9f0e2;
+  --warn:#7a4f06; --warnbg:#fbeccc; --danger:#8f1d16; --dangerbg:#fbdcd9; --gold:#8a6508;
+  /* Garis tabel diukur dengan rasio kontras, bukan dikira-kira: #7d90a9 = 3,26:1
+     terhadap putih (ambang WCAG 1.4.11 untuk komponen non-teks). Di bawah matahari
+     garis di bawah 2:1 hilang total — itu sebabnya abu-abu muda tidak dipakai. */
+  --garis-h:#7d90a9;   /* garis antar-baris — 3,26:1 */
+  --garis-v:#8b9db4;   /* garis antar-kolom — 2,77:1, sengaja setingkat lebih muda */
+}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+     background:var(--bg);color:var(--ink)}
+.wrap{max-width:1140px;margin:0 auto;padding:22px 16px 70px}
+.bar{background:var(--navy);color:#fff}
+.bar .in{max-width:1140px;margin:0 auto;padding:0 16px;display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.brand{padding:13px 0;font-weight:800;letter-spacing:.5px;font-size:15px;line-height:1.2}
+.brand small{display:block;font-weight:400;font-size:11px;color:#cfe4ef;letter-spacing:.2px}
+.bar .sisa{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12.5px;color:#cfe4ef}
+h1{font-size:25px;letter-spacing:-.5px;margin:0 0 3px}
+.sub{color:var(--muted);font-size:13.5px;margin:0 0 18px}
+.dbtabs{display:flex;gap:3px;border-bottom:1px solid var(--line);margin-bottom:18px;overflow-x:auto}
+.dbtab{background:none;border:0;border-bottom:2px solid transparent;padding:9px 13px;font:inherit;
+       font-size:13.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.dbtab.on{color:var(--sea);border-bottom-color:var(--sea);font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px;
+  box-shadow:0 1px 2px rgba(15,39,68,.06)}
+.card.tight{padding:13px}
+.card h3{margin:0 0 12px;font-size:15.5px}
+.grid{display:grid;gap:14px;margin-bottom:16px}
+.g4{grid-template-columns:repeat(auto-fit,minmax(195px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(195px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(290px,1fr))}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:12px;padding:15px;
+  box-shadow:0 1px 2px rgba(15,39,68,.06)}
+.kpi .k{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#334155;
+  font-weight:700;margin-bottom:6px}
+.kpi .v{font-size:23px;font-weight:700;letter-spacing:-.6px;font-variant-numeric:tabular-nums}
+.kpi .d{font-size:12px;color:var(--muted);margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px;
+   color:#1e293b;font-weight:700;background:#dde6f0;
+   padding:9px 8px;border-bottom:2px solid #475569;white-space:nowrap}
+td{padding:9px 8px;border-bottom:1.5px solid var(--garis-h);vertical-align:middle}
+/* Garis pemisah antarkolom — tipis saja, cukup untuk memandu mata ke bawah
+   tanpa bikin tabel tampak seperti kotak-kotak. Tidak dipasang di kolom pertama
+   supaya tepi kiri tabel tetap bersih. */
+th+th,td+td{border-left:1.5px solid var(--garis-v)}
+th:last-child,td:last-child{padding-right:16px}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:0}
+tbody tr:hover td,table tr:hover td{background:#e3eefa}
+.nw{white-space:nowrap}
+.kode-in{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;width:148px;padding:3px 7px;
+  border:1.5px solid var(--sea);border-radius:6px;text-transform:none}
+/* Nama orang/biro bisa panjang: potong dengan elipsis, jangan pernah pecah jadi dua baris.
+   Nama lengkap tetap bisa dibaca lewat atribut title saat disorot. */
+.nama{display:inline-block;max-width:135px;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;vertical-align:middle}
+/* Tautan aksi di dalam sel: jangan pernah jadi tombol balok */
+/* Badge aksi: ukurannya kecil supaya tidak menaikkan tinggi baris, tapi punya
+   latar berwarna supaya terbaca sebagai tombol — bukan teks biasa. */
+a.aksi{display:inline-block;padding:3px 9px;border-radius:999px;text-decoration:none;
+  font-weight:800;font-size:11.5px;letter-spacing:.2px;white-space:nowrap;line-height:1.5;
+  border:1.5px solid transparent;transition:filter .12s}
+a.aksi:hover{filter:brightness(.94);text-decoration:none}
+a.wa{background:#d6f0e1;color:#0f5c37;border-color:#7cc49c}
+a.ghost{background:#fff;color:var(--sea);border-color:#8fb3c9}
+.sel2{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+.mono{font-family:ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.3px;
+      padding:2px 8px;border-radius:99px;white-space:nowrap;border:1px solid}
+.p-ok{background:var(--okbg);color:var(--ok);border-color:#a7d8bd}
+.p-warn{background:var(--warnbg);color:var(--warn);border-color:#e0bf7a}
+.p-sea{background:var(--sky);color:var(--sea);border-color:#a4cbdc}
+.p-mute{background:#e2e8f0;color:var(--muted);border-color:#b6c2d1}
+.p-dang{background:var(--dangerbg);color:var(--danger);border-color:#e3a8a2}
+.btn{background:var(--sea);color:#fff;border:0;border-radius:9px;padding:10px 15px;font:inherit;
+     font-size:13.5px;font-weight:600;cursor:pointer}
+.btn.ghost{background:#fff;color:var(--sea);border:1px solid var(--sea)}
+.btn.sm{padding:5px 10px;font-size:12px;border-radius:7px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.fld{margin-bottom:13px}
+.fld label{display:block;font-size:12px;font-weight:600;margin-bottom:5px}
+input,select{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;
+             font:inherit;font-size:13.5px;background:#fff}
+input:focus,select:focus{outline:2px solid var(--sea);outline-offset:1px;border-color:var(--sea)}
+.hint{font-size:12px;color:var(--muted);margin-top:5px}
+.note{background:var(--sky);border-left:3px solid var(--sea);padding:11px 13px;border-radius:0 8px 8px 0;
+      font-size:12.5px;margin:12px 0}
+.note b{display:block;margin-bottom:3px}
+.note.w{background:var(--warnbg);border-left-color:var(--warn)}
+.note.d{background:var(--dangerbg);border-left-color:var(--danger)}
+.rank{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--garis-h)}
+.rank:last-child{border-bottom:0}
+.rank .no{width:28px;height:28px;border-radius:50%;background:var(--navy);color:#fff;
+          display:grid;place-items:center;font-weight:700;font-size:13px;flex:0 0 28px}
+.rank.r1 .no{background:var(--gold)} .rank.r2 .no{background:#64748b} .rank.r3 .no{background:#8d6346}
+.mid{min-height:72vh;display:grid;place-items:center}
+.hide{display:none!important}
+.prog{height:9px;background:#dbe3ec;border:1px solid #8b9db4;border-radius:99px;overflow:hidden;margin:7px 0}
+.prog i{display:block;height:100%;background:var(--sea)}
+.fugrp{margin-bottom:20px}
+.fugrp h3{display:flex;align-items:center;gap:8px}
+#pesan{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--navy);color:#fff;
+       padding:13px 17px;border-radius:10px;font-size:13px;max-width:min(520px,92vw);
+       box-shadow:0 8px 26px rgba(0,0,0,.22);z-index:99;display:none;line-height:1.5}
+.spin{display:inline-block;width:13px;height:13px;border:2px solid #fff6;border-top-color:#fff;
+      border-radius:50%;animation:p .7s linear infinite;vertical-align:-2px}
+@keyframes p{to{transform:rotate(360deg)}}
+.scrollx{overflow-x:auto}
+</style>
+</head>
+<body>
+
+<div id="pesan"></div>
+
+<!-- ============ LOGIN ============ -->
+<div id="layarLogin" class="wrap mid">
+  <div style="width:100%;max-width:380px">
+    <div style="text-align:center;margin-bottom:18px">
+      <div style="font-size:21px;font-weight:800;color:var(--navy);letter-spacing:.5px">THE TAMPERAN CRUISE</div>
+      <div style="font-size:12.5px;color:var(--muted)">Dashboard internal</div>
+    </div>
+    <div class="card">
+      <div class="fld"><label>Email</label><input id="email" type="email" autocomplete="username"></div>
+      <div class="fld"><label>Kata sandi</label><input id="sandi" type="password" autocomplete="current-password"></div>
+      <button class="btn" style="width:100%" id="tblMasuk">Masuk</button>
+      <div class="hint" id="loginPesan"></div>
+    </div>
+    <div class="hint" style="text-align:center">Akun dibuat Super Admin. Tidak ada pendaftaran mandiri.</div>
+  </div>
+</div>
+
+<!-- ============ APLIKASI ============ -->
+<div id="layarApp" class="hide">
+  <div class="bar"><div class="in">
+    <div class="brand">THE TAMPERAN CRUISE<small>sistem penjualan</small></div>
+    <div class="sisa"><span id="labelUser"></span>
+      <button class="btn ghost sm" id="tblKeluar">Keluar</button></div>
+  </div></div>
+  <div class="wrap">
+    <h1 id="judul">—</h1>
+    <p class="sub" id="subjudul"></p>
+    <div class="dbtabs" id="navTab"></div>
+    <div id="isi"></div>
+  </div>
+</div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+/* Publishable key memang untuk browser — bukan rahasia. Yang menjaga data
+   adalah RLS + GRANT di database, bukan penyembunyian kunci. */
+const sb = createClient(
+  'https://xumbqiezefdkgertjkjv.supabase.co',
+  'sb_publishable_fiKXnxZS_ZpzGDGQ_TY4jw_T-t-3_zF'
+);
+
+const $ = id => document.getElementById(id);
+const rp = n => 'Rp' + (n||0).toLocaleString('id-ID');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const tgl = s => s ? new Date(s).toLocaleDateString('id-ID',{day:'numeric',month:'short'}) : '—';
+const jam = s => s ? new Date(s).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}) : '—';
+
+let TIMER;
+const pesan = (t, ms=6000) => {
+  const el = $('pesan'); el.innerHTML = t; el.style.display='block';
+  clearTimeout(TIMER); TIMER = setTimeout(()=>el.style.display='none', ms);
+};
+
+const STATUS = {
+  pending:['BELUM BAYAR','p-mute'], waiting:['PERLU CEK','p-warn'],
+  paid:['LUNAS','p-ok'], boarded:['SUDAH NAIK','p-sea'], expired:['KEDALUWARSA','p-mute'],
+  cancel_cuaca:['BATAL · CUACA','p-mute'], cancel_pembeli:['BATAL · PEMBELI','p-dang']
+};
+const FU = {belum:['BELUM','p-warn'], dihubungi:['DIHUBUNGI','p-sea'],
+            tidak:['TIDAK TERTARIK','p-mute'], jadi:['JADI','p-ok']};
+const JUDUL = {
+  super:['Dashboard Super Admin','Semua akses — semua agen, semua pelanggan, bisa mengubah harga & komisi'],
+  owner:['Dashboard Owner','Lihat semua data, tidak bisa mengubah apa pun'],
+  agen:['Dashboard Agen','Hanya pelanggan & komisi milikmu'],
+  boarding:['Petugas Boarding','Tanpa akses ke data penjualan maupun komisi']
+};
+
+const S = { peran:null, agenId:null, email:null, atur:null };
+
+/* ============ LOGIN ============ */
+$('tblMasuk').onclick = async () => {
+  const b=$('tblMasuk'), p=$('loginPesan');
+  b.disabled=true; b.innerHTML='<span class="spin"></span> Memeriksa…'; p.textContent='';
+  const { error } = await sb.auth.signInWithPassword({
+    email: $('email').value.trim(), password: $('sandi').value });
+  b.disabled=false; b.textContent='Masuk';
+  if (error){ p.innerHTML=`<span style="color:var(--danger);font-weight:600">${esc(error.message)}</span>`; return; }
+  await mulai();
+};
+$('sandi').addEventListener('keydown', e => { if(e.key==='Enter') $('tblMasuk').click(); });
+$('tblKeluar').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+/* ============ MULAI ============ */
+async function mulai(){
+  const { data:{ user } } = await sb.auth.getUser();
+  if (!user) return;
+  const [{ data:peran, error:e1 }, { data:agenId }] =
+    await Promise.all([ sb.rpc('peran'), sb.rpc('agen_saya') ]);
+  if (e1 || !peran){
+    $('loginPesan').innerHTML = `<span style="color:var(--danger);font-weight:600">
+      Akun ini belum punya profil atau sedang nonaktif. Minta Super Admin menautkannya.</span>`;
+    await sb.auth.signOut(); return;
+  }
+  S.peran=peran; S.agenId=agenId; S.email=user.email;
+  $('labelUser').textContent = user.email;
+  $('judul').textContent    = JUDUL[peran][0];
+  $('subjudul').textContent = JUDUL[peran][1];
+  $('layarLogin').classList.add('hide');
+  $('layarApp').classList.remove('hide');
+
+  const menu = peran==='agen'     ? [['komisi','Komisi & Pelanggan Saya'],['fu','Follow-Up Saya']]
+             : peran==='boarding' ? [['boarding','Daftar Boarding']]
+             : [['ringkas','Ringkasan'],['pesanan','Pesanan'],['fu','Follow-Up'],
+                ['manifest','Manifest'],['agen','Agen & Kode'],['atur','Pengaturan']];
+
+  $('navTab').innerHTML = menu.map(([k,l],i)=>
+    `<button class="dbtab${i?'':' on'}" data-tab="${k}">${l}</button>`).join('');
+  $('navTab').querySelectorAll('.dbtab').forEach(b => b.onclick = () => {
+    $('navTab').querySelectorAll('.dbtab').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); buka(b.dataset.tab);
+  });
+  buka(menu[0][0]);
+}
+
+function buka(tab){
+  $('isi').innerHTML = `<div class="card"><span class="spin"
+    style="border-color:#ccc;border-top-color:var(--sea)"></span> Memuat…</div>`;
+  ({ringkas:tabRingkas, pesanan:tabPesanan, fu:tabFollowUp, manifest:tabManifest,
+    agen:tabAgen, atur:tabAtur, komisi:tabKomisi, boarding:tabBoarding}[tab] || (()=>{}))();
+}
+
+/* ============ RINGKASAN ============ */
+async function tabRingkas(){
+  const [{data:r, error:er}, {data:lb}, {data:ord, error:eo}] = await Promise.all([
+    sb.rpc('ringkasan_dashboard',{p_periode:null}),
+    sb.rpc('papan_peringkat',{p_periode:null}),
+    sb.from('pesanan').select('pax,total,status,produk(nama)').in('status',['paid','boarded'])
+  ]);
+  if (er) return gagal(er);
+  if (eo) return gagal(eo);
+  const k = (r&&r[0])||{}, L = lb||[];
+
+  /* Penjualan per produk — dihitung dari pesanan lunas */
+  const perProduk = {};
+  (ord||[]).forEach(o => {
+    const n = o.produk?.nama || '—';
+    perProduk[n] = perProduk[n] || {tiket:0, omzet:0};
+    perProduk[n].tiket += o.pax; perProduk[n].omzet += o.total;
+  });
+  const urutProduk = Object.entries(perProduk).sort((a,b)=>b[1].omzet-a[1].omzet);
+
+  /* Temuan: kontradiksi tier tiket vs omzet, dari angka nyata */
+  let temuan = '';
+  if (L.length >= 2){
+    const [a,b] = L;
+    const dOm = Math.abs(a.omzet-b.omzet)/Math.max(Math.min(a.omzet,b.omzet),1)*100;
+    const dKo = Math.abs(a.komisi-b.komisi)/Math.max(Math.min(a.komisi,b.komisi),1)*100;
+    temuan = `<div class="note d">
+      <b>⚠️ Temuan dari data ini — tier berbasis jumlah tiket</b>
+      ${esc(a.nama)} ${rp(a.omzet)} (${a.tiket} tiket, tarif ${a.tarif}%) vs
+      ${esc(b.nama)} ${rp(b.omzet)} (${b.tiket} tiket, tarif ${b.tarif}%).
+      Selisih omzet <b>${dOm.toFixed(0)}%</b>, selisih komisi <b>${dKo.toFixed(0)}%</b>.
+      ${a.tarif!==b.tarif
+        ? 'Omzet berbeda tapi komisi beda jauh lebih tajam, karena satu tembus ambang tier dan satu tidak. Leaderboard mengukur rupiah, tier mengukur jumlah tiket — dua ukuran yang bertentangan.'
+        : 'Tarif keduanya sama, jadi selisih komisinya proporsional dengan omzet. Inilah yang terjadi kalau tier dihitung dari omzet rupiah.'}
+    </div>`;
+  }
+
+  $('isi').innerHTML = `
+    <div class="grid g4">
+      <div class="kpi"><div class="k">Omzet</div><div class="v">${rp(k.omzet_total)}</div>
+        <div class="d">${k.tiket_total||0} tiket terjual</div></div>
+      <div class="kpi"><div class="k">Komisi Agen</div><div class="v">${rp(k.komisi_total)}</div>
+        <div class="d">total ${L.length} agen</div></div>
+      <div class="kpi"><div class="k">Perlu Follow-Up</div>
+        <div class="v" style="color:var(--warn)">${k.perlu_follow_up||0}</div>
+        <div class="d">lead &amp; pelanggan menggantung</div></div>
+      <div class="kpi"><div class="k">Menunggu Verifikasi</div>
+        <div class="v" style="color:var(--warn)">${k.menunggu_verif||0}</div>
+        <div class="d">order belum ditandai lunas</div></div>
+    </div>
+    ${temuan}
+    <div class="grid g2">
+      <div class="card"><h3>Leaderboard Top ${Math.min(L.length,3)}</h3>
+        <div style="font-size:11.5px;color:var(--muted);margin-bottom:9px">Diurutkan berdasarkan total rupiah</div>
+        ${L.length ? L.slice(0,3).map((a,i)=>`
+          <div class="rank r${i+1}"><div class="no">${i+1}</div>
+            <div style="flex:1"><div style="font-weight:600;font-size:14px">${esc(a.nama)}</div>
+              <div style="font-size:11.5px;color:var(--muted)">${a.tiket} tiket · tarif ${a.tarif}%</div></div>
+            <div class="num"><div style="font-weight:700">${rp(a.omzet)}</div>
+              <div style="font-size:11.5px;color:var(--muted)">komisi ${rp(a.komisi)}</div></div>
+          </div>`).join('') : '<div class="hint">Belum ada penjualan lunas.</div>'}
+        <div class="note w"><b>Tarif berlaku retroaktif</b>
+          Begitu tembus ambang tier, seluruh omzet periode itu ikut naik tarifnya — bukan hanya tiket sesudahnya.</div>
+      </div>
+      <div class="card"><h3>Penjualan per Produk</h3>
+        ${urutProduk.length ? `<table>${urutProduk.map(([n,v])=>
+          `<tr><td>${esc(n)}</td>
+            <td class="num" style="color:var(--muted)">${v.tiket} tiket</td>
+            <td class="num"><b>${rp(v.omzet)}</b></td></tr>`).join('')}</table>`
+          : '<div class="hint">Belum ada penjualan lunas.</div>'}
+      </div>
+    </div>`;
+}
+
+/* ============ PESANAN ============ */
+async function tabPesanan(){
+  const { data, error } = await sb.from('pesanan')
+    .select('kode,tipe,pax,anak,total,status,dibuat,pemesan_nama,pemesan_hp,produk(nama),agen(nama)')
+    .order('dibuat',{ascending:false}).limit(300);
+  if (error) return gagal(error);
+
+  $('isi').innerHTML = `
+    <div class="card scrollx">
+      <h3>Pesanan <span class="pill p-mute">${data.length}</span></h3>
+      <table>
+        <tr><th class="nw">Kode</th><th class="nw">Tgl</th><th>Pembeli</th><th class="nw">WhatsApp</th>
+            <th class="nw">Produk</th><th class="num">Pax</th><th class="nw">Agen</th>
+            <th class="num">Total</th><th class="nw">Status</th></tr>
+        ${data.map(o=>{
+          const st = STATUS[o.status]||[o.status,'p-mute'];
+          return `<tr>
+            <td class="mono nw">${esc(o.kode)}</td>
+            <td class="nw" style="color:var(--muted)">${tgl(o.dibuat)}</td>
+            <td class="nw"><span class="nama" title="${esc(o.pemesan_nama)}">${esc(o.pemesan_nama)}</span>${
+              o.tipe==='biro'?' <span class="pill p-sea">BIRO</span>':''}</td>
+            <td class="nw">${selWa(o.pemesan_hp, `Halo ${o.pemesan_nama}, ini dari The Tamperan Cruise soal pesanan ${o.kode}.`)}</td>
+            <td class="nw">${esc(o.produk?.nama)}</td>
+            <td class="num nw">${o.pax}${o.anak?` <span class="pill p-warn">${o.anak} anak</span>`:''}</td>
+            <td class="nw">${o.agen?`<span class="nama" style="max-width:130px" title="${esc(o.agen.nama)}">${esc(o.agen.nama)}</span>`
+              :'<span class="pill p-mute">LANGSUNG</span>'}</td>
+            <td class="num nw">${rp(o.total)}</td>
+            <td class="nw"><span class="sel2"><span class="pill ${st[1]}">${st[0]}</span>${
+              o.status==='waiting' && S.peran==='super'
+                ? `<a class="aksi ghost" href="#" data-lunas="${esc(o.kode)}">Lunas</a>` : ''
+              }</span></td></tr>`;
+        }).join('')}
+      </table>
+    </div>`;
+  $('isi').querySelectorAll('[data-lunas]').forEach(b => b.onclick = e => {
+    e.preventDefault(); tandaiLunas(b.dataset.lunas, b); });
+}
+
+/* Satu sel: nomor + tautan chat, sebaris, tidak pernah membuat baris jadi dua tingkat */
+const selWa = (hp,teks) => !hp ? '<span style="color:var(--muted)">—</span>' : `
+  <span class="sel2"><span class="mono" style="font-size:12px">${esc(fmtHp(hp))}</span>
+  <a class="aksi wa" href="https://wa.me/62${String(hp).replace(/\D/g,'').replace(/^0/,'')}?text=${
+     encodeURIComponent(teks)}" target="_blank" rel="noopener">Chat</a></span>`;
+const fmtHp = hp => {
+  const d = String(hp||'').replace(/\D/g,'');
+  return d.length>9 ? d.replace(/^(\d{4})(\d{4})(\d+)$/,'$1-$2-$3') : d;
+};
+
+async function tandaiLunas(kode, btn){
+  const asal = btn.textContent; btn.style.pointerEvents='none'; btn.textContent='menyimpan…';
+  const { error } = await sb.from('pesanan')
+    .update({status:'paid', diubah:new Date().toISOString()}).eq('kode',kode);
+  if (error){ btn.style.pointerEvents=''; btn.textContent=asal; return gagalPesan(error); }
+  await sb.from('audit').insert({aktor_nama:S.email, aksi:'Status pembayaran',
+    objek:kode, dari:'waiting', ke:'paid'});
+  pesan(`<b>${esc(kode)}</b> ditandai LUNAS. Tercatat di audit log dan tidak bisa dihapus siapa pun.`,9000);
+  tabPesanan();
+}
+
+/* ============ FOLLOW-UP ============ */
+async function tabFollowUp(){
+  const { data, error } = await sb.from('pesanan')
+    .select('kode,status,fu_status,fu_terakhir,pemesan_nama,pemesan_hp,total,dibuat,produk(nama)')
+    .in('status',['pending','expired','cancel_pembeli'])
+    .order('dibuat',{ascending:false});
+  if (error) return gagal(error);
+
+  const grup = [
+    ['pending',        'Belum bayar',        'Order dibuat tapi belum ada pembayaran. Paling berharga — niatnya sudah ada.'],
+    ['expired',        'Kedaluwarsa',        'Lewat batas tahan order. Kursinya sudah dilepas, tapi orangnya masih bisa ditawari lagi.'],
+    ['cancel_pembeli', 'Batal oleh pembeli', 'Dibatalkan sendiri. Tanya alasannya — ini umpan balik yang paling jujur.']
+  ];
+
+  $('isi').innerHTML = grup.map(([st,judul,ket]) => {
+    const arr = (data||[]).filter(o=>o.status===st);
+    if (!arr.length) return `<div class="fugrp"><h3>${judul}
+      <span class="pill p-mute">0</span></h3><div class="hint">Tidak ada. Bagus.</div></div>`;
+    return `<div class="fugrp">
+      <h3>${judul} <span class="pill p-warn">${arr.length}</span></h3>
+      <div class="hint" style="margin-bottom:9px">${ket}</div>
+      <div class="card tight scrollx"><table>
+        <tr><th class="nw">Kode</th><th>Nama</th><th class="nw">WhatsApp</th><th class="nw">Produk</th>
+            <th class="num">Nilai</th><th class="nw">Status FU</th><th class="nw">Terakhir</th><th></th></tr>
+        ${arr.map(o=>{
+          const f = FU[o.fu_status]||[o.fu_status,'p-mute'];
+          return `<tr>
+            <td class="mono nw">${esc(o.kode)}</td>
+            <td class="nw"><span class="nama" title="${esc(o.pemesan_nama)}">${esc(o.pemesan_nama)}</span></td>
+            <td class="nw">${selWa(o.pemesan_hp, `Halo ${o.pemesan_nama}, ini dari The Tamperan Cruise. Pesanan ${o.kode} masih kami simpan — ada yang bisa kami bantu?`)}</td>
+            <td class="nw">${esc(o.produk?.nama)}</td>
+            <td class="num nw">${rp(o.total)}</td>
+            <td class="nw"><span class="pill ${f[1]}">${f[0]}</span></td>
+            <td class="nw" style="color:var(--muted);font-size:12px">${jam(o.fu_terakhir)}</td>
+            <td><select data-fu="${esc(o.kode)}" style="min-width:140px">
+              ${Object.entries(FU).map(([v,t])=>
+                `<option value="${v}" ${o.fu_status===v?'selected':''}>${t[0]}</option>`).join('')}
+            </select></td></tr>`;
+        }).join('')}
+      </table></div></div>`;
+  }).join('') + `
+    <div class="note"><b>Kenapa tiga kategori, bukan satu daftar</b>
+      Orang yang belum bayar, yang kadaluwarsa, dan yang membatalkan sendiri butuh kalimat pembuka
+      yang berbeda. Satu daftar campur membuat semuanya disapa dengan cara yang sama.</div>`;
+
+  $('isi').querySelectorAll('[data-fu]').forEach(sel => sel.onchange = async () => {
+    sel.disabled = true;
+    const { error } = await sb.from('pesanan').update({
+      fu_status: sel.value, fu_terakhir: new Date().toISOString()
+    }).eq('kode', sel.dataset.fu);
+    sel.disabled = false;
+    if (error) return gagalPesan(error);
+    await sb.from('audit').insert({aktor_nama:S.email, aksi:'Follow-up',
+      objek:sel.dataset.fu, ke:sel.value});
+    pesan(`<b>${esc(sel.dataset.fu)}</b> ditandai <b>${FU[sel.value][0]}</b>. Tercatat supaya tidak ada lead yang dihubungi dua kali atau terlewat.`);
+    tabFollowUp();
+  });
+}
+
+/* ============ MANIFEST ============ */
+async function tabManifest(){
+  const [{data:ord, error:e1}, {data:atur}] = await Promise.all([
+    sb.from('pesanan').select(`kode,tipe,pax,anak,status,pemesan_nama,biro_pic,produk(nama),
+       penumpang(urut,nama,gender,usia,nik,alamat,provinsi,naik,naik_jam,cara)`)
+      .in('status',['paid','boarded']).order('dibuat'),
+    sb.from('pengaturan').select('kolom_manifest,nik_siapa_boleh_lihat').single()
+  ]);
+  if (e1) return gagal(e1);
+  const kol = atur?.kolom_manifest || {};
+  const bolehNik = atur?.nik_siapa_boleh_lihat === 'super_owner'
+    ? ['super','owner'].includes(S.peran) : S.peran==='super';
+  const samarNik = n => !n ? '<span style="color:var(--muted)">— dari biro</span>'
+    : bolehNik ? `<span class="mono" style="font-size:11.5px">${esc(n)}</span>`
+    : `<span class="mono" style="font-size:11.5px">${esc(n.slice(0,4))} •••• •••• ${esc(n.slice(-4))}</span>`;
+
+  let no=0, tot=0, naik=0, anak=0, perNama=0, dihitung=0;
+  const baris = (ord||[]).map(o=>{
+    const px = (o.penumpang||[]).sort((a,b)=>a.urut-b.urut);
+    const sdh = px.filter(p=>p.naik).length;
+    const adaUsia = px.some(p=>p.usia!=null);
+    tot += px.length; naik += sdh;
+    anak += adaUsia ? px.filter(p=>p.usia!=null && p.usia<12).length : (o.anak||0);
+    perNama  += px.filter(p=>p.cara==='nama').length;
+    dihitung += px.filter(p=>p.cara==='hitung'||p.cara==='massal').length;
+
+    return `<tr style="background:#dce9f5"><td class="num">—</td>
+      <td class="mono" style="font-size:11.5px">${esc(o.kode)}</td>
+      <td colspan="${3+(kol.nik?1:0)+(kol.alamat?2:0)}"><b>${esc(o.pemesan_nama)}</b>
+        <div style="font-size:11px;font-weight:600;color:${adaUsia?'var(--ok)':'var(--sea)'}">
+          ${adaUsia?'✓ usia diminta per orang':'○ usia tidak diminta (jalur biro)'}
+          ${(o.anak||0)>0?` · <span style="color:var(--warn)">${o.anak} anak di bawah 12 — siapkan life jacket anak</span>`:''}
+          ${o.biro_pic?` · PIC: ${esc(o.biro_pic)}`:''}</div></td>
+      <td class="mono">${px.length} orang</td>
+      <td><span class="pill ${sdh>=px.length?'p-ok':'p-warn'}">${sdh}/${px.length} NAIK</span></td></tr>`
+    + px.map(p=>{ no++;
+      return `<tr><td class="num" style="color:var(--muted)">${no}</td>
+        <td class="mono" style="font-size:11px;color:var(--muted)">${esc(o.kode)}-${p.urut}</td>
+        <td style="padding-left:16px">${esc(p.nama)}</td>
+        <td>${p.gender||'<span style="color:var(--muted)">—</span>'}</td>
+        <td class="num">${p.usia!=null
+          ? `${p.usia}${p.usia<12?' <span class="pill p-warn">ANAK</span>':''}`
+          : '<span style="color:var(--muted)">—</span>'}</td>
+        ${kol.nik?`<td>${samarNik(p.nik)}</td>`:''}
+        ${kol.alamat?`<td style="font-size:11.5px;color:var(--muted);max-width:260px">${
+            p.alamat?esc(p.alamat.slice(0,52)):'<span style="color:var(--muted)">—</span>'}</td>
+          <td style="font-size:12px">${p.provinsi?esc(p.provinsi):'<span style="color:var(--muted)">—</span>'}</td>`:''}
+        <td class="mono" style="font-size:11px">${esc(o.kode)}</td>
+        <td>${p.naik
+          ? `<span class="pill ${p.cara==='nama'?'p-sea':'p-mute'}">${
+               p.cara==='nama'?'NAIK '+jam(p.naik_jam).split(' ').pop():'DIHITUNG'}</span>`
+          : '<span class="pill p-mute">BELUM</span>'}</td></tr>`;
+    }).join('');
+  }).join('');
+
+  $('isi').innerHTML = `
+    <div class="grid g3">
+      <div class="kpi"><div class="k">Penumpang</div><div class="v">${tot}</div>
+        <div class="d">${(ord||[]).length} pesanan sah</div></div>
+      <div class="kpi"><div class="k">Sudah Naik</div><div class="v">${naik}</div>
+        <div class="d">dari ${tot} penumpang</div></div>
+      <div class="kpi"><div class="k">Anak di Bawah 12</div>
+        <div class="v" style="color:var(--warn)">${anak}</div>
+        <div class="d">life jacket ukuran anak</div></div>
+    </div>
+    <div class="card scrollx">
+      <h3>Manifest Penumpang</h3>
+      <table>
+        <tr><th class="num">No</th><th>Kode</th><th>Nama</th><th>L/P</th><th class="num">Usia</th>
+          ${kol.nik?'<th>NIK</th>':''}${kol.alamat?'<th>Alamat sesuai KTP</th><th>Provinsi</th>':''}
+          <th>Pesanan</th><th>Boarding</th></tr>
+        ${baris || '<tr><td colspan="9"><div class="hint">Belum ada pesanan sah.</div></td></tr>'}
+      </table>
+      <div class="note w"><b>Manifest ini jujur soal kedalaman pemeriksaannya</b>
+        Diperiksa per nama: <b>${perNama} orang</b> · dihitung per kepala: <b>${dihitung} orang</b> ·
+        belum naik: <b>${tot-naik} orang</b>.
+        Jangan diubah jadi seolah semua dicek satu-satu.</div>
+      ${!bolehNik && kol.nik ? `<div class="note"><b>NIK disamarkan untuk peran ini</b>
+        Hanya ${atur.nik_siapa_boleh_lihat==='super_owner'?'Super Admin & Owner':'Super Admin'} yang melihat NIK penuh.
+        Pengaturannya ada di tab Pengaturan.</div>`:''}
+    </div>`;
+}
+
+/* ============ AGEN ============ */
+async function tabAgen(){
+  const [{data:agen, error:e1}, {data:kontak}] = await Promise.all([
+    sb.from('agen').select('id,nama,kode,boleh_biro,aktif').order('nama'),
+    sb.from('agen_kontak').select('agen_id,wa')
+  ]);
+  if (e1) return gagal(e1);
+  const waOf = Object.fromEntries((kontak||[]).map(k=>[k.agen_id,k.wa]));
+
+  $('isi').innerHTML = `
+    <div class="card scrollx">
+      <h3>Agen &amp; Kode Referral</h3>
+      <table>
+        <tr><th class="nw">Nama</th><th class="nw">Kode</th><th class="nw">WhatsApp</th>
+            <th class="nw">Jalur Biro</th><th class="nw">Status</th><th></th></tr>
+        ${agen.map(a=>`<tr>
+          <td class="nw"><b class="nama" title="${esc(a.nama)}">${esc(a.nama)}</b></td>
+          <td class="mono nw" data-sel-kode="${a.id}">${selKode(a)}</td>
+          <td class="nw">${waOf[a.id]
+            ? selWa(waOf[a.id], `Halo ${a.nama}, ini dari The Tamperan Cruise.`)
+            : '<span style="color:var(--muted);font-size:12px">— tidak terlihat di peran ini</span>'}</td>
+          <td class="nw">${a.boleh_biro?'<span class="pill p-sea">BOLEH</span>':'<span class="pill p-mute">TIDAK</span>'}</td>
+          <td class="nw">${a.aktif?'<span class="pill p-ok">AKTIF</span>':'<span class="pill p-mute">NONAKTIF</span>'}</td>
+          <td class="nw">${S.peran==='super'
+            ? `<a class="aksi ghost" href="#" data-biro="${a.id}" data-nilai="${a.boleh_biro?0:1}">${
+                 a.boleh_biro?'Cabut':'Beri akses'}</a>`
+            : '<span style="color:var(--muted);font-size:11.5px">tidak bisa edit</span>'}</td>
+        </tr>`).join('')}
+      </table>
+    </div>
+    <div class="note"><b>Kenapa nomor WA ada di tabel terpisah</b>
+      RLS bekerja per baris, bukan per kolom. Agen boleh melihat nama agen lain untuk leaderboard —
+      kalau nomornya ikut di baris yang sama, nomornya ikut terbaca. Jadi kolomnya dipisah ke tabel
+      sendiri, bukan disembunyikan di tampilan.</div>`;
+
+  $('isi').querySelectorAll('[data-biro]').forEach(b => b.onclick = async e => {
+    e.preventDefault(); b.style.pointerEvents='none';
+    const { error } = await sb.from('agen')
+      .update({boleh_biro: b.dataset.nilai==='1'}).eq('id', b.dataset.biro);
+    if (error){ b.style.pointerEvents=''; return gagalPesan(error); }
+    /* Tidak menulis audit dari sini. Trigger trg_agen_audit di database yang
+       mencatat — audit sisi klien bisa dilewati, audit sisi database tidak. */
+    pesan('Penanda jalur biro diperbarui.'); tabAgen();
+  });
+
+  pasangEditorKode();
+}
+
+/* ---- Editor kode referral (hanya super) ----
+   Kode referral adalah identitas komersial agen. Mengubahnya sah, tapi tautan
+   lama langsung mati — karena itu ada konfirmasi dan catatan audit di database. */
+const KODE_POLA = /^[A-Za-z0-9._-]{3,32}$/;   /* sama persis dengan CHECK agen_kode_format */
+
+function selKode(a){
+  if (S.peran !== 'super') return esc(a.kode);
+  return `<span class="sel2"><span>${esc(a.kode)}</span>
+    <a class="aksi ghost" href="#" data-ubah-kode="${a.id}"
+       data-kode="${esc(a.kode)}" data-nama="${esc(a.nama)}">Ubah</a></span>`;
+}
+
+function pasangEditorKode(){
+  $('isi').querySelectorAll('[data-ubah-kode]').forEach(t => t.onclick = e => {
+    e.preventDefault();
+    const sel = $('isi').querySelector(`[data-sel-kode="${t.dataset.ubahKode}"]`);
+    sel.innerHTML = `<span class="sel2">
+      <input class="kode-in" value="${esc(t.dataset.kode)}" maxlength="32" spellcheck="false">
+      <a class="aksi ghost" href="#" data-simpan-kode>Simpan</a>
+      <a class="aksi" href="#" data-batal-kode style="color:var(--muted)">Batal</a></span>`;
+    const inp = sel.querySelector('.kode-in');
+    inp.focus(); inp.select();
+    const tutup = () => { sel.innerHTML = selKode({id:t.dataset.ubahKode, kode:t.dataset.kode,
+                                                   nama:t.dataset.nama}); pasangEditorKode(); };
+    sel.querySelector('[data-batal-kode]').onclick = ev => { ev.preventDefault(); tutup(); };
+    sel.querySelector('[data-simpan-kode]').onclick = ev => {
+      ev.preventDefault(); simpanKode(t.dataset.ubahKode, t.dataset.kode, t.dataset.nama, inp, tutup);
+    };
+    inp.onkeydown = ev => {
+      if (ev.key === 'Enter') sel.querySelector('[data-simpan-kode]').onclick(ev);
+      if (ev.key === 'Escape') tutup();
+    };
+  });
+}
+
+async function simpanKode(id, kodeLama, nama, inp, tutup){
+  const baru = inp.value.trim();
+  if (baru === kodeLama) return tutup();
+  if (!KODE_POLA.test(baru))
+    return pesan('<b>Ditolak</b> Kode harus 3–32 karakter: huruf, angka, titik, garis bawah, atau strip saja.', 9000);
+  if (!confirm(
+      `Ganti kode ${nama}: ${kodeLama} → ${baru}?\n\n`
+      + `Tautan referral lama (?ref=${kodeLama}) langsung berhenti bekerja. `
+      + `Pesanan lama dan komisi TIDAK terpengaruh — keduanya menyambung lewat ID, bukan kode.`))
+    return;
+
+  inp.disabled = true;
+  const { error } = await sb.from('agen').update({kode: baru}).eq('id', id);
+  inp.disabled = false;
+  if (error){
+    if (error.code === '23505') return pesan(`<b>Ditolak</b> Kode <b>${esc(baru)}</b> sudah dipakai agen lain (tidak peka huruf besar/kecil).`, 9000);
+    if (error.code === '23514') return pesan('<b>Ditolak</b> Format kode ditolak database.', 9000);
+    return gagalPesan(error);
+  }
+  pesan(`Kode ${nama} diubah ke ${baru}. Perubahan tercatat di audit.`);
+  tabAgen();
+}
+
+/* ============ PENGATURAN ============ */
+async function tabAtur(){
+  const { data, error } = await sb.from('pengaturan').select('*').single();
+  if (error) return gagal(error);
+  S.atur = data;
+  const ro = S.peran !== 'super';
+  const f = (k,l,hint='') => `<div class="fld"><label>${l}</label>
+    <input id="set_${k}" type="number" value="${data[k] ?? ''}" ${ro?'disabled':''}>
+    ${hint?`<div class="hint">${hint}</div>`:''}</div>`;
+  const pil = (k,l,opsi,hint='') => `<div class="fld"><label>${l}</label>
+    <select id="set_${k}" ${ro?'disabled':''}>${opsi.map(([v,t])=>
+      `<option value="${v}" ${data[k]===v?'selected':''}>${t}</option>`).join('')}</select>
+    ${hint?`<div class="hint">${hint}</div>`:''}</div>`;
+
+  $('isi').innerHTML = `
+    ${ro?'<div class="note w"><b>Hanya bisa dilihat</b>Pengaturan hanya bisa diubah Super Admin.</div>':''}
+    <div class="note">Semua angka di sini bisa diubah tanpa ngoding. Harga belum fix — makanya semuanya jadi parameter.</div>
+    <div class="card"><h3>Diskon &amp; Komisi</h3><div class="grid g3" style="margin-bottom:0">
+      ${f('diskon_persen','Diskon konsumen (%)')}
+      ${f('ambang_tier','Ambang tier')}
+      ${f('komisi_bawah_persen','Komisi di bawah ambang (%)')}
+      ${f('komisi_atas_persen','Komisi di atas ambang (%)')}
+      ${pil('komisi_dari','Komisi dihitung dari',
+        [['bruto','Bruto — sebelum diskon'],['neto','Neto — sesudah diskon']],
+        '⬜ Belum kamu putuskan. Sementara: bruto')}
+      ${pil('periode_reset','Reset tier',
+        [['bulanan','Bulanan'],['per_event','Per event'],['all_time','All-time']])}
+    </div></div>
+    <div class="card"><h3>Boarding &amp; Kapal</h3><div class="grid g3" style="margin-bottom:0">
+      ${f('ambang_cek_boarding','Ambang cek per nama',
+        'Pesanan sampai sekian orang dicentang per nama. Di atas itu dihitung per kepala')}
+      ${f('kuota_kursi','Kuota kursi per keberangkatan','Dikosongkan = tanpa batas')}
+      ${f('kapasitas_izin','Kapasitas izin kapal','⬜ Belum diketahui — tanya syahbandar')}
+      ${f('tahan_pending_jam','Order pending ditahan (jam)')}
+    </div></div>
+    <div class="card"><h3>Leaderboard &amp; NIK</h3><div class="grid g3" style="margin-bottom:0">
+      ${pil('lb_agen_mode','Leaderboard untuk agen',
+        [['off','Tidak ada'],['peringkat','Peringkat saja'],['penuh','Angka terbuka']])}
+      ${pil('nik_siapa_boleh_lihat','Siapa boleh lihat NIK penuh',
+        [['super','Super Admin saja'],['super_owner','Super Admin & Owner']])}
+      ${f('retensi_nik_bulan','Hapus NIK otomatis setelah (bulan)')}
+    </div></div>
+    ${ro?'':'<button class="btn" id="tblSimpan">Simpan pengaturan</button>'}`;
+
+  if (!ro) $('tblSimpan').onclick = async () => {
+    const b=$('tblSimpan'); b.disabled=true; b.innerHTML='<span class="spin"></span> Menyimpan…';
+    const isi={};
+    ['diskon_persen','ambang_tier','komisi_bawah_persen','komisi_atas_persen','ambang_cek_boarding',
+     'kuota_kursi','kapasitas_izin','tahan_pending_jam','retensi_nik_bulan'].forEach(k=>{
+      const v=$('set_'+k).value.trim(); isi[k]= v===''?null:Number(v);
+    });
+    ['komisi_dari','periode_reset','lb_agen_mode','nik_siapa_boleh_lihat']
+      .forEach(k=> isi[k]=$('set_'+k).value);
+    isi.diubah = new Date().toISOString();
+    const { error } = await sb.from('pengaturan').update(isi).eq('id',true);
+    b.disabled=false; b.textContent='Simpan pengaturan';
+    if (error) return gagalPesan(error);
+    await sb.from('audit').insert({aktor_nama:S.email, aksi:'Ubah pengaturan', objek:'pengaturan'});
+    pesan('Pengaturan tersimpan. Perubahan tercatat di audit log.');
+  };
+}
+
+/* ============ AGEN: KOMISI & PELANGGAN SAYA ============ */
+async function tabKomisi(){
+  const [{data:lb}, {data:pesananku, error}] = await Promise.all([
+    sb.rpc('papan_peringkat',{p_periode:null}),
+    sb.from('pesanan').select('kode,pax,total,status,dibuat,pemesan_nama,pemesan_hp,produk(nama)')
+      .order('dibuat',{ascending:false})
+  ]);
+  if (error) return gagal(error);
+  const L=lb||[], saya=L.find(x=>x.agen_id===S.agenId)||{tiket:0,omzet:0,tarif:0,komisi:0};
+  const pos=L.findIndex(x=>x.agen_id===S.agenId)+1;
+  const sisa=Math.max(0,20-saya.tiket);
+
+  $('isi').innerHTML = `
+    <div class="card"><h3>Progress Tier Komisi</h3>
+      <div style="display:flex;justify-content:space-between;font-size:13.5px">
+        <span><b>${saya.tiket} tiket</b></span>
+        <span class="pill ${saya.tarif>=10?'p-ok':'p-warn'}">TARIF ${saya.tarif}%</span></div>
+      <div class="prog"><i style="width:${Math.min(100,saya.tiket/20*100)}%"></i></div>
+      <div style="font-size:12.5px;color:var(--muted)">Tarif berlaku <b>retroaktif</b> ke seluruh
+        ${saya.tiket} tiket, bukan hanya tiket sesudah ambang.
+        ${sisa?` Kurang <b>${sisa} tiket</b> lagi menuju tarif lebih tinggi.`:''}</div>
+    </div>
+    <div class="grid g4">
+      <div class="kpi"><div class="k">Komisi Berjalan</div><div class="v">${rp(saya.komisi)}</div>
+        <div class="d">belum final, bisa berubah</div></div>
+      <div class="kpi"><div class="k">Tarif Saat Ini</div><div class="v">${saya.tarif}%</div>
+        <div class="d">retroaktif ke semua tiket</div></div>
+      <div class="kpi"><div class="k">Tiket Terjual</div><div class="v">${saya.tiket}</div>
+        <div class="d">omzet ${rp(saya.omzet)}</div></div>
+      <div class="kpi"><div class="k">Peringkat</div><div class="v">${pos||'—'}</div>
+        <div class="d">dari ${L.length} agen</div></div>
+    </div>
+    <div class="note w"><b>Kenapa ditulis "berjalan", bukan angka final</b>
+      Komisi bersifat retroaktif — begitu tembus ambang, seluruh tiket ikut naik tarifnya.
+      Jadi angkanya berubah selama periode masih jalan, dan baru dikunci saat komisi dibayarkan.</div>
+    <div class="card"><h3>Top Penjualan</h3>
+      ${L.map((a,i)=>{
+        const aku=a.agen_id===S.agenId;
+        return `<div class="rank r${i+1}"${aku?' style="background:var(--sky);margin:0 -10px;padding-left:10px;padding-right:10px;border-radius:8px"':''}>
+          <div class="no">${i+1}</div>
+          <div style="flex:1"><div style="font-weight:600;font-size:14px">${esc(a.nama)}
+            ${aku?'<span class="pill p-sea">KAMU</span>':''}</div>
+            <div style="font-size:11.5px;color:var(--muted)">${a.tiket} tiket · tarif ${a.tarif}%</div></div>
+          <div class="num"><div style="font-weight:700">${rp(a.omzet)}</div>
+            <div style="font-size:11.5px;color:var(--muted)">komisi ${rp(a.komisi)}</div></div></div>`;
+      }).join('')}
+      <div class="note"><b>Yang ditampilkan di sini hanya angka penjualan</b>
+        Data pelanggan agen lain — nama, nomor HP, kode pesanan — tidak pernah muncul di halaman
+        mana pun yang bisa kamu buka. Itu dijaga database, bukan tampilan.</div>
+    </div>
+    <div class="card scrollx"><h3>Pelanggan Saya <span class="pill p-mute">${pesananku.length}</span></h3>
+      <table>
+        <tr><th class="nw">Kode</th><th class="nw">Tgl</th><th>Pembeli</th><th class="nw">WhatsApp</th>
+            <th class="nw">Produk</th><th class="num">Pax</th><th class="num">Total</th><th class="nw">Status</th></tr>
+        ${pesananku.map(o=>{
+          const st=STATUS[o.status]||[o.status,'p-mute'];
+          return `<tr><td class="mono nw">${esc(o.kode)}</td>
+            <td class="nw" style="color:var(--muted)">${tgl(o.dibuat)}</td>
+            <td class="nw"><span class="nama" title="${esc(o.pemesan_nama)}">${esc(o.pemesan_nama)}</span></td>
+            <td class="nw">${selWa(o.pemesan_hp, `Halo ${o.pemesan_nama}, ini dari The Tamperan Cruise soal pesanan ${o.kode}.`)}</td>
+            <td class="nw">${esc(o.produk?.nama)}</td><td class="num">${o.pax}</td>
+            <td class="num nw">${rp(o.total)}</td>
+            <td class="nw"><span class="pill ${st[1]}">${st[0]}</span></td></tr>`;
+        }).join('')}
+      </table>
+      <div class="note"><b>Nomor lengkap, tapi hanya pelanggan sendiri</b>
+        Kamu melihat nomor HP utuh supaya bisa follow up langsung. Pelanggan agen lain tidak pernah
+        muncul, dan NIK serta alamat KTP tidak pernah ditampilkan ke peran agen.</div>
+    </div>`;
+}
+
+/* ============ BOARDING ============ */
+async function tabBoarding(){
+  const { data, error } = await sb.from('pesanan')
+    .select('kode,pax,anak,tipe,status,pemesan_nama,produk(nama),penumpang(naik)')
+    .in('status',['paid','boarded']).order('dibuat');
+  if (error) return gagal(error);
+  $('isi').innerHTML = `
+    <div class="card scrollx"><h3>Daftar Boarding</h3>
+      <table>
+        <tr><th>Kode</th><th>Pemesan</th><th>Produk</th><th class="num">Pax</th>
+            <th class="num">Naik</th><th>Status</th></tr>
+        ${(data||[]).map(o=>{
+          const sdh=(o.penumpang||[]).filter(p=>p.naik).length;
+          return `<tr><td class="mono">${esc(o.kode)}</td>
+            <td>${esc(o.pemesan_nama)}${o.tipe==='biro'?' <span class="pill p-sea">BIRO</span>':''}</td>
+            <td>${esc(o.produk?.nama)}</td>
+            <td class="num">${o.pax}${o.anak?`<div style="font-size:10.5px;color:var(--warn)">${o.anak} anak</div>`:''}</td>
+            <td class="num"><span class="pill ${sdh>=o.pax?'p-ok':'p-warn'}">${sdh}/${o.pax}</span></td>
+            <td><span class="pill ${(STATUS[o.status]||['','p-mute'])[1]}">${(STATUS[o.status]||[o.status])[0]}</span></td>
+          </tr>`;
+        }).join('')}
+      </table>
+      <div class="note w"><b>Halaman scan belum dibangun</b>
+        Ini baru daftar bacanya. Pemindaian QR dan pencentangan per nama menyusul setelah
+        dashboard dan landing page selesai.</div>
+    </div>`;
+}
+
+/* ============ GALAT ============ */
+const gagal = e => $('isi').innerHTML = `<div class="card"><div class="note d">
+  <b>Tidak bisa memuat</b>${esc(e.message)}
+  ${/permission|denied|policy/i.test(e.message||'')
+    ? '<br><br>Ini penolakan dari database, bukan kesalahan tampilan — berarti RLS bekerja.' : ''}
+</div></div>`;
+const gagalPesan = e => pesan(`<b>Ditolak</b> ${esc(e.message)}`, 9000);
+
+/* ============ JALAN ============ */
+const { data:{ session } } = await sb.auth.getSession();
+if (session) await mulai();
+</script>
+</body>
+</html>
