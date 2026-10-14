@@ -120,6 +120,38 @@ footer{margin-top:40px;padding:22px 0 40px;border-top:1px solid var(--line);
   color:var(--muted);font-size:13px;text-align:center}
 .sembunyi{display:none}
 .kode-besar{font-size:30px;font-weight:800;letter-spacing:1px}
+
+/* ---------- Timeline status pesanan ----------
+   Acuan: halaman status Suroboyo Mlayu Bengi. Tujuannya satu — pemesan tahu
+   dia ada di langkah mana dan apa yang ditunggu, tanpa bertanya ke agen. */
+.tl{list-style:none;margin:0;padding:0}
+.tl li{display:flex;gap:14px;padding:0 0 20px;position:relative}
+.tl li:last-child{padding-bottom:0}
+/* Garis penyambung ditarik dari titik ke titik berikutnya, bukan sepanjang li,
+   supaya tidak menggantung di bawah langkah terakhir. */
+.tl li:not(:last-child)::before{content:'';position:absolute;left:10px;top:22px;bottom:2px;
+  width:2px;background:var(--line)}
+.tl li.done:not(:last-child)::before{background:var(--ok)}
+.tl .dot{width:22px;height:22px;border-radius:50%;flex:none;border:2px solid var(--line);
+  background:#fff;position:relative;z-index:1}
+.tl li.done .dot{background:var(--ok);border-color:var(--ok)}
+.tl li.done .dot::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;color:#fff;font-size:12px;font-weight:800;line-height:1}
+.tl li.now .dot{border-color:var(--sea);border-width:3px;
+  box-shadow:0 0 0 4px rgba(21,104,138,.18)}
+.tl li.batal .dot{background:var(--danger);border-color:var(--danger)}
+.tl li.batal .dot::after{content:'×';position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;color:#fff;font-size:15px;font-weight:800;line-height:1}
+.tl .tt{font-weight:700;font-size:15px;line-height:1.3}
+.tl li:not(.done):not(.now):not(.batal) .tt{color:var(--muted);font-weight:600}
+.tl .st{font-size:13px;color:var(--muted);margin-top:2px}
+
+/* Daftar peserta di halaman status */
+.pst{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid #dbe3ec}
+.pst:last-child{border-bottom:0}
+.pst .no{width:26px;height:26px;border-radius:50%;background:#e2e8f0;color:var(--muted);
+  font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
+.pst.naik .no{background:var(--okbg);color:var(--ok)}
 </style>
 </head>
 <body>
@@ -323,6 +355,17 @@ const $  = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const rp = n => 'Rp' + Number(n||0).toLocaleString('id-ID');
+const jam = s => s ? new Date(s).toLocaleString('id-ID',
+  {day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) + ' WIB' : '';
+const jamSaja = s => s ? new Date(s).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}) : '';
+/* Hari + tanggal lengkap: "Sabtu, 18 Oktober 2026" dibaca jauh lebih cepat
+   daripada "2026-10-18" oleh pemesan maupun petugas. */
+const tglPanjang = d => {
+  if (!d) return '—';
+  const t = new Date(String(d) + 'T00:00:00');
+  return isNaN(t) ? String(d)
+    : t.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+};
 /* 081234567890 -> 6281234567890. Nomor tersimpan dalam format lokal di
    agen_kontak; wa.me butuh format internasional tanpa tanda plus. */
 const wa62 = hp => {
@@ -852,7 +895,10 @@ async function cekStatus(token){
   kotak.innerHTML = `<h2 style="display:block">Status pesanan</h2>
     <div class="card"><span class="spin" style="border-color:#ccc;border-top-color:var(--sea)"></span> Memuat…</div>`;
 
-  const { data, error } = await sb.rpc('status_pesanan', { p_token: token });
+  const [{ data, error }, { data:peserta }] = await Promise.all([
+    sb.rpc('status_pesanan',     { p_token: token }),
+    sb.rpc('penumpang_pesanan',  { p_token: token })
+  ]);
   if (error){
     kotak.innerHTML = `<h2 style="display:block">Status pesanan</h2>
       <div class="card"><div class="note d"><b>Tidak bisa memuat</b>${esc(error.message)}</div></div>`;
@@ -882,21 +928,97 @@ async function cekStatus(token){
   const waSiap = WA_ADMIN && WA_ADMIN !== WA_PLACEHOLDER;
   const teksWa = `Halo The Tamperan Cruise, saya ingin menanyakan pesanan ${o.kode}.`;
 
+  const tamb = Array.isArray(o.tambahan) ? o.tambahan : [];
+  const psr  = peserta || [];
+
   kotak.innerHTML = `<h2 style="display:block">Status pesanan</h2>
     <div class="card">
       <div class="kode-besar mono">${esc(o.kode)}</div>
       <div style="margin:8px 0 14px"><span class="pill ${s[1]}">${esc(s[0])}</span></div>
-      <p class="sub">${esc(s[2])}</p>
+      <p class="sub" style="margin-bottom:0">${esc(s[2])}</p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 14px;font-size:16.5px">Perjalanan pesanan</h3>
+      <ul class="tl">${garisWaktu(o)}</ul>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 12px;font-size:16.5px">Rincian</h3>
       <div class="rk"><span>Atas nama</span><span>${esc(o.pemesan_nama)}</span></div>
       <div class="rk"><span>Pelayaran</span><span>${esc(o.produk)}</span></div>
+      <div class="rk"><span>Tanggal berangkat</span><span>${
+        o.tanggal_berangkat ? tglPanjang(o.tanggal_berangkat) : 'belum ditentukan'}</span></div>
+      <div class="rk"><span>Kapal</span><span>${o.kapal
+        ? esc(o.kapal)
+        : '<span style="color:var(--muted)">ditentukan menjelang keberangkatan</span>'}</span></div>
       <div class="rk"><span>Penumpang</span><span>${o.pax} orang${o.anak?` · ${o.anak} anak`:''}</span></div>
-      <div class="rk"><span>Sudah naik</span><span>${o.sudah_naik} dari ${o.jumlah_penumpang}</span></div>
+      ${tamb.map(t => `<div class="rk"><span>${esc(t.nama)}${
+        t.jumlah > 1 ? ` × ${t.jumlah}` : ''}</span><span>${rp(t.harga * t.jumlah)}</span></div>`).join('')}
       <div class="rk"><span>Total</span><span>${rp(o.total)}</span></div>
-      ${waSiap ? `<a class="btn wa blok" style="margin-top:14px"
+    </div>
+
+    ${psr.length ? `<div class="card">
+      <h3 style="margin:0 0 4px;font-size:16.5px">Daftar peserta</h3>
+      <p class="sub" style="margin-bottom:10px">${o.sudah_naik} dari ${o.jumlah_penumpang} sudah naik kapal.</p>
+      ${psr.map(p => `<div class="pst${p.naik?' naik':''}">
+        <span class="no">${p.urut}</span>
+        <span style="flex:1">${esc(p.nama)}</span>
+        ${p.naik
+          ? `<span class="pill p-ok">NAIK ${p.naik_jam ? jamSaja(p.naik_jam) : ''}</span>`
+          : '<span class="pill p-mute">BELUM</span>'}</div>`).join('')}
+      ${o.tipe === 'biro' ? `<div class="note" style="margin-bottom:0"><b>Nama peserta bisa disusulkan</b>
+        Untuk pemesanan biro, nama di atas masih penanda urut. Kirimkan daftar nama
+        sebenarnya ke agen Anda sebelum keberangkatan.</div>` : ''}
+    </div>` : ''}
+
+    <div class="card">
+      ${waSiap ? `<a class="btn wa blok"
           href="https://wa.me/${WA_ADMIN}?text=${encodeURIComponent(teksWa)}"
           target="_blank" rel="noopener">Tanya lewat WhatsApp</a>` : ''}
       <a class="btn ghost blok" style="margin-top:9px" href="${location.pathname}">Buat pesanan baru</a>
+      <div class="hint" style="text-align:center;margin-top:10px">
+        Simpan tautan halaman ini — bisa dibuka kapan saja tanpa login.</div>
     </div>`;
+}
+
+/* Timeline empat langkah, mengikuti acuan Suroboyo Mlayu Bengi.
+   Aturannya: langkah yang SUDAH lewat ditandai centang, langkah yang sedang
+   ditunggu diberi lingkaran biru, sisanya abu-abu. Pesanan batal memotong
+   timeline di tengah — tidak ditampilkan seolah masih berjalan. */
+function garisWaktu(o){
+  const batal = ['cancel_cuaca','cancel_pembeli','expired'].includes(o.status);
+  const li = (kelas, judul, ket) =>
+    `<li class="${kelas}"><div class="dot"></div><div>
+       <div class="tt">${judul}</div>${ket?`<div class="st">${ket}</div>`:''}</div></li>`;
+
+  if (batal){
+    const sebab = { cancel_cuaca: 'Keberangkatan dibatalkan karena cuaca.',
+                    cancel_pembeli: 'Pesanan dibatalkan.',
+                    expired: 'Pesanan kedaluwarsa karena belum dibayar.' }[o.status];
+    return li('done', 'Pesanan dibuat', jam(o.dibuat))
+         + li('batal', 'Pesanan berhenti di sini', `${esc(sebab)} · ${jam(o.diubah)}`);
+  }
+
+  const lunas  = ['paid','boarded'].includes(o.status);
+  const naikSemua = o.jumlah_penumpang > 0 && o.sudah_naik >= o.jumlah_penumpang;
+  const adaNaik   = o.sudah_naik > 0;
+
+  return li('done', 'Pesanan dibuat', jam(o.dibuat))
+    + li(lunas ? 'done' : 'now',
+         'Pembayaran dikonfirmasi',
+         lunas ? jam(o.diubah)
+               : o.status === 'waiting' ? 'Bukti pembayaran sedang diperiksa petugas'
+                                        : 'Menunggu konfirmasi bersama agen Anda lewat WhatsApp')
+    + li(o.tanggal_berangkat && o.kapal ? 'done' : (lunas ? 'now' : ''),
+         'Kapal ditentukan',
+         o.kapal ? `${esc(o.kapal)}${o.tanggal_berangkat?' · '+tglPanjang(o.tanggal_berangkat):''}`
+                 : 'Ditentukan petugas menjelang keberangkatan')
+    + li(naikSemua ? 'done' : (adaNaik ? 'now' : ''),
+         'Sudah naik kapal',
+         naikSemua ? 'Semua penumpang tercatat naik'
+                   : adaNaik ? `${o.sudah_naik} dari ${o.jumlah_penumpang} sudah naik`
+                             : 'Dicatat petugas saat boarding');
 }
 
 /* ====================== PASANG ====================== */
