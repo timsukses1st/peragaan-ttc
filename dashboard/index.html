@@ -242,7 +242,7 @@ async function mulai(){
              : peran==='admin'    ? [['kapal','Pembagian Kapal'],['berangkat','Keberangkatan']]
              : [['ringkas','Ringkasan'],['pesanan','Pesanan'],['berangkat','Keberangkatan'],
                 ['kapal','Pembagian Kapal'],['fu','Follow-Up'],['manifest','Manifest'],
-                ['agen','Agen & Kode'],['voucher','Voucher'],['atur','Pengaturan']];
+                ['agen','Agen & Kode'],['voucher','Voucher & Tambahan'],['atur','Pengaturan']];
 
   $('navTab').innerHTML = menu.map(([k,l],i)=>
     `<button class="dbtab${i?'':' on'}" data-tab="${k}">${l}</button>`).join('');
@@ -871,9 +871,12 @@ async function tabKapal(){
 
 /* ============ VOUCHER ============ */
 async function tabVoucher(){
-  const { data, error } = await sb.from('kode_voucher')
-    .select('id,kode,keterangan,aktif,dibuat').order('dibuat', {ascending:false});
+  const [{ data, error }, { data:tamb, error:e2 }] = await Promise.all([
+    sb.from('kode_voucher').select('id,kode,keterangan,aktif,dibuat').order('dibuat', {ascending:false}),
+    sb.from('tambahan').select('id,slug,nama,ket,harga,satuan,maks,aktif').order('urutan')
+  ]);
   if (error) return gagal(error);
+  if (e2) return gagal(e2);
   const bisa = S.peran === 'super';
 
   $('isi').innerHTML = `
@@ -914,6 +917,34 @@ async function tabVoucher(){
         Yang di tabel ini adalah kode yang <b>diketik pemesan</b> untuk mendapat harga
         khusus. Voucher makan &amp; menginap yang <b>diberikan ke pembeli</b> Cruise PROMO
         itu hal lain — kertasnya disobek kasir, tidak diurus di sini.</div>
+    </div>
+
+    <div class="card scrollx">
+      <h3>Tambahan (Add-on)</h3>
+      <table>
+        <thead><tr><th class="nw">Nama</th><th class="nw">Satuan</th><th class="num">Harga</th>
+          <th class="num">Maks</th><th class="nw">Status</th><th></th></tr></thead>
+        <tbody>${(tamb||[]).map(t=>`<tr>
+          <td class="nw"><b class="nama" title="${esc(t.nama)}">${esc(t.nama)}</b>
+            ${t.ket?`<div class="hint">${esc(t.ket)}</div>`:''}</td>
+          <td class="nw">${({pesanan:'per pesanan',orang:'per orang',unit:'per unit'}[t.satuan])||esc(t.satuan)}</td>
+          <td class="num nw" data-sel-harga="${t.id}">${selHarga(t, bisa)}</td>
+          <td class="num nw">${t.maks ?? '—'}</td>
+          <td class="nw">${t.aktif
+            ? '<span class="pill p-ok">AKTIF</span>' : '<span class="pill p-mute">NONAKTIF</span>'}</td>
+          <td class="nw">${bisa
+            ? `<a class="aksi ghost" href="#" data-taktif="${t.id}" data-nilai="${t.aktif?0:1}">${
+                 t.aktif?'Nonaktifkan':'Aktifkan'}</a>`
+            : '<span style="color:var(--muted);font-size:11.5px">tidak bisa edit</span>'}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+      <div class="note"><b>Satuan menentukan cara menghitungnya</b>
+        <b>per pesanan</b> = dikenakan sekali, berapa pun jumlah penumpang ·
+        <b>per orang</b> = otomatis dikali jumlah pax ·
+        <b>per unit</b> = pemesan sendiri yang mengetik jumlahnya, dibatasi kolom Maks.</div>
+      <div class="note w"><b>Add-on berharga Rp0 tidak bisa dipesan</b>
+        Database menolaknya dengan sengaja — harga 0 hampir selalu berarti harganya
+        belum ditentukan, bukan benar-benar gratis. Isi harganya dulu, baru aktifkan.</div>
     </div>`;
 
   if (bisa){
@@ -940,7 +971,75 @@ async function tabVoucher(){
       if (error){ b.style.pointerEvents=''; return gagalPesan(error); }
       pesan('Status voucher diperbarui.'); tabVoucher();
     });
+    $('isi').querySelectorAll('[data-taktif]').forEach(b => b.onclick = async e => {
+      e.preventDefault(); b.style.pointerEvents='none';
+      const { error } = await sb.from('tambahan')
+        .update({ aktif: b.dataset.nilai==='1' }).eq('id', b.dataset.taktif);
+      if (error){ b.style.pointerEvents=''; return gagalPesan(error); }
+      pesan('Status tambahan diperbarui. Halaman pemesanan langsung ikut.'); tabVoucher();
+    });
+    pasangEditorHarga(tamb||[]);
   }
+}
+
+/* ---- Editor harga add-on (hanya super) ----
+   Ini angka uang: perubahannya tercatat di audit lewat trg_tambahan_audit, dan
+   langsung berlaku di halaman pemesanan tanpa deploy ulang. */
+function selHarga(t, bisa){
+  const h = `<span class="mono">${rp(t.harga)}</span>`;
+  if (!bisa) return h;
+  return `<span class="sel2" style="justify-content:flex-end">${h}
+    <a class="aksi ghost" href="#" data-ubah-harga="${t.id}" data-harga="${t.harga}"
+       data-nama="${esc(t.nama)}" data-ket="${esc(t.ket||'')}" data-satuan="${esc(t.satuan)}"
+       data-maks="${t.maks ?? ''}" data-aktif="${t.aktif?1:0}">Ubah</a></span>`;
+}
+
+function pasangEditorHarga(tamb){
+  $('isi').querySelectorAll('[data-ubah-harga]').forEach(tb => tb.onclick = e => {
+    e.preventDefault();
+    const sel = $('isi').querySelector(`[data-sel-harga="${tb.dataset.ubahHarga}"]`);
+    sel.innerHTML = `<span class="sel2" style="justify-content:flex-end">
+      <input class="kode-in" type="number" min="0" step="1000" style="width:118px;text-align:right"
+             value="${tb.dataset.harga}">
+      <a class="aksi ghost" href="#" data-simpan-harga>Simpan</a>
+      <a class="aksi" href="#" data-batal-harga style="color:var(--muted)">Batal</a></span>`;
+    const inp = sel.querySelector('.kode-in');
+    inp.focus(); inp.select();
+    const t = (tamb||[]).find(x => x.id === tb.dataset.ubahHarga) || {
+      id: tb.dataset.ubahHarga, nama: tb.dataset.nama, ket: tb.dataset.ket,
+      satuan: tb.dataset.satuan, harga: Number(tb.dataset.harga),
+      maks: tb.dataset.maks === '' ? null : Number(tb.dataset.maks),
+      aktif: tb.dataset.aktif === '1'
+    };
+    const tutup = () => { sel.innerHTML = selHarga(t, true); pasangEditorHarga(tamb); };
+    sel.querySelector('[data-batal-harga]').onclick = ev => { ev.preventDefault(); tutup(); };
+    sel.querySelector('[data-simpan-harga]').onclick = ev => {
+      ev.preventDefault(); simpanHarga(t, inp, tutup);
+    };
+    inp.onkeydown = ev => {
+      if (ev.key === 'Enter')  sel.querySelector('[data-simpan-harga]').onclick(ev);
+      if (ev.key === 'Escape') tutup();
+    };
+  });
+}
+
+async function simpanHarga(t, inp, tutup){
+  const baru = parseInt(inp.value, 10);
+  if (!Number.isFinite(baru) || baru < 0)
+    return pesan('<b>Ditolak</b> Harga harus angka 0 atau lebih.', 9000);
+  if (baru === t.harga) return tutup();
+
+  /* Konfirmasi karena ini harga yang langsung dibayar pelanggan. */
+  if (!confirm(`Ubah harga ${t.nama}: ${rp(t.harga)} → ${rp(baru)}?\n\n`
+      + `Berlaku seketika di halaman pemesanan. Pesanan lama TIDAK berubah — `
+      + `harganya sudah dibekukan saat pemesanan.`)) return;
+
+  inp.disabled = true;
+  const { error } = await sb.from('tambahan').update({ harga: baru }).eq('id', t.id);
+  inp.disabled = false;
+  if (error) return gagalPesan(error);
+  pesan(`Harga ${esc(t.nama)} jadi ${rp(baru)}. Tercatat di audit.`, 9000);
+  tabVoucher();
 }
 
 /* ============ PENGATURAN ============ */

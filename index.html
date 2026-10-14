@@ -350,7 +350,7 @@ const S = {
   vouOk: false,          /* voucher: true hanya setelah diperiksa & sah */
   vouKode: null,
   tambahan: [],          /* daftar add-on dari database */
-  tambahanPilih: []      /* slug yang dicentang */
+  tambahanPilih: []      /* [{slug, jumlah}] — jumlah hanya berarti untuk satuan 'unit' */
 };
 
 /* Kode referral dari tautan agen: ?ref=KODE */
@@ -363,7 +363,7 @@ async function muat(){
     sb.from('produk').select('slug,nama,deskripsi,bertingkat,harga_lokal,harga_umum,harga_flat,dapat_voucher')
       .eq('aktif', true).order('urutan'),
     sb.from('pengaturan').select('diskon_persen').maybeSingle(),
-    sb.from('tambahan').select('slug,nama,ket,harga,satuan').eq('aktif', true).order('urutan')
+    sb.from('tambahan').select('slug,nama,ket,harga,satuan,maks').eq('aktif', true).order('urutan')
   ]);
 
   if (e1 || !prod){
@@ -522,25 +522,62 @@ async function cekVoucher(){
 }
 
 /* ====================== ADD-ON ====================== */
+/* Jumlah dijepit ke 1..maks di sini hanya untuk umpan balik cepat; penolakan
+   yang sebenarnya tetap di buat_pesanan(). Nilai kosong atau bukan angka
+   dianggap 1, bukan 0 — 0 akan ditolak server dan membingungkan pemesan. */
+function batasJml(t, nilai){
+  const v = parseInt(String(nilai ?? '').trim(), 10);
+  if (!Number.isFinite(v) || v < 1) return 1;
+  return t?.maks ? Math.min(v, t.maks) : v;
+}
+
 function gambarTambahan(){
   const kartu = $('kartu-tambahan');
   if (!S.tambahan.length){ kartu.classList.add('sembunyi'); return; }
   kartu.classList.remove('sembunyi');
+  const sat = t => t.satuan === 'orang' ? ' / orang' : t.satuan === 'unit' ? ' / unit' : '';
   $('daftar-tambahan').innerHTML = S.tambahan.map(t => `
-    <label class="fld" style="display:flex;gap:11px;align-items:flex-start;cursor:pointer;
-           border:1.5px solid var(--line);border-radius:9px;padding:12px;font-weight:400">
-      <input type="checkbox" data-tambahan="${esc(t.slug)}" style="width:19px;height:19px;margin-top:2px;flex:none">
-      <span style="flex:1">
-        <b style="font-size:15px">${esc(t.nama)}</b>
-        <span class="pill p-sea">${rp(t.harga)}${t.satuan === 'orang' ? ' / orang' : ''}</span>
-        ${t.ket ? `<div class="hint" style="margin-top:3px">${esc(t.ket)}</div>` : ''}
-      </span></label>`).join('');
+    <div class="fld" style="border:1.5px solid var(--line);border-radius:9px;padding:12px">
+      <label style="display:flex;gap:11px;align-items:flex-start;cursor:pointer;font-weight:400;margin:0">
+        <input type="checkbox" data-tambahan="${esc(t.slug)}" style="width:19px;height:19px;margin-top:2px;flex:none">
+        <span style="flex:1">
+          <b style="font-size:15px">${esc(t.nama)}</b>
+          <span class="pill p-sea">${rp(t.harga)}${sat(t)}</span>
+          ${t.ket ? `<div class="hint" style="margin-top:3px">${esc(t.ket)}</div>` : ''}
+        </span></label>
+      ${t.satuan === 'unit' ? `
+        <div class="sembunyi" id="jml-${esc(t.slug)}" style="margin-top:10px;padding-left:30px">
+          <label for="in-${esc(t.slug)}" style="font-size:12.5px">Butuh berapa ${esc(t.nama.toLowerCase())}?</label>
+          <input id="in-${esc(t.slug)}" type="number" inputmode="numeric" value="1"
+                 min="1" ${t.maks ? `max="${t.maks}"` : ''} data-jumlah="${esc(t.slug)}"
+                 style="width:110px">
+          ${t.maks ? `<div class="hint">Maksimal ${t.maks} per pesanan.</div>` : ''}
+        </div>` : ''}
+    </div>`).join('');
+
+  const setJml = (slug, jumlah) => {
+    const i = S.tambahanPilih.findIndex(x => x.slug === slug);
+    if (i >= 0) S.tambahanPilih[i].jumlah = jumlah;
+  };
 
   $('daftar-tambahan').querySelectorAll('[data-tambahan]').forEach(c => c.onchange = () => {
     const slug = c.dataset.tambahan;
-    S.tambahanPilih = c.checked
-      ? [...new Set([...S.tambahanPilih, slug])]
-      : S.tambahanPilih.filter(x => x !== slug);
+    const t = S.tambahan.find(x => x.slug === slug);
+    const kotak = $(`jml-${slug}`);
+    if (kotak) kotak.classList.toggle('sembunyi', !c.checked);
+    if (c.checked){
+      if (!S.tambahanPilih.some(x => x.slug === slug))
+        S.tambahanPilih.push({ slug, jumlah: t?.satuan === 'unit' ? batasJml(t, $(`in-${slug}`)?.value) : 1 });
+    } else {
+      S.tambahanPilih = S.tambahanPilih.filter(x => x.slug !== slug);
+    }
+    ringkasan();
+  });
+
+  $('daftar-tambahan').querySelectorAll('[data-jumlah]').forEach(inp => inp.oninput = () => {
+    const slug = inp.dataset.jumlah;
+    const t = S.tambahan.find(x => x.slug === slug);
+    setJml(slug, batasJml(t, inp.value));
     ringkasan();
   });
 }
@@ -620,10 +657,12 @@ function ringkasan(){
   const anak = hitungAnak();
 
   /* Add-on bersatuan 'orang' dikali pax — sama persis dengan hitungan server. */
-  const tamb = S.tambahanPilih.map(slug => {
-    const t = S.tambahan.find(x => x.slug === slug);
+  const tamb = S.tambahanPilih.map(pil => {
+    const t = S.tambahan.find(x => x.slug === pil.slug);
     if (!t) return null;
-    const jml = t.satuan === 'orang' ? n : 1;
+    const jml = t.satuan === 'orang' ? n
+              : t.satuan === 'unit'  ? batasJml(t, pil.jumlah)
+              : 1;
     return { nama: t.nama, jml, total: t.harga * jml };
   }).filter(Boolean);
   const totalTamb = tamb.reduce((a,b) => a + b.total, 0);
@@ -718,7 +757,14 @@ async function kirim(){
     p_tanggal:       $('f-tgl').value,
     p_kode_referral: S.kodeRef,
     p_kode_voucher:  (p.bertingkat && S.vouOk) ? S.vouKode : null,
-    p_tambahan:      S.tambahanPilih.length ? S.tambahanPilih : null,
+    p_tambahan:      S.tambahanPilih.length
+                       ? S.tambahanPilih.map(x => {
+                           const t = S.tambahan.find(y => y.slug === x.slug);
+                           return t?.satuan === 'unit'
+                             ? { slug: x.slug, jumlah: batasJml(t, x.jumlah) }
+                             : { slug: x.slug };
+                         })
+                       : null,
     p_pemesan: {
       nama, hp,
       email:    $('f-email').value.trim() || null,
