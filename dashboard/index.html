@@ -212,8 +212,14 @@ input:focus,select:focus{outline:2px solid var(--sea);outline-offset:1px;border-
     <div class="card">
       <div class="fld"><label>Email</label><input id="email" type="email" autocomplete="username"></div>
       <div class="fld"><label>Kata sandi</label><input id="sandi" type="password" autocomplete="current-password"></div>
+      <div class="fld hide" id="fld-nama-daftar"><label for="namaDaftar">Nama lengkap</label>
+        <input id="namaDaftar" maxlength="60" autocomplete="name" placeholder="mis. Merila">
+        <div class="hint">Nama ini yang dilihat Super Admin saat menyetujui akses Anda.</div></div>
       <button class="btn" style="width:100%" id="tblMasuk">Masuk</button>
+      <button class="btn ghost hide" style="width:100%;margin-top:8px" id="tblDaftar">Daftar akun baru</button>
       <div class="hint" id="loginPesan"></div>
+      <div class="hint" style="margin-top:10px">
+        <a href="#" id="tautDaftar">Belum punya akun? Daftar di sini</a></div>
     </div>
     <div class="hint" style="text-align:center">Akun dibuat Super Admin. Tidak ada pendaftaran mandiri.</div>
   </div>
@@ -314,7 +320,64 @@ $('tblMasuk').onclick = async () => {
   if (error){ p.innerHTML=`<span style="color:var(--danger);font-weight:600">${esc(error.message)}</span>`; return; }
   await mulai();
 };
-$('sandi').addEventListener('keydown', e => { if(e.key==='Enter') $('tblMasuk').click(); });
+$('sandi').addEventListener('keydown', e => {
+  if (e.key === 'Enter') (modeDaftar ? $('tblDaftar') : $('tblMasuk')).click();
+});
+
+/* ---- Daftar akun sendiri (pola rumah KIG: sama seperti SIGMA & Delta Portal) ----
+   Akun baru TIDAK langsung dapat akses. Trigger on_auth_user_created di database
+   membuat profilnya dengan peran 'menunggu' dan aktif=false, dan peran() hanya
+   mengembalikan peran untuk profil aktif. Jadi siapa pun boleh mendaftar, tapi
+   yang dia lihat nol sampai Super Admin memberi peran. */
+let modeDaftar = false;
+
+function setModeDaftar(nyala){
+  modeDaftar = nyala;
+  $('fld-nama-daftar').classList.toggle('hide', !nyala);
+  $('tblDaftar').classList.toggle('hide', !nyala);
+  $('tblMasuk').classList.toggle('hide', nyala);
+  $('sandi').setAttribute('autocomplete', nyala ? 'new-password' : 'current-password');
+  $('tautDaftar').textContent = nyala
+    ? 'Sudah punya akun? Masuk di sini'
+    : 'Belum punya akun? Daftar di sini';
+  $('loginPesan').innerHTML = nyala
+    ? 'Akun baru belum langsung bisa dipakai &mdash; Super Admin memberi aksesnya dulu.'
+    : '';
+  if (nyala) $('namaDaftar').focus();
+}
+
+$('tautDaftar').onclick = e => { e.preventDefault(); setModeDaftar(!modeDaftar); };
+
+$('tblDaftar').onclick = async () => {
+  const b = $('tblDaftar'), p = $('loginPesan');
+  const email = $('email').value.trim();
+  const sandi = $('sandi').value;
+  const nama  = ($('namaDaftar').value || '').trim();
+  const salah = t => { p.innerHTML =
+    `<span style="color:var(--danger);font-weight:600">${t}</span>`; };
+
+  if (!nama)              return salah('Nama lengkap belum diisi.');
+  if (!email)             return salah('Email belum diisi.');
+  if (sandi.length < 8)   return salah('Kata sandi minimal 8 karakter.');
+
+  b.disabled = true; b.innerHTML = '<span class="spin"></span> Mendaftarkan…';
+  /* nama dititipkan di metadata; handle_new_user() membacanya untuk kolom profil.nama */
+  const { data, error } = await sb.auth.signUp({
+    email, password: sandi, options: { data: { nama } }
+  });
+  b.disabled = false; b.textContent = 'Daftar akun baru';
+  if (error) return salah(esc(error.message));
+
+  /* Dua kemungkinan, tergantung setelan konfirmasi email di Supabase. */
+  if (data.session){
+    /* Sudah langsung login, tapi peran() masih null -> mulai() yang menjelaskan. */
+    await mulai();
+  } else {
+    setModeDaftar(false);
+    p.innerHTML = '<b>Akun dibuat.</b> Cek email Anda untuk memastikan alamatnya benar, '
+      + 'lalu tunggu Super Admin memberi akses. Anda akan bisa masuk setelah itu.';
+  }
+};
 $('tblKeluar').onclick = async () => { await sb.auth.signOut(); location.reload(); };
 /* Satu tombol saja. Panduan SELALU memakai data latihan: dengan data sungguhan,
    langkah seperti "Konfirmasi pembayaran" bisa hilang begitu tidak ada pesanan
@@ -328,8 +391,14 @@ async function mulai(){
   const [{ data:peran, error:e1 }, { data:agenId }] =
     await Promise.all([ DB.rpc('peran'), DB.rpc('agen_saya') ]);
   if (e1 || !peran){
-    $('loginPesan').innerHTML = `<span style="color:var(--danger);font-weight:600">
-      Akun ini belum punya profil atau sedang nonaktif. Minta Super Admin menautkannya.</span>`;
+    /* peran() mengembalikan null untuk profil nonaktif — termasuk akun yang baru
+       mendaftar dan masih berperan 'menunggu'. Bedakan dua hal ini, karena
+       "tunggu persetujuan" dan "akun Anda dinonaktifkan" bukan kabar yang sama. */
+    $('loginPesan').innerHTML = `<b>Akun Anda sudah terdaftar.</b> Sekarang menunggu
+      Super Admin memberi akses. Begitu diberi, Anda tinggal masuk lagi dengan email
+      dan kata sandi yang sama &mdash; tidak perlu mendaftar ulang.
+      <div style="margin-top:6px;color:var(--muted)">Kalau sebelumnya sudah pernah bisa
+      masuk, berarti akunnya dinonaktifkan. Hubungi Super Admin.</div>`;
     await sb.auth.signOut(); return;
   }
   S.peran=peran; S.peranAsli=peran;
@@ -752,7 +821,16 @@ function rpcLatihan(nama, arg = {}){
       return Object.values(peta).sort((a,b) => b.tanggal.localeCompare(a.tanggal));
     },
 
-    daftar_pengguna: () => [
+    /* Urutannya WAJIB sama dengan fungsi daftar_pengguna() di database:
+       menunggu dulu (butuh tindakan), lalu super, owner, admin, agen, sisanya;
+       di dalam tiap kelompok urut nama. Kalau beda, panduan mengajarkan urutan
+       yang tidak akan Mas Dik lihat di data sungguhan. */
+    daftar_pengguna: () => ((d) => {
+      const bobot = { menunggu:0, super:1, owner:2, admin:3, agen:4 };
+      return d.slice().sort((a,b) =>
+        ((bobot[a.peran] ?? 5) - (bobot[b.peran] ?? 5))
+        || String(a.nama).localeCompare(String(b.nama), 'id'));
+    })([
       { id:'u1', nama:'Dika Kurniawan', email:'super@contoh.test',  peran:'super',
         aktif:true,  agen_nama:null, dibuat:JAM(2000), masuk_terakhir:JAM(1) },
       { id:'u2', nama:'Uun Staf COO',   email:'admin@contoh.test',  peran:'admin',
@@ -761,7 +839,12 @@ function rpcLatihan(nama, arg = {}){
         aktif:true,  agen_nama:'Budi Santoso', dibuat:JAM(800), masuk_terakhir:JAM(48) },
       { id:'u4', nama:'Petugas Dermaga',email:'boarding@contoh.test',peran:'boarding',
         aktif:false, agen_nama:null, dibuat:JAM(700),  masuk_terakhir:null },
-    ],
+      /* Akun yang baru mendaftar sendiri dan belum diberi akses. Wajib ada di
+         data latihan: tanpa ini, langkah panduan soal menyetujui akses tidak
+         punya sasaran. daftar_pengguna() menaruhnya paling atas. */
+      { id:'u5', nama:'Merila',          email:'merila@contoh.test',  peran:'menunggu',
+        aktif:false, agen_nama:null, dibuat:JAM(3),    masuk_terakhir:null },
+    ]),
 
     atur_kapal: () => {
       const o = P.find(x => x.id === arg.p_pesanan_id);
@@ -1060,7 +1143,11 @@ const TUTOR = {
          + 'drone dan paddleboard yang bisa diubah dari sini.' },
     { tab:'akses', cari:'#isi #baris-akses', judul:'Kelola Akses',
       teks:'Atur peran tiap pengguna, nonaktifkan akun, kirim tautan reset password, '
-         + 'dan ganti nama tampilan Anda sendiri di bagian atas.' },
+         + 'dan ganti nama tampilan Anda sendiri di bagian atas. Baris berlencana '
+         + '<b>MENUNGGU AKSES</b> selalu di paling atas: itu orang yang sudah mendaftar '
+         + 'sendiri di halaman login tapi belum Anda beri peran. Sebelum diberi peran, '
+         + 'yang dia lihat benar-benar nol &mdash; ganti perannya lewat dropdown, '
+         + 'lalu aktifkan akunnya.' },
     { tab:'atur', cari:'#isi table[data-papan="produk"]', judul:'Produk & Harga',
       teks:'Harga jual ada di sini, dan hanya Super Admin yang bisa mengubahnya. '
          + '<b>BERTINGKAT</b> berarti harga warga Pacitan beda dari harga umum; '
@@ -2676,6 +2763,10 @@ async function simpanHarga(t, inp, tutup){
    Semua harus bisa dijalankan dari layar — yang cuma bisa lewat SQL tidak
    dihitung selesai. */
 const PERAN_LABEL = {
+  /* Peran 'menunggu' bukan peran kerja: dia keadaan "sudah daftar, belum diberi
+     akses". Tidak dipegang policy mana pun, jadi nol akses. Ditaruh paling atas
+     karena daftar_pengguna() juga mengurutkannya paling atas. */
+  menunggu:['Menunggu Akses','Sudah daftar, belum diberi peran'],
   super:   ['Super Admin','Semua akses, pemegang master'],
   owner:   ['Owner','Lihat semua, tidak bisa mengubah'],
   admin:   ['Admin','Konfirmasi bayar & bagi kapal'],
