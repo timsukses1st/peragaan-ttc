@@ -1906,6 +1906,103 @@ async function tabAgen(){
   });
 }
 
+/* ---- Hapus akun (hanya super) ----
+   Sama seperti Alpha: akun bisa dihapus permanen, bukan cuma dinonaktifkan.
+   Dikerjakan /api/hapus-akun di server karena menghapus baris auth.users butuh
+   service_role. Seluruh penjagaannya ADA DI SERVER juga — tidak cukup di sini:
+   pemanggil wajib super, tidak boleh menghapus diri sendiri, tidak boleh
+   menghapus super admin aktif terakhir, dan email yang diketik harus cocok
+   dengan akun yang dituju.
+
+   Konfirmasinya mengetik email, bukan tombol "yakin?". Satu baris salah klik di
+   tabel yang panjang itu gampang; mengetik alamat email orang lain tidak. */
+function pasangHapusAkun(gambarUlang){
+  $('baris-akses').querySelectorAll('[data-hapus]').forEach(t => t.onclick = e => {
+    e.preventDefault();
+    const uid   = t.dataset.hapus;
+    const email = t.dataset.email;
+    const nama  = t.dataset.nama;
+    const area  = $('baris-akses').querySelector(`[data-area="${uid}"]`);
+    if (!area) return;
+
+    area.classList.remove('hide');
+    area.innerHTML = `
+      <div class="note w" style="margin:0">
+        <b>Hapus akun ${esc(nama)}?</b>
+        Akunnya hilang permanen dan tidak bisa dikembalikan. Pesanan, boarding,
+        dan pembayaran yang pernah dia kerjakan <b>tidak ikut terhapus</b>, tapi
+        catatan &ldquo;dikerjakan oleh siapa&rdquo; pada baris-baris itu jadi kosong.
+        Riwayat audit tetap menyimpan namanya.
+        <div style="margin-top:7px">Kalau cuma mau mencabut aksesnya,
+        <b>Nonaktifkan</b> lebih tepat &mdash; itu bisa dibatalkan.</div>
+        <div class="fld" style="margin-top:9px">
+          <label style="font-size:12px">Ketik <span class="mono">${esc(email)}</span> untuk memastikan</label>
+          <div class="sel2" style="display:flex;gap:8px;align-items:flex-start">
+            <input class="konfirm-hapus" autocomplete="off" spellcheck="false"
+                   placeholder="${esc(email)}" style="flex:1;max-width:280px">
+            <button type="button" class="btn ghost tbl-hapus"
+                    style="padding:9px 14px;white-space:nowrap;color:var(--danger)">Hapus permanen</button>
+            <button type="button" class="btn ghost tbl-batal" style="padding:9px 14px">Batal</button>
+          </div>
+        </div>
+      </div>`;
+
+    const inp = area.querySelector('.konfirm-hapus');
+    const tblHapus = area.querySelector('.tbl-hapus');
+    inp.focus();
+
+    const tutup = () => { area.classList.add('hide'); area.innerHTML = ''; };
+    area.querySelector('.tbl-batal').onclick = tutup;
+    inp.onkeydown = ev => {
+      if (ev.key === 'Enter')  tblHapus.onclick();
+      if (ev.key === 'Escape') tutup();
+    };
+
+    tblHapus.onclick = async () => {
+      if ((inp.value || '').trim().toLowerCase() !== email.toLowerCase()){
+        inp.focus();
+        return pesan('Email yang diketik belum cocok. Tidak ada yang dihapus.', 7000);
+      }
+
+      tblHapus.disabled = true; tblHapus.innerHTML = '<span class="spin"></span> Menghapus…';
+      const pulih = () => { tblHapus.disabled = false; tblHapus.textContent = 'Hapus permanen'; };
+
+      if (S.latihan){
+        pulih();
+        return pesan('Di mode panduan akun tidak benar-benar dihapus. Keluar dari panduan '
+                   + 'dulu kalau memang mau menghapus.', 9000);
+      }
+
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session){ pulih(); return pesan('Sesi habis. Masuk ulang dulu.', 8000); }
+
+      let jawab;
+      try {
+        const r = await fetch('/api/hapus-akun', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ uid, email }),
+        });
+        jawab = await r.json().catch(() => ({}));
+        if (!r.ok){
+          pulih();
+          return pesan(`<b>Gagal:</b> ${esc(jawab.pesan || 'Tidak ada keterangan dari server.')}`, 12000);
+        }
+      } catch {
+        pulih();
+        return pesan('<b>Gagal menghubungi /api/hapus-akun.</b> Pastikan dashboard dibuka '
+                   + 'lewat domain Vercel dan folder api/ sudah ikut terupload.', 14000);
+      }
+
+      pesan(`Akun <b>${esc(email)}</b> dihapus permanen.`, 9000);
+      tabAkses();
+    };
+  });
+}
+
 /* ---- Tambah user (hanya super) ----
    Pola yang sama dengan Alpha: akun dibuat langsung dengan sandi sementara,
    tanpa email undangan dan tanpa magic link. Alasan praktisnya: magic link
@@ -3074,12 +3171,18 @@ async function tabAkses(){
                  ? 'background:var(--dangerbg);color:var(--danger);border-color:#e3a8a2'
                  : 'background:var(--okbg);color:var(--ok);border-color:#a7d8bd'}">${
                  u.aktif ? 'Nonaktifkan' : 'Aktifkan'}</a>`}
-          </span>` : '<span style="color:var(--muted);font-size:11.5px">tidak bisa edit</span>'}</td>
+            ${sendiri ? '' : `<a class="aksi ghost" href="#" data-hapus="${u.id}"
+               data-email="${esc(u.email)}" data-nama="${esc(u.nama)}"
+               style="color:var(--danger)">Hapus</a>`}
+          </span>
+          <div class="hapus-area hide" data-area="${u.id}" style="margin-top:7px"></div>`
+          : '<span style="color:var(--muted);font-size:11.5px">tidak bisa edit</span>'}</td>
       </tr>`;
     }).join('') : `<tr><td colspan="7"><div class="hint">
       Tidak ada pengguna yang cocok dengan pencarian.</div></td></tr>`;
 
     pasangEditorNama(bisa, gambar);
+    if (bisa) pasangHapusAkun(gambar);
 
     if (!bisa) return;
 
