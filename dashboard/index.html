@@ -1906,53 +1906,111 @@ async function tabAgen(){
   });
 }
 
-/* ---- Undang pengguna baru (hanya super) ----
-   Membuat akun login TIDAK bisa pakai service_role dari browser — kunci itu bisa
-   melakukan apa saja tanpa dijaga RLS. Yang dipakai di sini: permintaan tautan
-   masuk sekali-pakai dengan shouldCreateUser, yang membuat barisnya di auth.users
-   tanpa perlu kunci admin. Trigger on_auth_user_created lalu membuat profilnya
-   dengan peran 'menunggu' dan aktif=false, jadi nol akses sampai diberi peran.
+/* ---- Tambah user (hanya super) ----
+   Pola yang sama dengan Alpha: akun dibuat langsung dengan sandi sementara,
+   tanpa email undangan dan tanpa magic link. Alasan praktisnya: magic link
+   bergantung pada Site URL Supabase yang benar dan pengirim email yang jalan;
+   dua-duanya gampang salah dan tidak kelihatan sampai ada orang gagal masuk.
 
-   Sesi Super Admin TIDAK terganggu: panggilan ini hanya mengirim email, tidak
-   mengembalikan sesi apa pun, jadi Anda tidak ikut keluar. */
+   Pembuatan akun dikerjakan /api/buat-akun di server, karena butuh service_role
+   yang TIDAK boleh ada di browser. Dashboard hanya mengirim token Super Admin
+   yang sedang login; server yang memeriksa sendiri bahwa pemanggilnya super. */
+function acakSandi(){
+  /* Tanpa huruf/angka yang gampang tertukar waktu dibacakan lewat WhatsApp:
+     0/O, 1/l/I. Panjang 14 supaya lolos pemeriksaan sandi bocor milik Supabase. */
+  const abjad = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+  const acak = new Uint32Array(14);
+  crypto.getRandomValues(acak);
+  return Array.from(acak, x => abjad[x % abjad.length]).join('');
+}
+
 function pasangUndang(){
   const b = $('un-kirim');
+
+  $('un-acak').onclick = () => {
+    $('un-sandi').value = acakSandi();
+    $('un-sandi').focus(); $('un-sandi').select();
+  };
+
+  /* Kolom agen hanya muncul kalau perannya Agen — profil_agen_konsisten di
+     database mewajibkan agen_id untuk peran itu, dan melarangnya untuk yang lain. */
+  const ikutPeran = () => {
+    $('un-fld-agen').classList.toggle('hide', $('un-peran').value !== 'agen');
+    $('un-peran-ket').textContent = PERAN_LABEL[$('un-peran').value]?.[1] || '';
+  };
+  $('un-peran').onchange = ikutPeran;
+  ikutPeran();
+
   b.onclick = async () => {
     const nama  = ($('un-nama').value  || '').trim();
     const email = ($('un-email').value || '').trim().toLowerCase();
-    if (!nama)  return pesan('Nama lengkap belum diisi.', 6000);
+    const sandi = $('un-sandi').value;
+    const peranBaru = $('un-peran').value;
+    const agenId = peranBaru === 'agen' ? ($('un-agen').value || '') : '';
+
+    if (!nama)  return pesan('Nama tampilan belum diisi.', 6000);
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
       return pesan('Alamat email belum benar.', 6000);
+    if (sandi.length < 8)
+      return pesan('Sandi sementara minimal 8 karakter. Tekan <b>Acak</b> kalau bingung.', 8000);
+    if (peranBaru === 'agen' && !agenId)
+      return pesan('Peran Agen wajib ditautkan ke satu data agen.', 7000);
 
     const teksAsal = b.textContent;
-    b.disabled = true; b.innerHTML = '<span class="spin"></span> Mengirim…';
+    b.disabled = true; b.innerHTML = '<span class="spin"></span> Membuat…';
     const pulih = () => { b.disabled = false; b.textContent = teksAsal; };
 
     if (S.latihan){
       pulih();
-      return pesan('Di mode panduan undangan tidak benar-benar dikirim. Keluar dari '
-                 + 'panduan dulu kalau mau mengundang orang sungguhan.', 9000);
+      return pesan('Di mode panduan akun tidak benar-benar dibuat. Keluar dari panduan '
+                 + 'dulu kalau mau menambah orang sungguhan.', 9000);
     }
 
-    const { error } = await sb.auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser: true,
-        emailRedirectTo: location.origin + location.pathname,
-        /* dibaca handle_new_user() untuk mengisi kolom profil.nama */
-        data: { nama },
-      }
-    });
-    pulih();
-    if (error) return gagalPesan(error);
+    /* Token Super Admin yang sedang login. Server yang menilai perannya. */
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session){ pulih(); return pesan('Sesi habis. Masuk ulang dulu.', 8000); }
 
-    $('un-nama').value = ''; $('un-email').value = '';
-    pesan(`Undangan dikirim ke <b>${esc(email)}</b>. Minta dia membuka tautannya, lalu `
-        + 'beri perannya di tabel atas. Kalau belum muncul di tabel, buka ulang tab '
-        + 'Kelola Akses.', 12000);
-    tabAkses();
+    let jawab;
+    try {
+      const r = await fetch('/api/buat-akun', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ nama, email, sandi, peran: peranBaru, agen_id: agenId || null }),
+      });
+      jawab = await r.json().catch(() => ({}));
+      if (!r.ok){
+        pulih();
+        return pesan(`<b>Gagal:</b> ${esc(jawab.pesan || 'Tidak ada keterangan dari server.')}`, 12000);
+      }
+    } catch (e) {
+      pulih();
+      return pesan('<b>Gagal menghubungi /api/buat-akun.</b> Kalau dashboard dibuka langsung '
+                 + 'dari berkas atau dari host lain, fungsi servernya memang tidak ikut. '
+                 + 'Pastikan dibuka lewat domain Vercel.', 14000);
+    }
+
+    pulih();
+    /* Sandi ditampilkan SEKALI di sini, bukan dikirim lewat email. Super admin
+       yang menyalin dan menyampaikannya. Tidak ada yang tersimpan di mana pun. */
+    const kotak = $('un-hasil');
+    kotak.style.display = '';
+    kotak.innerHTML = `<b>Akun ${esc(email)} dibuat.</b>
+      ${jawab.sebagian ? esc(jawab.pesan) + '<br>' : ''}
+      Salin dan kirimkan ini ke orangnya sekarang &mdash; sandinya tidak ditampilkan lagi:
+      <div class="mono" style="margin-top:8px;padding:10px;background:var(--sky);
+        border-radius:8px;font-size:14px;user-select:all;word-break:break-all">
+        ${esc(email)} &nbsp;&middot;&nbsp; ${esc(sandi)}</div>
+      <div style="margin-top:8px;color:var(--muted);font-size:12.5px">Minta dia masuk lalu
+        mengganti sandinya sendiri lewat <b>Kelola Akses &rarr; Akun Saya &rarr;
+        Ganti password</b>.</div>`;
+    $('un-nama').value = ''; $('un-email').value = ''; $('un-sandi').value = '';
+    pesan(`Akun <b>${esc(email)}</b> dibuat. Sandi sementaranya ada di kotak di bawah.`, 10000);
   };
-  ['un-nama','un-email'].forEach(id => $(id).onkeydown = e => {
+
+  ['un-nama','un-email','un-sandi'].forEach(id => $(id).onkeydown = e => {
     if (e.key === 'Enter') b.onclick();
   });
 }
@@ -2934,26 +2992,45 @@ async function tabAkses(){
         <span class="mono">peran()</span> hanya mengembalikan peran untuk profil aktif.
         Jejak pekerjaannya di audit tetap punya pemilik, itu sebabnya tidak dihapus.</div>
       ${bisa ? `<div style="border-top:1px solid var(--line);margin-top:18px;padding-top:16px">
-        <h3 style="margin:0 0 4px;font-size:15px">Undang Pengguna Baru</h3>
-        <div class="hint" style="margin-bottom:12px">Orangnya dikirimi tautan masuk lewat
-          email. Begitu diundang, dia langsung muncul di tabel atas berlencana
-          <b>MENUNGGU AKSES</b> &mdash; dan <b>belum bisa melihat apa pun</b> sampai Anda
-          beri peran di kolom Peran.</div>
+        <h3 style="margin:0 0 4px;font-size:15px">Tambah User</h3>
+        <div class="hint" style="margin-bottom:12px">Akun dibuat dengan <b>sandi sementara</b>.
+          Salin sandinya, kirimkan ke orangnya, lalu minta dia menggantinya sendiri lewat
+          <b>Ganti password</b> di bagian Akun Saya. Tidak ada email yang dikirim.</div>
         <div class="grid g2">
-          <div class="fld"><label for="un-nama">Nama lengkap</label>
+          <div class="fld"><label for="un-nama">Nama tampilan</label>
             <input id="un-nama" maxlength="60" autocomplete="off" placeholder="mis. Merila"></div>
           <div class="fld"><label for="un-email">Email</label>
             <input id="un-email" type="email" maxlength="120" autocomplete="off"
                    placeholder="mis. merila@contoh.com">
-            <div class="hint">Email ini yang menautkan akunnya ke sistem login, dan tidak
-              bisa diubah lagi setelahnya. Pastikan benar.</div></div>
+            <div class="hint">Email ini yang menautkan akunnya ke sistem login dan tidak
+              bisa diubah lagi. Pastikan benar.</div></div>
         </div>
-        <button type="button" class="btn" id="un-kirim">Kirim undangan</button>
-        <div class="note" style="margin-bottom:0"><b>Kalau emailnya tidak sampai</b>
-          Pengirim email bawaan Supabase dibatasi beberapa email per jam dan sering masuk
-          spam. Jalan cadangannya: minta orangnya membuka halaman login dashboard lalu
-          menekan <b>&ldquo;Belum punya akun? Daftar di sini&rdquo;</b> &mdash; hasilnya
-          sama persis, dia muncul sebagai Menunggu Akses.</div>
+        <div class="grid g2">
+          <div class="fld"><label for="un-sandi">Sandi sementara</label>
+            <div class="sel2" style="display:flex;gap:8px;align-items:flex-start">
+              <input id="un-sandi" maxlength="40" autocomplete="off" spellcheck="false"
+                     placeholder="tekan Acak" style="flex:1;font-family:ui-monospace,Menlo,monospace">
+              <button type="button" class="btn ghost" id="un-acak"
+                      style="padding:9px 14px;white-space:nowrap">Acak</button>
+            </div>
+            <div class="hint">Minimal 8 karakter. Sandi umum seperti 123456 ditolak Supabase
+              karena ada di daftar sandi yang pernah bocor &mdash; itu aturan Supabase, bukan
+              aturan kita. Tekan <b>Acak</b>, lalu salin.</div></div>
+          <div class="fld"><label for="un-peran">Peran</label>
+            <select id="un-peran">${Object.entries(PERAN_LABEL).map(([v,t]) =>
+              `<option value="${v}"${v==='menunggu'?' selected':''}>${esc(t[0])}</option>`).join('')}
+            </select>
+            <div class="hint" id="un-peran-ket">Menunggu Akses = akun jadi, tapi belum bisa
+              melihat apa pun. Aman dipakai kalau perannya belum diputuskan.</div></div>
+        </div>
+        <div class="fld hide" id="un-fld-agen"><label for="un-agen">Tautkan ke agen</label>
+          <select id="un-agen"><option value="">— pilih agen —</option>${
+            S.agenList.map(a => `<option value="${a.id}">${esc(a.nama)} (${esc(a.kode)})</option>`).join('')}
+          </select>
+          <div class="hint">Peran Agen wajib ditautkan ke satu data agen, supaya dia hanya
+            melihat pelanggan miliknya sendiri.</div></div>
+        <button type="button" class="btn" id="un-kirim">Tambah user</button>
+        <div class="note" id="un-hasil" style="margin-bottom:0;display:none"></div>
       </div>` : ''}
     </div>`;
 
