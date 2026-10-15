@@ -1906,6 +1906,57 @@ async function tabAgen(){
   });
 }
 
+/* ---- Undang pengguna baru (hanya super) ----
+   Membuat akun login TIDAK bisa pakai service_role dari browser — kunci itu bisa
+   melakukan apa saja tanpa dijaga RLS. Yang dipakai di sini: permintaan tautan
+   masuk sekali-pakai dengan shouldCreateUser, yang membuat barisnya di auth.users
+   tanpa perlu kunci admin. Trigger on_auth_user_created lalu membuat profilnya
+   dengan peran 'menunggu' dan aktif=false, jadi nol akses sampai diberi peran.
+
+   Sesi Super Admin TIDAK terganggu: panggilan ini hanya mengirim email, tidak
+   mengembalikan sesi apa pun, jadi Anda tidak ikut keluar. */
+function pasangUndang(){
+  const b = $('un-kirim');
+  b.onclick = async () => {
+    const nama  = ($('un-nama').value  || '').trim();
+    const email = ($('un-email').value || '').trim().toLowerCase();
+    if (!nama)  return pesan('Nama lengkap belum diisi.', 6000);
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
+      return pesan('Alamat email belum benar.', 6000);
+
+    const teksAsal = b.textContent;
+    b.disabled = true; b.innerHTML = '<span class="spin"></span> Mengirim…';
+    const pulih = () => { b.disabled = false; b.textContent = teksAsal; };
+
+    if (S.latihan){
+      pulih();
+      return pesan('Di mode panduan undangan tidak benar-benar dikirim. Keluar dari '
+                 + 'panduan dulu kalau mau mengundang orang sungguhan.', 9000);
+    }
+
+    const { error } = await sb.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: location.origin + location.pathname,
+        /* dibaca handle_new_user() untuk mengisi kolom profil.nama */
+        data: { nama },
+      }
+    });
+    pulih();
+    if (error) return gagalPesan(error);
+
+    $('un-nama').value = ''; $('un-email').value = '';
+    pesan(`Undangan dikirim ke <b>${esc(email)}</b>. Minta dia membuka tautannya, lalu `
+        + 'beri perannya di tabel atas. Kalau belum muncul di tabel, buka ulang tab '
+        + 'Kelola Akses.', 12000);
+    tabAkses();
+  };
+  ['un-nama','un-email'].forEach(id => $(id).onkeydown = e => {
+    if (e.key === 'Enter') b.onclick();
+  });
+}
+
 /* ---- Kelola produk & harga (hanya super) ----
    Dijaga policy produk_kelola_super (ALL, peran()='super', lengkap WITH CHECK).
    CHECK yang menentukan bentuk formulirnya:
@@ -2882,11 +2933,31 @@ async function tabAkses(){
         Akun yang dinonaktifkan langsung kehilangan seluruh akses — fungsi
         <span class="mono">peran()</span> hanya mengembalikan peran untuk profil aktif.
         Jejak pekerjaannya di audit tetap punya pemilik, itu sebabnya tidak dihapus.</div>
-      ${bisa ? `<div class="note w"><b>Menambah akun baru belum bisa dari sini</b>
-        Membuat akun butuh kunci admin Supabase yang tidak boleh ditaruh di browser.
-        Untuk sekarang: buat akunnya di Supabase → Authentication → Add user, lalu
-        atur perannya di tabel ini.</div>` : ''}
+      ${bisa ? `<div style="border-top:1px solid var(--line);margin-top:18px;padding-top:16px">
+        <h3 style="margin:0 0 4px;font-size:15px">Undang Pengguna Baru</h3>
+        <div class="hint" style="margin-bottom:12px">Orangnya dikirimi tautan masuk lewat
+          email. Begitu diundang, dia langsung muncul di tabel atas berlencana
+          <b>MENUNGGU AKSES</b> &mdash; dan <b>belum bisa melihat apa pun</b> sampai Anda
+          beri peran di kolom Peran.</div>
+        <div class="grid g2">
+          <div class="fld"><label for="un-nama">Nama lengkap</label>
+            <input id="un-nama" maxlength="60" autocomplete="off" placeholder="mis. Merila"></div>
+          <div class="fld"><label for="un-email">Email</label>
+            <input id="un-email" type="email" maxlength="120" autocomplete="off"
+                   placeholder="mis. merila@contoh.com">
+            <div class="hint">Email ini yang menautkan akunnya ke sistem login, dan tidak
+              bisa diubah lagi setelahnya. Pastikan benar.</div></div>
+        </div>
+        <button type="button" class="btn" id="un-kirim">Kirim undangan</button>
+        <div class="note" style="margin-bottom:0"><b>Kalau emailnya tidak sampai</b>
+          Pengirim email bawaan Supabase dibatasi beberapa email per jam dan sering masuk
+          spam. Jalan cadangannya: minta orangnya membuka halaman login dashboard lalu
+          menekan <b>&ldquo;Belum punya akun? Daftar di sini&rdquo;</b> &mdash; hasilnya
+          sama persis, dia muncul sebagai Menunggu Akses.</div>
+      </div>` : ''}
     </div>`;
+
+  if (bisa) pasangUndang();
 
   const gambar = () => {
     const q = ($('cari-akses').value || '').trim().toLowerCase();
