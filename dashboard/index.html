@@ -624,6 +624,36 @@ function dataLatihan(){
       ambang_cek_boarding:10, lb_agen_mode:'penuh', retensi_nik_bulan:12,
       nik_siapa_boleh_lihat:'super', kuota_kursi:null, kapasitas_izin:null, tahan_pending_jam:2,
       kolom_manifest:{nama:true,gender:true,usia:true,nik:true,alamat:true,wn:false} }],
+    /* Katalog produk. Sebelum 15 Okt 2026 tabel ini TIDAK ada di data latihan,
+       jadi kartu Produk & Harga akan kosong melompong saat mode panduan.
+       Isinya sengaja sama dengan katalog sungguhan: ini konfigurasi, bukan data
+       pelanggan, jadi panduan mengajarkan angka yang memang dipakai.
+       Dua model harga keduanya diwakili supaya langkah panduan punya contoh:
+       'Cruise Daily' bertingkat (lokal/umum), sisanya harga flat. */
+    produk: [
+      { id:'p1', slug:'cruise-daily', nama:'Cruise Daily', bertingkat:true,
+        harga_lokal:100000, harga_umum:150000, harga_flat:null,
+        dapat_voucher:false, aktif:true, urutan:1, dibuat:JAM(2000),
+        deskripsi:'Pelabuhan Tamperan ke Teluk Gelon.' },
+      { id:'p2', slug:'cruise-promo', nama:'Cruise PROMO', bertingkat:false,
+        harga_lokal:null, harga_umum:null, harga_flat:150000,
+        dapat_voucher:true, aktif:true, urutan:2, dibuat:JAM(1900),
+        deskripsi:'Harga sama untuk semua, dapat voucher.' },
+      { id:'p3', slug:'1-day-journey', nama:'1 Day Journey', bertingkat:false,
+        harga_lokal:null, harga_umum:null, harga_flat:490000,
+        dapat_voucher:false, aktif:true, urutan:3, dibuat:JAM(1800),
+        deskripsi:'Perjalanan sehari ke pulau wisata.' },
+      { id:'p4', slug:'2-day-journey', nama:'2 Day Journey', bertingkat:false,
+        harga_lokal:null, harga_umum:null, harga_flat:780000,
+        dapat_voucher:false, aktif:true, urutan:4, dibuat:JAM(1700),
+        deskripsi:'Dua hari satu malam.' },
+      /* Satu produk nonaktif: langkah panduan soal "aktifkan lagi" perlu contoh,
+         dan ini membuktikan produk nonaktif tetap terlihat di pengelolaan. */
+      { id:'p5', slug:'sunset-trip', nama:'Sunset Trip (uji coba)', bertingkat:false,
+        harga_lokal:null, harga_umum:null, harga_flat:200000,
+        dapat_voucher:false, aktif:false, urutan:5, dibuat:JAM(400),
+        deskripsi:'Belum dijual, masih uji coba.' },
+    ],
     penumpang: [], audit: [], pesanan_tambahan: [],
   };
 }
@@ -1741,6 +1771,183 @@ async function tabAgen(){
   });
 }
 
+/* ---- Kelola produk & harga (hanya super) ----
+   Dijaga policy produk_kelola_super (ALL, peran()='super', lengkap WITH CHECK).
+   CHECK yang menentukan bentuk formulirnya:
+     produk_harga_konsisten -> bertingkat WAJIB punya harga_lokal + harga_umum;
+                               tidak bertingkat WAJIB punya harga_flat
+     produk_slug_check      -> ^[a-z0-9-]{2,40}$ , dan slug UNIQUE
+   Kolom harga yang tidak dipakai sengaja DIKOSONGKAN (null), bukan dibiarkan,
+   supaya tidak ada angka basi yang menyesatkan pembaca tabel. */
+const SLUG_POLA = /^[a-z0-9-]{2,40}$/;    /* sama persis dengan produk_slug_check */
+
+function slugOtomatis(nama){
+  return String(nama||'').toLowerCase()
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40);
+}
+/* Kosong = tidak dipakai. Selain itu harus bilangan bulat >= 0 (CHECK harga >= 0). */
+function hargaSalah(teks){
+  if (teks === '') return false;
+  return !/^[0-9]{1,9}$/.test(teks);
+}
+
+function pasangKelolaProduk(produkSemua){
+  let sedangUbah = null;          /* id produk yang sedang diedit, null = tambah baru */
+
+  const gambarForm = () => {
+    const p = sedangUbah ? produkSemua.find(x => x.id === sedangUbah) : null;
+    const bertingkat = p ? p.bertingkat : false;
+    $('form-produk').innerHTML = `
+      <h3 style="margin:0 0 4px;font-size:15px">${p
+        ? 'Ubah: ' + esc(p.nama) : 'Tambah Produk Baru'}</h3>
+      <div class="grid g2">
+        <div class="fld"><label for="pr-nama">Nama produk</label>
+          <input id="pr-nama" maxlength="80" autocomplete="off"
+                 placeholder="mis. Sunset Trip" value="${esc(p?.nama ?? '')}"></div>
+        <div class="fld"><label for="pr-slug">Kode slug</label>
+          <input id="pr-slug" maxlength="40" spellcheck="false" autocomplete="off"
+                 placeholder="mis. sunset-trip" value="${esc(p?.slug ?? '')}"
+                 style="font-family:ui-monospace,Menlo,monospace">
+          <div class="hint">Huruf kecil, angka, dan strip saja. Dipakai sistem,
+            bukan ditampilkan ke pelanggan. Terisi otomatis dari nama.</div></div>
+      </div>
+      <div class="grid g2">
+        <div class="fld"><label for="pr-model">Model harga</label>
+          <select id="pr-model">
+            <option value="flat"${!bertingkat?' selected':''}>Harga sama untuk semua</option>
+            <option value="tingkat"${bertingkat?' selected':''}>Bertingkat &mdash; beda warga Pacitan &amp; luar</option>
+          </select></div>
+        <div class="fld"><label for="pr-urut">Urutan tampil</label>
+          <input id="pr-urut" inputmode="numeric" maxlength="3" autocomplete="off"
+                 value="${p?.urutan ?? ''}" placeholder="otomatis"></div>
+      </div>
+      <div class="grid g3" id="harga-flat" style="display:${bertingkat?'none':'grid'}">
+        <div class="fld"><label for="pr-flat">Harga (Rp)</label>
+          <input id="pr-flat" inputmode="numeric" maxlength="9" autocomplete="off"
+                 value="${p?.harga_flat ?? ''}" placeholder="mis. 150000">
+          <div class="hint">Berlaku untuk semua pembeli.</div></div>
+      </div>
+      <div class="grid g3" id="harga-tingkat" style="display:${bertingkat?'grid':'none'}">
+        <div class="fld"><label for="pr-lokal">Harga warga Pacitan (Rp)</label>
+          <input id="pr-lokal" inputmode="numeric" maxlength="9" autocomplete="off"
+                 value="${p?.harga_lokal ?? ''}" placeholder="mis. 100000"></div>
+        <div class="fld"><label for="pr-umum">Harga umum (Rp)</label>
+          <input id="pr-umum" inputmode="numeric" maxlength="9" autocomplete="off"
+                 value="${p?.harga_umum ?? ''}" placeholder="mis. 150000">
+          <div class="hint">Harga lokal dipakai hanya kalau pembeli memakai kode voucher
+            warga Pacitan. Browser tidak bisa mengaku-ngaku warga Pacitan.</div></div>
+      </div>
+      <div class="grid g2">
+        <div class="fld"><label for="pr-desk">Deskripsi <span style="font-weight:400;color:var(--muted)">(boleh dikosongkan)</span></label>
+          <input id="pr-desk" maxlength="200" autocomplete="off"
+                 value="${esc(p?.deskripsi ?? '')}"></div>
+        <div class="fld"><label>Voucher makan</label>
+          <label style="display:flex;gap:9px;align-items:flex-start;font-weight:400;cursor:pointer">
+            <input type="checkbox" id="pr-vou" style="width:auto;margin-top:3px"
+                   ${p?.dapat_voucher?'checked':''}>
+            <span style="font-size:13.5px">Pembeli produk ini dapat voucher</span></label></div>
+      </div>
+      <span class="sel2">
+        <button type="button" class="btn" id="pr-simpan">${p?'Simpan perubahan':'Tambah produk'}</button>
+        ${p?'<button type="button" class="btn ghost" id="pr-batal">Batal</button>':''}
+      </span>`;
+
+    /* Kolom harga ikut model yang dipilih: CHECK produk_harga_konsisten menolak
+       kombinasi yang tidak cocok, jadi jangan sampai pengguna mengisi yang salah. */
+    $('pr-model').onchange = () => {
+      const t = $('pr-model').value === 'tingkat';
+      $('harga-tingkat').style.display = t ? 'grid' : 'none';
+      $('harga-flat').style.display    = t ? 'none' : 'grid';
+    };
+    /* Slug terisi otomatis selama belum disentuh tangan. */
+    let slugManual = !!p;
+    $('pr-slug').oninput = () => { slugManual = true; };
+    $('pr-nama').oninput = () => {
+      if (!slugManual) $('pr-slug').value = slugOtomatis($('pr-nama').value);
+    };
+    if (p) $('pr-batal').onclick = () => { sedangUbah = null; gambarForm(); };
+    $('pr-simpan').onclick = () => simpanProduk(p, produkSemua);
+  };
+
+  $('isi').querySelectorAll('[data-ubah-produk]').forEach(t => t.onclick = e => {
+    e.preventDefault();
+    sedangUbah = t.dataset.ubahProduk;
+    gambarForm();
+    $('form-produk').scrollIntoView({ behavior:'smooth', block:'center' });
+  });
+
+  $('isi').querySelectorAll('[data-produk-aktif]').forEach(b => b.onclick = async e => {
+    e.preventDefault(); b.style.pointerEvents = 'none';
+    const jual = b.dataset.nilai === '1';
+    const { error } = await DB.from('produk')
+      .update({ aktif: jual }).eq('id', b.dataset.produkAktif);
+    if (error){ b.style.pointerEvents = ''; return gagalPesan(error); }
+    pesan(jual ? 'Produk kembali dijual dan muncul lagi di halaman pemesanan.'
+               : 'Produk berhenti dijual. Pesanan lama tidak terpengaruh.', 8000);
+    tabAtur();
+  });
+
+  gambarForm();
+}
+
+async function simpanProduk(p, produkSemua){
+  const nama = ($('pr-nama').value || '').trim();
+  const slug = ($('pr-slug').value || '').trim().toLowerCase();
+  const tingkat = $('pr-model').value === 'tingkat';
+  const flat  = ($('pr-flat').value  || '').trim();
+  const lokal = ($('pr-lokal').value || '').trim();
+  const umum  = ($('pr-umum').value  || '').trim();
+  const urut  = ($('pr-urut').value  || '').trim();
+
+  if (!nama) return pesan('Nama produk belum diisi.', 6000);
+  if (!SLUG_POLA.test(slug))
+    return pesan('Kode slug harus 2&ndash;40 karakter, hanya huruf kecil, angka, dan strip.', 9000);
+  if (produkSemua.some(x => x.id !== p?.id && x.slug === slug))
+    return pesan(`Kode slug <b>${esc(slug)}</b> sudah dipakai produk lain.`, 8000);
+  if (urut && !/^[0-9]{1,3}$/.test(urut))
+    return pesan('Urutan harus angka 0&ndash;999.', 6000);
+
+  /* Inilah yang dijaga CHECK produk_harga_konsisten. Diperiksa di sini juga
+     supaya pesannya jelas, bukan "violates check constraint". */
+  if (tingkat){
+    if (hargaSalah(lokal) || lokal === '' || hargaSalah(umum) || umum === '')
+      return pesan('Model bertingkat wajib mengisi <b>kedua</b> harga: warga Pacitan '
+        + 'dan umum. Keduanya harus angka bulat.', 10000);
+  } else {
+    if (hargaSalah(flat) || flat === '')
+      return pesan('Model harga sama wajib mengisi harganya, berupa angka bulat.', 9000);
+  }
+
+  const b = $('pr-simpan'); b.disabled = true; b.textContent = 'Menyimpan…';
+  const pulih = () => { b.disabled = false;
+    b.textContent = p ? 'Simpan perubahan' : 'Tambah produk'; };
+
+  /* Kolom harga yang tidak dipakai dikosongkan, bukan dibiarkan berisi angka lama. */
+  const isi = {
+    nama, slug,
+    deskripsi: ($('pr-desk').value || '').trim() || null,
+    bertingkat: tingkat,
+    harga_lokal: tingkat ? parseInt(lokal,10) : null,
+    harga_umum:  tingkat ? parseInt(umum,10)  : null,
+    harga_flat:  tingkat ? null : parseInt(flat,10),
+    dapat_voucher: $('pr-vou').checked,
+    urutan: urut === ''
+      ? (p ? p.urutan : Math.max(0, ...produkSemua.map(x => x.urutan || 0)) + 1)
+      : parseInt(urut,10),
+  };
+
+  const { error } = p
+    ? await DB.from('produk').update(isi).eq('id', p.id)
+    : await DB.from('produk').insert({ ...isi, aktif: true });
+  if (error){ pulih(); return gagalPesan(error); }
+
+  pesan(p
+    ? `<b>${esc(nama)}</b> diperbarui. Harga baru langsung berlaku di halaman pemesanan; `
+      + 'pesanan yang sudah masuk tetap memakai harga lamanya.'
+    : `<b>${esc(nama)}</b> ditambahkan dan langsung dijual.`, 10000);
+  tabAtur();
+}
+
 /* ---- Kelola armada kapal (hanya super) ----
    Tabel kapal sudah dijaga policy kapal_kelola_super (ALL, peran()='super',
    lengkap dengan WITH CHECK) plus CHECK kapasitas>0 dan nama tidak kosong.
@@ -2713,8 +2920,21 @@ async function tabAkses(){
 
 /* ============ PENGATURAN ============ */
 async function tabAtur(){
-  const { data, error } = await DB.from('pengaturan').select('*').single();
+  const [{ data, error }, { data: produk, error: ePro }] = await Promise.all([
+    DB.from('pengaturan').select('*').single(),
+    /* SEMUA produk termasuk nonaktif: kalau disaring aktif=true, produk yang
+       pernah dinonaktifkan tidak akan pernah bisa dihidupkan lagi dari layar. */
+    DB.from('produk').select('id,slug,nama,deskripsi,bertingkat,harga_lokal,harga_umum,'
+      + 'harga_flat,dapat_voucher,aktif,urutan').order('urutan'),
+  ]);
   if (error) return gagal(error);
+  if (ePro)  return gagal(ePro);
+  /* Ketahuan lewat uji: kalau baris pengaturan tidak ada, data = null dan
+     seluruh tab mati dengan TypeError yang tidak bisa dibaca siapa pun.
+     Di produksi barisnya memang selalu ada, tapi "selalu" bukan jaminan. */
+  if (!data) return gagal({ message:
+    'Baris pengaturan tidak ditemukan. Tabel pengaturan harus berisi tepat satu '
+    + 'baris dengan id = true. Hubungi tim Delta sebelum mengubah apa pun.' });
   S.atur = data;
   const ro = S.peran !== 'super';
   const f = (k,l,hint='') => `<div class="fld"><label>${l}</label>
@@ -2753,7 +2973,55 @@ async function tabAtur(){
         [['super','Super Admin saja'],['super_owner','Super Admin & Owner']])}
       ${f('retensi_nik_bulan','Hapus NIK otomatis setelah (bulan)')}
     </div></div>
-    ${ro?'':'<button class="btn" id="tblSimpan">Simpan pengaturan</button>'}`;
+    ${ro?'':'<button class="btn" id="tblSimpan">Simpan pengaturan</button>'}
+    <div class="card scrollx" id="kartu-produk">
+      <h3 style="margin:0 0 4px">Produk &amp; Harga</h3>
+      <div class="hint" style="margin-bottom:12px">Harga di sini yang dibaca halaman
+        pemesanan. Mengubahnya <b>tidak mengubah pesanan yang sudah masuk</b> &mdash;
+        tiap pesanan menyimpan harganya sendiri saat dibuat.</div>
+      <table data-papan="produk">
+        <thead><tr><th class="nw">Nama</th><th class="nw">Kode slug</th><th class="nw">Model harga</th>
+          <th class="num">Lokal</th><th class="num">Umum</th><th class="num">Flat</th>
+          <th class="nw">Voucher</th><th class="nw">Status</th><th></th></tr></thead>
+        <tbody>${(produk||[]).map(p => `<tr>
+          <td class="nw"><b class="nama" title="${esc(p.nama)}">${esc(p.nama)}</b></td>
+          <td class="mono nw" style="font-size:12px;color:var(--muted)">${esc(p.slug)}</td>
+          <td class="nw">${p.bertingkat
+            ? '<span class="pill p-sea">BERTINGKAT</span>'
+            : '<span class="pill p-mute">HARGA SAMA</span>'}</td>
+          <td class="num nw" data-urut="${p.harga_lokal ?? 0}">${p.harga_lokal!=null?rp(p.harga_lokal):'—'}</td>
+          <td class="num nw" data-urut="${p.harga_umum ?? 0}">${p.harga_umum!=null?rp(p.harga_umum):'—'}</td>
+          <td class="num nw" data-urut="${p.harga_flat ?? 0}">${p.harga_flat!=null?rp(p.harga_flat):'—'}</td>
+          <td class="nw">${p.dapat_voucher
+            ? '<span class="pill p-ok">DAPAT</span>'
+            : '<span class="pill p-mute">TIDAK</span>'}</td>
+          <td class="nw">${p.aktif
+            ? '<span class="pill p-ok">DIJUAL</span>'
+            : '<span class="pill p-mute">TIDAK DIJUAL</span>'}</td>
+          <td class="nw">${ro
+            ? '<span style="color:var(--muted);font-size:11.5px">tidak bisa edit</span>'
+            : `<span class="sel2">
+                <a class="aksi ghost" href="#" data-ubah-produk="${p.id}">Ubah</a>
+                <a class="aksi ghost" href="#" data-produk-aktif="${p.id}"
+                   data-nilai="${p.aktif?0:1}">${p.aktif?'Stop jual':'Jual lagi'}</a></span>`}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+      ${ro ? '' : `<div id="form-produk" style="margin-top:16px"></div>`}
+      <div class="note"><b>Kenapa harga lama tidak ikut berubah</b>
+        Tiap pesanan membekukan harganya sendiri di kolom
+        <span class="mono">harga_satuan_beku</span> dan
+        <span class="mono">diskon_persen_beku</span>. Jadi menaikkan harga hari ini
+        tidak mengubah tagihan orang yang memesan kemarin.</div>
+    </div>`;
+
+  lengkapiTabel('#isi table[data-papan="produk"]', {
+    id: 'produk', takUrut: [8], petunjuk: 'Cari nama produk atau slug…',
+    saring: [
+      { kolom: 2, semua: 'Semua model harga', pilihan: ['BERTINGKAT','HARGA SAMA'] },
+      { kolom: 7, semua: 'Semua status',      pilihan: ['DIJUAL','TIDAK DIJUAL'] },
+    ]
+  });
+  if (!ro) pasangKelolaProduk(produk || []);
 
   if (!ro) $('tblSimpan').onclick = async () => {
     const b=$('tblSimpan'); b.disabled=true; b.innerHTML='<span class="spin"></span> Menyimpan…';
