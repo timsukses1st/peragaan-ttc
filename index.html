@@ -139,6 +139,9 @@ footer{margin-top:40px;padding:22px 0 40px;border-top:1px solid var(--line);
 .tutor-btn{font:inherit;font-size:13.5px;font-weight:700;padding:8px 16px;border-radius:8px;
   cursor:pointer;background:var(--sea);color:#fff;border:1.5px solid var(--sea)}
 .tutor-btn.ghost{background:#fff;color:var(--sea)}
+/* Tombol 'menunggu': terlihat belum bisa dipakai, tapi tetap bisa diklik supaya
+   bisa memberi penjelasan kenapa belum bisa lanjut. */
+.tutor-btn.nunggu{background:#e2e8f0;color:#64748b;border-color:#cbd5e1;cursor:help}
 .tutor-btn:disabled{opacity:.45;cursor:not-allowed}
 .tutor-titik{display:flex;gap:4px;margin-top:11px}
 .tutor-titik i{width:6px;height:6px;border-radius:50%;background:#cbd5e1;display:block}
@@ -535,6 +538,9 @@ async function cekKodeAgen(otomatis = false){
     $('tb-biro').style.opacity = S.bolehBiro ? '' : '.5';
     if (S.bolehBiro && !$('f-bnama').value) $('f-bnama').value = r.nama;
     if (!otomatis) pesan(`Kode sah atas nama ${esc(r.nama)}. Silakan lanjut mengisi pesanan.`);
+    /* Form baru saja muncul; kalau panduan sedang menunggu di langkah kode,
+       daftar langkahnya disusun ulang dan panduan lanjut sendiri ke isi form. */
+    setTimeout(tutorLanjutKalauMenunggu, 260);
   } else {
     /* Gerbang ditutup ulang supaya kode sah yang lama tidak nyangkut. */
     S.kodeOk = false; S.kodeRef = null; S.agenNama = null;
@@ -1070,11 +1076,16 @@ const TUTOR = [
   { cari:'#produk', judul:'Harga pelayaran',
     teks:'Empat paket beserta harganya. Harga di sini sudah yang terbaru — '
        + 'diambil langsung dari sistem kami, bukan ditulis tangan.' },
-  { cari:'#gate', judul:'Kode agen dulu',
+  /* Langkah bersyarat: tutorial berhenti di sini sampai kodenya terbukti sah,
+     seperti tutorial game yang menyuruh menekan sesuatu dulu sebelum lanjut.
+     Tanpa ini, langkah-langkah form tersaring habis pada kunjungan pertama
+     (formnya memang belum ada di layar) dan isi pemesanan tidak pernah dijelaskan. */
+  { cari:'#gate', judul:'Kode agen dulu', tunggu: () => S.kodeOk,
+    tungguTeks:'Isi kode agen dulu',
     teks:'Pemesanan di The Tamperan Cruise dilayani lewat agen resmi. Masukkan kode '
-       + 'dari agen Anda, lalu tekan Periksa. Kalau kodenya benar muncul tanda hijau '
-       + 'SAH dan form pemesanan terbuka. Kalau merah, kodenya salah ketik atau sudah '
-       + 'tidak berlaku — tanyakan lagi ke agen Anda.' },
+       + 'dari agen Anda di kotak ini, lalu tekan <b>Periksa kode</b>. Kalau benar, '
+       + 'muncul tanda hijau SAH dan form pemesanan terbuka &mdash; panduan ini lanjut sendiri. '
+       + 'Kalau merah, kodenya salah ketik atau sudah tidak berlaku.' },
   { cari:'#tb-per', judul:'Perorangan atau biro',
     teks:'Pilih Perorangan untuk keluarga atau rombongan pribadi. Biro / Travel hanya '
        + 'untuk biro yang sudah bekerja sama, dan harus memakai kode biro.' },
@@ -1137,11 +1148,34 @@ const tutorTombol = e => {
 };
 
 function tutorMaju(arah){
+  const L = TUT.urut[TUT.i];
+  /* Maju ditahan kalau syarat langkah ini belum terpenuhi. Mundur selalu boleh.
+     Tombolnya sengaja TIDAK dimatikan: tombol mati tidak memicu klik, jadi
+     pengguna menekan lalu tidak terjadi apa-apa tanpa tahu sebabnya. */
+  if (arah > 0 && typeof L?.tunggu === 'function' && !L.tunggu()){
+    pesan('Isi dan periksa kode agen dulu &mdash; panduannya lanjut sendiri '
+        + 'begitu kodenya sah.', 7000);
+    return;
+  }
   const tujuan = TUT.i + arah;
   if (tujuan < 0) return;
   if (tujuan >= TUT.urut.length) return tutorTutup(true);
   TUT.i = tujuan;
   tutorGambar();
+}
+
+/* Dipanggil saat keadaan berubah (mis. kode agen jadi sah). Daftar langkah
+   disusun ulang karena bagian yang tadinya belum ada di layar kini muncul,
+   lalu tutorial lanjut sendiri dari langkah yang sedang ditunggu. */
+function tutorLanjutKalauMenunggu(){
+  if (!TUT.jalan) return;
+  const sekarang = TUT.urut[TUT.i];
+  if (!sekarang || typeof sekarang.tunggu !== 'function' || !sekarang.tunggu()) return;
+
+  TUT.urut = TUTOR.filter(L => L.cari === null || tutorElemen(L.cari));
+  const i = TUT.urut.indexOf(sekarang);
+  TUT.i = i >= 0 ? i : TUT.i;
+  tutorMaju(1);
 }
 
 /* Elemen di dalam bar yang menempel (position sticky/fixed) tidak boleh
@@ -1251,6 +1285,11 @@ function tutorKartuTengah(L){
 /* Isi kartu dipakai dua tempat: kartu bersorotan dan kartu di tengah layar.
    Satu fungsi supaya keduanya tidak pernah berbeda. */
 function tutorIsiKartu(L){
+  /* Langkah bersyarat: tombol Lanjut dimatikan sampai syaratnya terpenuhi,
+     supaya pengguna tidak melompati bagian yang justru jadi kuncinya. */
+  const menunggu = typeof L.tunggu === 'function' && !L.tunggu();
+  const labelMaju = menunggu ? (L.tungguTeks || 'Selesaikan dulu')
+                   : (TUT.i===TUT.urut.length-1 ? 'Selesai' : 'Lanjut');
   return `
     <div class="tnum">Langkah ${TUT.i+1} dari ${TUT.urut.length}</div>
     <div class="tt">${esc(L.judul)}</div>
@@ -1260,8 +1299,7 @@ function tutorIsiKartu(L){
     <div class="tutor-kaki">
       <button class="lewati" data-t-lewati>Lewati</button>
       <button class="tutor-btn ghost" data-t-mundur ${TUT.i===0?'disabled':''}>Kembali</button>
-      <button class="tutor-btn" data-t-maju>${
-        TUT.i===TUT.urut.length-1 ? 'Selesai' : 'Lanjut'}</button>
+      <button class="tutor-btn${menunggu?' nunggu':''}" data-t-maju>${labelMaju}</button>
     </div>`;
 }
 
