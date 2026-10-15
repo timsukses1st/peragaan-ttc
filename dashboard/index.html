@@ -83,6 +83,49 @@ th.urut::after{content:'⇅';position:absolute;right:6px;top:50%;transform:trans
 th.urut.naik::after{content:'↑';opacity:1;color:var(--sea)}
 th.urut.turun::after{content:'↓';opacity:1;color:var(--sea)}
 tr.kosong td{color:var(--muted);font-size:13px;padding:16px 8px}
+
+/* ================= TUTORIAL DI DALAM DASHBOARD =================
+   Pola "sorotan": satu kotak transparan diletakkan tepat di atas bagian yang
+   sedang dijelaskan, lalu seluruh layar selain kotak itu digelapkan memakai
+   box-shadow raksasa. Cara ini tidak memerlukan pustaka apa pun dan tidak
+   menyentuh tata letak aslinya — penting karena dashboard ini dipakai di
+   lapangan dan tidak boleh bergeser gara-gara tutorial. */
+.tutor-sorot{position:absolute;z-index:9998;border-radius:10px;pointer-events:none;
+  box-shadow:0 0 0 9999px rgba(8,20,36,.66), 0 0 0 3px var(--sea) inset;
+  transition:top .22s, left .22s, width .22s, height .22s}
+.tutor-kartu{position:absolute;z-index:9999;width:330px;max-width:calc(100vw - 28px);
+  background:#fff;border:1.5px solid var(--sea);border-radius:12px;padding:15px 16px 13px;
+  box-shadow:0 12px 34px rgba(8,20,36,.34)}
+.tutor-kartu .tt{font-weight:800;font-size:15.5px;color:var(--navy);margin-bottom:5px}
+.tutor-kartu .ts{font-size:13.5px;line-height:1.5;color:#334155}
+.tutor-kartu .tnum{font-size:11px;font-weight:700;color:var(--sea);letter-spacing:.4px;
+  text-transform:uppercase;margin-bottom:7px}
+.tutor-kaki{display:flex;gap:8px;align-items:center;margin-top:13px}
+.tutor-kaki .lewati{margin-right:auto;background:none;border:0;font:inherit;font-size:12.5px;
+  color:var(--muted);cursor:pointer;text-decoration:underline;padding:0}
+.tutor-kaki .lewati:hover{color:var(--danger)}
+.tutor-btn{font:inherit;font-size:13px;font-weight:700;padding:7px 15px;border-radius:8px;
+  cursor:pointer;background:var(--sea);color:#fff;border:1.5px solid var(--sea)}
+.tutor-btn.ghost{background:#fff;color:var(--sea)}
+.tutor-btn:disabled{opacity:.45;cursor:not-allowed}
+.tutor-titik{display:flex;gap:4px;margin-top:11px}
+.tutor-titik i{width:6px;height:6px;border-radius:50%;background:#cbd5e1;display:block}
+.tutor-titik i.on{background:var(--sea);width:16px;border-radius:3px}
+/* Pita pratinjau peran: sengaja mencolok supaya tidak ada yang lupa sedang
+   melihat tampilan peran lain lalu mengira dashboardnya rusak. */
+#pita-pratinjau{background:#7a4f06;color:#fff;font-size:13px;position:sticky;top:0;z-index:30}
+#pita-pratinjau .in{max-width:1140px;margin:0 auto;padding:8px 16px;display:flex;
+  align-items:center;gap:12px;flex-wrap:wrap}
+#pita-pratinjau b{font-weight:800}
+#pita-pratinjau button{margin-left:auto;font:inherit;font-size:12.5px;font-weight:700;
+  background:#fff;color:#7a4f06;border:0;border-radius:7px;padding:5px 13px;cursor:pointer}
+#pilihPeran{font:inherit;font-size:12.5px;padding:5px 8px;border-radius:7px;
+  border:1px solid #39618a;background:#1b3a5c;color:#e4f1f8;max-width:170px}
+#pita-agen{font:inherit;font-size:12.5px;padding:4px 8px;border-radius:7px;border:0;
+  background:#fff;color:#7a4f06;font-weight:700;max-width:180px}
+/* Tombol panduan di bar atas */
+#tblPanduan{background:#1b3a5c;border-color:#39618a;color:#e4f1f8}
+#tblPanduan:hover{background:#27527d}
 .kode-in{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;width:148px;padding:3px 7px;
   border:1.5px solid var(--sea);border-radius:6px;text-transform:none}
 /* Nama orang/biro bisa panjang: potong dengan elipsis, jangan pernah pecah jadi dua baris.
@@ -169,8 +212,18 @@ input:focus,select:focus{outline:2px solid var(--sea);outline-offset:1px;border-
   <div class="bar"><div class="in">
     <div class="brand">THE TAMPERAN CRUISE<small>sistem penjualan</small></div>
     <div class="sisa"><span id="labelUser"></span>
+      <select id="pilihPeran" class="hide" title="Lihat tampilan peran lain"></select>
+      <button class="btn sm" id="tblPanduan">Panduan</button>
       <button class="btn ghost sm" id="tblKeluar">Keluar</button></div>
   </div></div>
+  <div id="pita-pratinjau" class="hide"><div class="in">
+    <span>Sedang melihat tampilan <b id="pita-peran">—</b>.
+      <span id="pita-ket">Ini pratinjau tampilan, bukan pengujian pembatasan akses &mdash;
+      akun Anda tetap Super Admin di mata database.</span></span>
+    <select id="pita-agen" class="hide" title="Berdiri sebagai agen mana"></select>
+    <button type="button" id="pita-kembali">Kembali ke Super Admin</button>
+  </div></div>
+
   <div class="wrap">
     <h1 id="judul">—</h1>
     <p class="sub" id="subjudul"></p>
@@ -226,7 +279,9 @@ const JUDUL = {
 };
 
 const S = { peran:null, agenId:null, email:null, uid:null, atur:null,
-             kapal:[], pengguna:[], agenList:[] };
+             kapal:[], pengguna:[], agenList:[], tabAktif:null,
+             peranAsli:null, agenIdAsli:null };  /* nilai sebenarnya; yang tanpa
+                 akhiran 'Asli' boleh diubah pratinjau */
 
 /* ============ LOGIN ============ */
 $('tblMasuk').onclick = async () => {
@@ -240,6 +295,7 @@ $('tblMasuk').onclick = async () => {
 };
 $('sandi').addEventListener('keydown', e => { if(e.key==='Enter') $('tblMasuk').click(); });
 $('tblKeluar').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+$('tblPanduan').onclick = () => mulaiTutor(true);
 
 /* ============ MULAI ============ */
 async function mulai(){
@@ -252,22 +308,51 @@ async function mulai(){
       Akun ini belum punya profil atau sedang nonaktif. Minta Super Admin menautkannya.</span>`;
     await sb.auth.signOut(); return;
   }
-  S.peran=peran; S.agenId=agenId; S.email=user.email; S.uid=user.id;
+  S.peran=peran; S.peranAsli=peran;
+  S.agenId=agenId; S.agenIdAsli=agenId;
+  S.email=user.email; S.uid=user.id;
   $('labelUser').textContent = user.email;
-  $('judul').textContent    = JUDUL[peran][0];
-  $('subjudul').textContent = JUDUL[peran][1];
   $('layarLogin').classList.add('hide');
   $('layarApp').classList.remove('hide');
 
-  const menu = peran==='agen'     ? [['komisi','Komisi & Pelanggan Saya'],['fu','Follow-Up Saya']]
-             : peran==='boarding' ? [['boarding','Daftar Boarding']]
-             : peran==='admin'    ? [['pesanan','Pesanan'],['kapal','Pembagian Kapal'],
-                                      ['berangkat','Keberangkatan']]
-             : [['ringkas','Ringkasan'],['pesanan','Pesanan'],['berangkat','Keberangkatan'],
-                ['kapal','Pembagian Kapal'],['fu','Follow-Up'],['manifest','Manifest'],
-                ['agen','Agen & Kode'],['voucher','Voucher & Tambahan'],
-                ['akses','Kelola Akses'],['atur','Pengaturan']];
+  /* Pemilih peran hanya untuk super admin, dan hanya mengubah TAMPILAN. */
+  if (peran === 'super'){
+    $('pilihPeran').innerHTML = Object.keys(JUDUL).map(k =>
+      `<option value="${k}">${k === 'super' ? 'Lihat sebagai: Super Admin'
+        : 'Lihat sebagai: ' + JUDUL[k][0].replace('Dashboard ','')
+                                        .replace('Petugas ','Petugas ')}</option>`).join('');
+    $('pilihPeran').classList.remove('hide');
+    $('pilihPeran').onchange = () => pratinjauPeran($('pilihPeran').value);
+    $('pita-kembali').onclick = () => {
+      $('pilihPeran').value = 'super';
+      pratinjauPeran('super');
+    };
+  }
 
+  gambarMenu(peran);
+
+  /* Tutorial dijalankan setelah tab pertama sempat tergambar; kalau langsung,
+     sasaran langkah pertama belum ada di layar. Hanya muncul sekali per peran. */
+  setTimeout(() => mulaiTutor(false), 900);
+}
+
+/* Daftar tab per peran. Dipisah dari mulai() supaya bisa digambar ulang saat
+   super admin mempratinjau peran lain. */
+function menuPeran(peran){
+  return peran==='agen'     ? [['komisi','Komisi & Pelanggan Saya'],['fu','Follow-Up Saya']]
+       : peran==='boarding' ? [['boarding','Daftar Boarding']]
+       : peran==='admin'    ? [['pesanan','Pesanan'],['kapal','Pembagian Kapal'],
+                               ['berangkat','Keberangkatan']]
+       : [['ringkas','Ringkasan'],['pesanan','Pesanan'],['berangkat','Keberangkatan'],
+          ['kapal','Pembagian Kapal'],['fu','Follow-Up'],['manifest','Manifest'],
+          ['agen','Agen & Kode'],['voucher','Voucher & Tambahan'],
+          ['akses','Kelola Akses'],['atur','Pengaturan']];
+}
+
+function gambarMenu(peran){
+  $('judul').textContent    = JUDUL[peran][0];
+  $('subjudul').textContent = JUDUL[peran][1];
+  const menu = menuPeran(peran);
   $('navTab').innerHTML = menu.map(([k,l],i)=>
     `<button class="dbtab${i?'':' on'}" data-tab="${k}">${l}</button>`).join('');
   $('navTab').querySelectorAll('.dbtab').forEach(b => b.onclick = () => {
@@ -277,7 +362,65 @@ async function mulai(){
   buka(menu[0][0]);
 }
 
+/* ---- Pratinjau peran (khusus super admin) ----
+   HANYA mengubah tampilan. Database tetap melihat Anda sebagai super admin:
+   fungsi peran() membaca tabel profil, bukan nilai di browser. Jadi data yang
+   muncul tetap data super admin.
+
+   Artinya alat ini MENGUJI TATA LETAK, bukan menguji pembatasan akses. Untuk
+   menguji pembatasan akses yang sebenarnya, harus login memakai akun berperan
+   itu sungguhan. Pita oranye di atas layar sengaja dipasang supaya tidak ada
+   yang keliru menyimpulkan. */
+async function pratinjauPeran(peran){
+  if (S.peranAsli !== 'super') return;
+  if (!JUDUL[peran]) return;
+
+  /* Tutorial dimatikan dulu: sorotannya menunjuk elemen tab lama. */
+  if (TUT.jalan) tutorTutup(false);
+
+  S.peran = peran;
+  const pratinjau = peran !== S.peranAsli;
+  $('pita-pratinjau').classList.toggle('hide', !pratinjau);
+  if (pratinjau) $('pita-peran').textContent = JUDUL[peran][0];
+
+  /* Peran agen tidak ada artinya tanpa "agen yang mana": tabel dan KPI-nya
+     disaring menurut agen_id. Super admin tidak punya agen_id, jadi kalau
+     dibiarkan kosong tampilannya nol baris — itu bukan tampilan agen sungguhan.
+     Maka super admin memilih berdiri sebagai agen siapa. */
+  if (pratinjau && peran === 'agen'){
+    await siapkanAgenPratinjau();
+  } else {
+    S.agenId = S.agenIdAsli;
+    $('pita-agen').classList.add('hide');
+  }
+
+  gambarMenu(peran);
+  pesan(pratinjau
+    ? `Tampilan diganti ke <b>${esc(JUDUL[peran][0])}</b>. Ini pratinjau tampilan saja.`
+    : 'Kembali ke tampilan Super Admin.', 7000);
+}
+
+async function siapkanAgenPratinjau(){
+  if (!S.agenList.length){
+    const { data } = await sb.from('agen').select('id,nama,kode').eq('aktif', true).order('nama');
+    S.agenList = data || [];
+  }
+  const sel = $('pita-agen');
+  if (!S.agenList.length){
+    sel.classList.add('hide');
+    S.agenId = null;
+    return;
+  }
+  if (!S.agenList.some(a => a.id === S.agenId)) S.agenId = S.agenList[0].id;
+  sel.innerHTML = S.agenList.map(a =>
+    `<option value="${a.id}"${a.id === S.agenId ? ' selected' : ''}>Sebagai: ${esc(a.nama)}</option>`
+  ).join('');
+  sel.classList.remove('hide');
+  sel.onchange = () => { S.agenId = sel.value; gambarMenu('agen'); };
+}
+
 function buka(tab){
+  S.tabAktif = tab;
   $('isi').innerHTML = `<div class="card"><span class="spin"
     style="border-color:#ccc;border-top-color:var(--sea)"></span> Memuat…</div>`;
   ({ringkas:tabRingkas, pesanan:tabPesanan, fu:tabFollowUp, manifest:tabManifest,
@@ -408,6 +551,246 @@ function lengkapiTabel(kunci, opsi = {}){
   });
 
   gambar();
+}
+
+/* ====================================================================
+   TUTORIAL DI DALAM DASHBOARD
+   --------------------------------------------------------------------
+   Muncul sendiri saat pertama kali seseorang masuk dengan peran tertentu,
+   dan bisa diputar ulang lewat tombol "Panduan" di bar atas.
+
+   Prinsip yang dijaga:
+   - Tidak menyentuh tata letak asli. Sorotan hanya lapisan di atasnya.
+   - Langkah yang sasarannya tidak ketemu DILEWATI, bukan membuat tutorial
+     mogok. Tabel bisa saja kosong, atau tombol tertentu tidak ada untuk
+     peran itu — tutorial harus tetap jalan.
+   - Berpindah tab sendiri kalau langkahnya ada di tab lain.
+   ==================================================================== */
+const TUTOR_VERSI = 'v1';
+
+/* Tiap langkah: {tab, cari, judul, teks}
+   'cari' boleh daftar — yang pertama ketemu yang dipakai. */
+const TUTOR = {
+  super: [
+    { cari:'#judul', judul:'Selamat datang',
+      teks:'Panduan singkat ini menunjukkan tempat-tempat yang paling sering dipakai. '
+         + 'Sekitar satu menit. Bisa dilewati kapan saja, dan diputar ulang lewat tombol Panduan di kanan atas.' },
+    { cari:'#navTab', judul:'Deretan tab',
+      teks:'Semua pekerjaan dibagi per tab di sini. Yang terlihat tergantung peran akun. '
+         + 'Sebagai Super Admin Anda melihat semuanya.' },
+    { tab:'pesanan', cari:'#isi table[data-papan="pesanan"] thead', judul:'Tab Pesanan',
+      teks:'Tab yang paling sering dibuka. Semua pesanan ada di sini, yang terbaru di atas. '
+         + 'Klik judul kolom untuk mengurutkan.' },
+    { tab:'pesanan', cari:'#isi .papan-atas .cari', judul:'Kotak cari',
+      teks:'Ketik apa saja: kode pesanan, nama pembeli, nama produk. Tabel langsung menyusut. '
+         + 'Tidak perlu lengkap, "8LP" sudah cukup.' },
+    { tab:'pesanan', cari:'#isi .papan-atas select', judul:'Saringan cepat',
+      teks:'Pilih di sini untuk menampilkan hanya status tertentu, misalnya yang BELUM BAYAR saja, '
+         + 'atau hanya pesanan dari satu agen.' },
+    { tab:'pesanan', cari:['#isi [data-status]','#isi table[data-papan="pesanan"] tbody tr'],
+      judul:'Konfirmasi pembayaran',
+      teks:'Di kolom Status ada tombol Lunas dan Batal. Tekan Lunas setelah uangnya benar-benar masuk. '
+         + 'Pembatalan wajib disertai alasan. Keduanya tercatat di audit atas nama Anda.' },
+    { tab:'berangkat', cari:'#isi .kpi', judul:'Keberangkatan',
+      teks:'Tiket terjual per tanggal berangkat. Perhatikan "Belum dapat kapal" — kalau angkanya '
+         + 'oranye, masih ada rombongan yang belum ditempatkan.' },
+    { tab:'kapal', cari:['#isi [data-kapal]','#isi .card'], judul:'Pembagian Kapal',
+      teks:'Dikelompokkan per tanggal berangkat. Pilih kapal lewat dropdown di kolom Kapal — '
+         + 'tersimpan langsung, tidak ada tombol Simpan. Kartu muatan di atas ikut berubah seketika.' },
+    { tab:'agen', cari:['#isi [data-sel-wa]','#isi table[data-papan="agen"]'], judul:'Agen & Kode',
+      teks:'Nomor WhatsApp di sini menentukan ke mana pelanggan diarahkan setelah memesan. '
+         + 'Perubahannya langsung berlaku di situs, tanpa perlu apa-apa lagi.' },
+    { tab:'voucher', cari:['#isi table[data-papan="voucher"]','#isi .card'], judul:'Voucher & Tambahan',
+      teks:'Kode voucher membuka harga warga Pacitan. Di bawahnya ada harga add-on '
+         + 'drone dan paddleboard yang bisa diubah dari sini.' },
+    { tab:'akses', cari:['#isi #baris-akses','#isi .card'], judul:'Kelola Akses',
+      teks:'Atur peran tiap pengguna, nonaktifkan akun, kirim tautan reset password, '
+         + 'dan ganti nama tampilan Anda sendiri di bagian atas.' },
+    { cari:'#tblPanduan', judul:'Selesai',
+      teks:'Itu saja yang paling sering dipakai. Tekan tombol ini kapan saja untuk mengulang panduan.' },
+  ],
+  admin: [
+    { cari:'#judul', judul:'Selamat datang',
+      teks:'Panduan singkat untuk peran Admin. Tugas Anda dua: mengonfirmasi pembayaran, '
+         + 'dan membagi penumpang ke kapal sebelum berangkat.' },
+    { cari:'#navTab', judul:'Tiga tab Anda',
+      teks:'Pesanan untuk konfirmasi pembayaran, Pembagian Kapal untuk menempatkan rombongan, '
+         + 'Keberangkatan untuk melihat ringkasannya per tanggal.' },
+    { tab:'pesanan', cari:'#isi .papan-atas .cari', judul:'Cari pesanan',
+      teks:'Ketik kode pesanan yang disebut pelanggan di chat. Tidak perlu lengkap.' },
+    { tab:'pesanan', cari:['#isi [data-status]','#isi table[data-papan="pesanan"] tbody tr'],
+      judul:'Tandai lunas',
+      teks:'Tekan Lunas setelah uangnya benar-benar masuk. Tercatat di audit atas nama Anda. '
+         + 'Anda tidak bisa mengubah harga — itu memang bukan wewenang Admin.' },
+    { tab:'kapal', cari:['#isi [data-kapal]','#isi .card'], judul:'Bagi kapal',
+      teks:'Pilih Kapal 1 atau Kapal 2 lewat dropdown. Perhatikan kartu muatan di atas: '
+         + 'kalau merah, muatannya melebihi kapasitas kapal.' },
+    { tab:'berangkat', cari:'#isi .kpi', judul:'Periksa sebelum berangkat',
+      teks:'Pastikan "Belum dapat kapal" sudah nol untuk tanggal yang akan berangkat.' },
+    { cari:'#tblPanduan', judul:'Selesai',
+      teks:'Tekan tombol ini kapan saja untuk mengulang panduan.' },
+  ],
+  agen: [
+    { cari:'#judul', judul:'Selamat datang',
+      teks:'Panduan singkat untuk peran Agen. Yang terlihat di sini hanya pelanggan yang Anda bawa sendiri.' },
+    { cari:'#navTab', judul:'Dua tab Anda',
+      teks:'Komisi & Pelanggan Saya untuk melihat penjualan dan komisi. '
+         + 'Follow-Up Saya untuk mengejar pesanan yang belum jadi.' },
+    { tab:'komisi', cari:'#isi .kpi', judul:'Komisi Anda',
+      teks:'Jumlah tiket, omzet, dan komisi Anda. Komisi naik dari 5% ke 10% setelah tembus '
+         + '20 tiket, dan berlaku surut untuk semua tiket.' },
+    { tab:'komisi', cari:['#isi table[data-papan="pelangganku"]','#isi .card'],
+      judul:'Pelanggan Anda',
+      teks:'Nomor HP ditampilkan utuh supaya Anda bisa menghubungi langsung. '
+         + 'Pelanggan agen lain tidak pernah muncul di sini.' },
+    { tab:'fu', cari:['#isi .fugrp','#isi .card'], judul:'Follow-Up',
+      teks:'Pesanan yang belum lunas, dikelompokkan menurut sudah dihubungi atau belum. '
+         + 'Kerjakan kelompok BELUM dulu.' },
+    { cari:'#tblPanduan', judul:'Selesai',
+      teks:'Tekan tombol ini kapan saja untuk mengulang panduan.' },
+  ],
+  boarding: [
+    { cari:'#judul', judul:'Selamat datang',
+      teks:'Panduan singkat untuk petugas boarding. Di sini hanya ada daftar penumpang '
+         + 'yang berhak naik — tanpa data harga maupun komisi.' },
+    { tab:'boarding', cari:['#isi .papan-atas select','#isi .papan-atas'], judul:'Saring per kapal',
+      teks:'Pilih kapal yang sedang dinaiki, supaya yang tampil hanya rombongan kapal itu.' },
+    { tab:'boarding', cari:'#isi .papan-atas .cari', judul:'Cari penumpang',
+      teks:'Kalau pemesan lupa kodenya, ketik namanya di sini.' },
+    { tab:'boarding', cari:['#isi table[data-papan="boarding"] tbody tr','#isi .card'],
+      judul:'Pil HARI INI',
+      teks:'Baris bertanda HARI INI adalah yang berangkat hari ini. Kolom Naik menunjukkan '
+         + 'berapa orang dari rombongan itu yang sudah tercatat naik.' },
+    { cari:'#tblPanduan', judul:'Selesai',
+      teks:'Tekan tombol ini kapan saja untuk mengulang panduan.' },
+  ],
+};
+TUTOR.owner = TUTOR.super;   /* Owner melihat tab yang sama, hanya tidak bisa mengubah */
+
+let TUT = { langkah: [], i: 0, jalan: false };
+
+const tutorKunci = () => `ttc_tutor_${S.peran}_${TUTOR_VERSI}`;
+
+function tutorElemen(cari){
+  for (const sel of (Array.isArray(cari) ? cari : [cari])){
+    const el = document.querySelector(sel);
+    if (el && el.offsetParent !== null) return el;
+  }
+  return null;
+}
+
+function tutorBersih(){
+  document.querySelector('.tutor-sorot')?.remove();
+  document.querySelector('.tutor-kartu')?.remove();
+}
+
+function tutorTutup(selesai){
+  TUT.jalan = false;
+  tutorBersih();
+  document.removeEventListener('keydown', tutorTombol);
+  window.removeEventListener('resize', tutorGambarUlang);
+  try { localStorage.setItem(tutorKunci(), selesai ? 'selesai' : 'lewati'); } catch(e){}
+  if (selesai) pesan('Panduan selesai. Tekan <b>Panduan</b> di kanan atas kalau mau mengulang.', 8000);
+}
+
+const tutorTombol = e => {
+  if (!TUT.jalan) return;
+  if (e.key === 'Escape'){ e.preventDefault(); tutorTutup(false); }
+  if (e.key === 'Enter' || e.key === 'ArrowRight'){ e.preventDefault(); tutorMaju(1); }
+  if (e.key === 'ArrowLeft'){ e.preventDefault(); tutorMaju(-1); }
+};
+
+function tutorMaju(arah){
+  const tujuan = TUT.i + arah;
+  if (tujuan < 0) return;
+  if (tujuan >= TUT.langkah.length) return tutorTutup(true);
+  tutorKe(tujuan);
+}
+
+async function tutorKe(i){
+  TUT.i = i;
+  const L = TUT.langkah[i];
+
+  /* Pindah tab dulu kalau langkahnya ada di tab lain, lalu tunggu isinya tergambar. */
+  if (L.tab && S.tabAktif !== L.tab){
+    const tb = $('navTab').querySelector(`[data-tab="${L.tab}"]`);
+    if (tb){ tb.click(); await new Promise(r => setTimeout(r, 420)); }
+  }
+  tutorGambarUlang();
+}
+
+function tutorGambarUlang(){
+  if (!TUT.jalan) return;
+  const L = TUT.langkah[TUT.i];
+  if (!L) return;
+  tutorBersih();
+
+  const el = tutorElemen(L.cari);
+  /* Sasaran tidak ketemu -> lewati, jangan mogok. Bisa terjadi kalau tabelnya
+     kosong atau tombolnya memang tidak ada untuk peran ini. */
+  if (!el){
+    if (TUT.i + 1 < TUT.langkah.length) return tutorKe(TUT.i + 1);
+    return tutorTutup(true);
+  }
+
+  el.scrollIntoView({ behavior:'smooth', block:'center' });
+
+  const r  = el.getBoundingClientRect();
+  const sy = window.scrollY, sx = window.scrollX;
+  const p  = 7;   /* jarak sorotan dari tepi elemen */
+
+  const sorot = document.createElement('div');
+  sorot.className = 'tutor-sorot';
+  Object.assign(sorot.style, {
+    top:  (r.top + sy - p) + 'px',
+    left: (r.left + sx - p) + 'px',
+    width:  (r.width + p*2) + 'px',
+    height: (r.height + p*2) + 'px',
+  });
+  document.body.appendChild(sorot);
+
+  const kartu = document.createElement('div');
+  kartu.className = 'tutor-kartu';
+  kartu.innerHTML = `
+    <div class="tnum">Langkah ${TUT.i + 1} dari ${TUT.langkah.length}</div>
+    <div class="tt">${esc(L.judul)}</div>
+    <div class="ts">${L.teks}</div>
+    <div class="tutor-titik">${TUT.langkah.map((_,k) =>
+      `<i class="${k === TUT.i ? 'on' : ''}"></i>`).join('')}</div>
+    <div class="tutor-kaki">
+      <button class="lewati" data-tutor-lewati>Lewati panduan</button>
+      <button class="tutor-btn ghost" data-tutor-mundur ${TUT.i === 0 ? 'disabled' : ''}>Kembali</button>
+      <button class="tutor-btn" data-tutor-maju>${
+        TUT.i === TUT.langkah.length - 1 ? 'Selesai' : 'Lanjut'}</button>
+    </div>`;
+  document.body.appendChild(kartu);
+
+  /* Letak gelembung: di bawah sasaran kalau muat, kalau tidak di atasnya.
+     Lalu dijepit supaya tidak keluar layar di kiri maupun kanan. */
+  const kr = kartu.getBoundingClientRect();
+  let atas = r.bottom + sy + 14;
+  if (r.bottom + 14 + kr.height > window.innerHeight && r.top - 14 - kr.height > 0)
+    atas = r.top + sy - kr.height - 14;
+  let kiri = r.left + sx + r.width/2 - kr.width/2;
+  kiri = Math.max(sx + 12, Math.min(kiri, sx + window.innerWidth - kr.width - 12));
+  kartu.style.top  = atas + 'px';
+  kartu.style.left = kiri + 'px';
+
+  kartu.querySelector('[data-tutor-maju]').onclick   = () => tutorMaju(1);
+  kartu.querySelector('[data-tutor-mundur]').onclick = () => tutorMaju(-1);
+  kartu.querySelector('[data-tutor-lewati]').onclick = () => tutorTutup(false);
+}
+
+function mulaiTutor(paksa){
+  const langkah = TUTOR[S.peran];
+  if (!langkah || !langkah.length) return;
+  if (!paksa){
+    try { if (localStorage.getItem(tutorKunci())) return; } catch(e){ return; }
+  }
+  TUT = { langkah, i: 0, jalan: true };
+  document.addEventListener('keydown', tutorTombol);
+  window.addEventListener('resize', tutorGambarUlang);
+  tutorKe(0);
 }
 
 /* ============ RINGKASAN ============ */
@@ -611,11 +994,18 @@ const fmtHp = hp => {
 
 /* ============ FOLLOW-UP ============ */
 async function tabFollowUp(){
-  const { data, error } = await sb.from('pesanan')
-    .select('kode,status,fu_status,fu_terakhir,pemesan_nama,pemesan_hp,total,dibuat,produk(nama)')
+  const { data: semua, error } = await sb.from('pesanan')
+    .select('kode,status,fu_status,fu_terakhir,pemesan_nama,pemesan_hp,total,dibuat,agen_id,produk(nama)')
     .in('status',['pending','expired','cancel_pembeli'])
     .order('dibuat',{ascending:false});
   if (error) return gagal(error);
+
+  /* Peran agen hanya boleh melihat pesanannya sendiri. Untuk agen sungguhan RLS
+     sudah menyaring; saringan ini ditulis ulang di klien supaya pratinjau peran
+     agen menampilkan baris yang sama persis, bukan seluruh pesanan. */
+  const data = S.peran === 'agen'
+    ? (semua||[]).filter(o => S.agenId && o.agen_id === S.agenId)
+    : (semua||[]);
 
   const grup = [
     ['pending',        'Belum bayar',        'Order dibuat tapi belum ada pembayaran. Paling berharga — niatnya sudah ada.'],
@@ -1639,12 +2029,17 @@ async function tabAtur(){
 
 /* ============ AGEN: KOMISI & PELANGGAN SAYA ============ */
 async function tabKomisi(){
-  const [{data:lb}, {data:pesananku, error}] = await Promise.all([
+  const [{data:lb}, {data:semuaPesanan, error}] = await Promise.all([
     sb.rpc('papan_peringkat',{p_periode:null}),
-    sb.from('pesanan').select('kode,pax,total,status,dibuat,pemesan_nama,pemesan_hp,produk(nama)')
+    sb.from('pesanan')
+      .select('kode,pax,total,status,dibuat,agen_id,pemesan_nama,pemesan_hp,produk(nama)')
       .order('dibuat',{ascending:false})
   ]);
   if (error) return gagal(error);
+  /* Saringan yang menyamakan tampilan agen sungguhan dengan pratinjau.
+     Agen sungguhan: tidak berubah, RLS sudah menyaring lebih dulu. */
+  const pesananku = (semuaPesanan||[])
+    .filter(o => S.agenId && o.agen_id === S.agenId);
   const L=lb||[], saya=L.find(x=>x.agen_id===S.agenId)||{tiket:0,omzet:0,tarif:0,komisi:0};
   const pos=L.findIndex(x=>x.agen_id===S.agenId)+1;
   const sisa=Math.max(0,20-saya.tiket);

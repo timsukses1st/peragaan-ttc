@@ -26,7 +26,7 @@ body{margin:0;font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,s
 .bar .in{max-width:960px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;gap:14px}
 .brand{font-weight:800;letter-spacing:.5px;font-size:15px;line-height:1.2}
 .brand small{display:block;font-weight:400;font-size:11px;color:#cfe4ef;letter-spacing:.2px}
-.bar a{margin-left:auto;color:#cfe4ef;font-size:13.5px;text-decoration:none;border:1px solid #39618a;
+.bar a{color:#cfe4ef;font-size:13.5px;text-decoration:none;border:1px solid #39618a;
   padding:6px 12px;border-radius:8px;white-space:nowrap}
 .bar a:hover{background:#1b3a5c;color:#fff}
 
@@ -119,6 +119,35 @@ td input,td select{padding:6px 8px;font-size:14px}
 footer{margin-top:40px;padding:22px 0 40px;border-top:1px solid var(--line);
   color:var(--muted);font-size:13px;text-align:center}
 .sembunyi{display:none}
+
+/* ================= TUTORIAL HALAMAN PEMESANAN =================
+   Pola yang sama dengan dashboard: satu kotak transparan di atas bagian yang
+   dijelaskan, sisanya digelapkan. Tidak menyentuh tata letak asli. */
+.tutor-sorot{position:absolute;z-index:9998;border-radius:10px;pointer-events:none;
+  box-shadow:0 0 0 9999px rgba(8,20,36,.66), 0 0 0 3px var(--sea) inset;
+  transition:top .22s, left .22s, width .22s, height .22s}
+.tutor-kartu{position:absolute;z-index:9999;width:320px;max-width:calc(100vw - 28px);
+  background:#fff;border:1.5px solid var(--sea);border-radius:12px;padding:15px 16px 13px;
+  box-shadow:0 12px 34px rgba(8,20,36,.34)}
+.tutor-kartu .tt{font-weight:800;font-size:16px;color:var(--navy);margin-bottom:5px}
+.tutor-kartu .ts{font-size:14px;line-height:1.5;color:#334155}
+.tutor-kartu .tnum{font-size:11px;font-weight:700;color:var(--sea);letter-spacing:.4px;
+  text-transform:uppercase;margin-bottom:7px}
+.tutor-kaki{display:flex;gap:8px;align-items:center;margin-top:13px}
+.tutor-kaki .lewati{margin-right:auto;background:none;border:0;font:inherit;font-size:12.5px;
+  color:var(--muted);cursor:pointer;text-decoration:underline;padding:0}
+.tutor-btn{font:inherit;font-size:13.5px;font-weight:700;padding:8px 16px;border-radius:8px;
+  cursor:pointer;background:var(--sea);color:#fff;border:1.5px solid var(--sea)}
+.tutor-btn.ghost{background:#fff;color:var(--sea)}
+.tutor-btn:disabled{opacity:.45;cursor:not-allowed}
+.tutor-titik{display:flex;gap:4px;margin-top:11px}
+.tutor-titik i{width:6px;height:6px;border-radius:50%;background:#cbd5e1;display:block}
+.tutor-titik i.on{background:var(--sea);width:16px;border-radius:3px}
+/* Tombol tutorial di bar atas, dibedakan dari tombol Pesan sekarang */
+#tombol-tutor{color:#cfe4ef;font-size:13.5px;text-decoration:none;border:1px solid #39618a;
+  padding:6px 12px;border-radius:8px;white-space:nowrap;cursor:pointer;background:none;
+  font-family:inherit}
+#tombol-tutor:hover{background:#1b3a5c;color:#fff}
 .kode-besar{font-size:30px;font-weight:800;letter-spacing:1px}
 
 /* ---------- Timeline status pesanan ----------
@@ -158,7 +187,8 @@ footer{margin-top:40px;padding:22px 0 40px;border-top:1px solid var(--line);
 
 <div class="bar"><div class="in">
   <div class="brand">THE TAMPERAN CRUISE<small>Pelabuhan Tamperan · Pacitan</small></div>
-  <a href="#pesan" id="tombol-pesan">Pesan sekarang</a>
+  <button type="button" id="tombol-tutor" style="margin-left:auto">Cara pesan</button>
+  <a href="#pesan" id="tombol-pesan" style="margin-left:9px">Pesan sekarang</a>
 </div></div>
 
 <div class="hero"><div class="wrap">
@@ -1023,6 +1053,165 @@ function garisWaktu(o){
                              : 'Dicatat petugas saat boarding');
 }
 
+/* ====================================================================
+   TUTORIAL "CARA PESAN"
+   --------------------------------------------------------------------
+   Muncul sendiri sekali pada kunjungan pertama, dan bisa diputar ulang
+   lewat tombol "Cara pesan" di kanan atas.
+
+   Langkah menyesuaikan keadaan: sebelum kode agen sah, form belum ada di
+   layar — jadi langkah-langkah form dilewati sendiri. Setelah kodenya sah,
+   tutorial bisa diputar ulang dan langkah formnya baru muncul.
+   ==================================================================== */
+const TUTOR_VERSI = 'v1';
+const TUTOR_KUNCI = 'ttc_cara_pesan_' + TUTOR_VERSI;
+
+const TUTOR = [
+  { cari:'#produk', judul:'Harga pelayaran',
+    teks:'Empat paket beserta harganya. Harga di sini sudah yang terbaru — '
+       + 'diambil langsung dari sistem kami, bukan ditulis tangan.' },
+  { cari:'#gate', judul:'Kode agen dulu',
+    teks:'Pemesanan di The Tamperan Cruise dilayani lewat agen resmi. Masukkan kode '
+       + 'yang diberikan agen Anda, lalu tekan Periksa. Form pemesanan baru terbuka '
+       + 'setelah kodenya terbukti sah.' },
+  { cari:'#bkode-ket', judul:'Hasil pemeriksaan kode',
+    teks:'Kalau kodenya benar, muncul tanda hijau SAH beserta nama agen Anda. '
+       + 'Kalau merah, kodenya salah ketik atau sudah tidak berlaku — tanyakan lagi ke agen.' },
+  { cari:'#tb-per', judul:'Perorangan atau biro',
+    teks:'Pilih Perorangan untuk keluarga atau rombongan pribadi. Biro / Travel hanya '
+       + 'untuk biro yang sudah bekerja sama, dan harus memakai kode biro.' },
+  { cari:'#f-tgl', judul:'Tanggal berangkat',
+    teks:'Pilih tanggal rencana berlayar. Tidak bisa tanggal yang sudah lewat.' },
+  { cari:'#f-pax', judul:'Jumlah penumpang',
+    teks:'Isi jumlah orang. Baris nama penumpang di bawah akan menyesuaikan sendiri '
+       + 'sebanyak angka yang Anda isi.' },
+  { cari:'#fld-voucher', judul:'Kode voucher (kalau ada)',
+    teks:'Kalau agen Anda memberi kode voucher, masukkan di sini lalu tekan Periksa. '
+       + 'Kode voucher berbeda dengan kode agen, dan tidak semua paket bisa memakainya.' },
+  { cari:'#kartu-tambahan', judul:'Tambahan',
+    teks:'Centang kalau mau. Paddleboard bisa diisi jumlahnya sesuai kebutuhan. '
+       + 'Boleh dilewati dan dibicarakan lagi dengan agen.' },
+  { cari:'#t-pnp', judul:'Daftar nama penumpang',
+    teks:'Isi nama sesuai identitas. Usia dipakai untuk menyiapkan life jacket ukuran anak — '
+       + 'kosongkan saja kalau belum tahu, jangan diisi angka asal.' },
+  { cari:'#ringkas', judul:'Perkiraan biaya',
+    teks:'Rincian biaya yang menyesuaikan sendiri. Angkanya masih perkiraan: total yang '
+       + 'mengikat dihitung ulang sistem kami saat pesanan disimpan.' },
+  { cari:'#kirim', judul:'Simpan pesanan',
+    teks:'Halaman ini tidak menerima uang sama sekali. Setelah disimpan, Anda dapat kode '
+       + 'pesanan dan tombol ke WhatsApp agen Anda untuk konfirmasi dan pembayaran.' },
+  { cari:'#tombol-tutor', judul:'Selesai',
+    teks:'Itu saja. Tekan tombol ini kapan saja kalau mau mengulang penjelasannya.' },
+];
+
+let TUT = { i: 0, jalan: false, urut: [] };
+
+function tutorElemen(cari){
+  for (const sel of (Array.isArray(cari) ? cari : [cari])){
+    const el = document.querySelector(sel);
+    if (el && el.offsetParent !== null) return el;
+  }
+  return null;
+}
+
+function tutorBersih(){
+  document.querySelector('.tutor-sorot')?.remove();
+  document.querySelector('.tutor-kartu')?.remove();
+}
+
+function tutorTutup(selesai){
+  TUT.jalan = false;
+  tutorBersih();
+  document.removeEventListener('keydown', tutorTombol);
+  window.removeEventListener('resize', tutorGambar);
+  try { localStorage.setItem(TUTOR_KUNCI, selesai ? 'selesai' : 'lewati'); } catch(e){}
+}
+
+const tutorTombol = e => {
+  if (!TUT.jalan) return;
+  if (e.key === 'Escape'){ e.preventDefault(); tutorTutup(false); }
+  if (e.key === 'Enter' || e.key === 'ArrowRight'){ e.preventDefault(); tutorMaju(1); }
+  if (e.key === 'ArrowLeft'){ e.preventDefault(); tutorMaju(-1); }
+};
+
+function tutorMaju(arah){
+  const tujuan = TUT.i + arah;
+  if (tujuan < 0) return;
+  if (tujuan >= TUT.urut.length) return tutorTutup(true);
+  TUT.i = tujuan;
+  tutorGambar();
+}
+
+function tutorGambar(){
+  if (!TUT.jalan) return;
+  const L = TUT.urut[TUT.i];
+  if (!L) return;
+  tutorBersih();
+
+  /* Sasaran bisa hilang di tengah jalan (mis. pengguna menutup gerbang kode).
+     Dilewati, bukan dibiarkan menggantung dengan layar gelap. */
+  const el = tutorElemen(L.cari);
+  if (!el){
+    if (TUT.i + 1 < TUT.urut.length){ TUT.i++; return tutorGambar(); }
+    return tutorTutup(true);
+  }
+
+  el.scrollIntoView({ behavior:'smooth', block:'center' });
+  const r = el.getBoundingClientRect();
+  const sy = window.scrollY, sx = window.scrollX, p = 7;
+
+  const sorot = document.createElement('div');
+  sorot.className = 'tutor-sorot';
+  Object.assign(sorot.style, {
+    top:(r.top+sy-p)+'px', left:(r.left+sx-p)+'px',
+    width:(r.width+p*2)+'px', height:(r.height+p*2)+'px'
+  });
+  document.body.appendChild(sorot);
+
+  const kartu = document.createElement('div');
+  kartu.className = 'tutor-kartu';
+  kartu.innerHTML = `
+    <div class="tnum">Langkah ${TUT.i+1} dari ${TUT.urut.length}</div>
+    <div class="tt">${esc(L.judul)}</div>
+    <div class="ts">${L.teks}</div>
+    <div class="tutor-titik">${TUT.urut.map((_,k) =>
+      `<i class="${k===TUT.i?'on':''}"></i>`).join('')}</div>
+    <div class="tutor-kaki">
+      <button class="lewati" data-t-lewati>Lewati</button>
+      <button class="tutor-btn ghost" data-t-mundur ${TUT.i===0?'disabled':''}>Kembali</button>
+      <button class="tutor-btn" data-t-maju>${
+        TUT.i===TUT.urut.length-1 ? 'Selesai' : 'Lanjut'}</button>
+    </div>`;
+  document.body.appendChild(kartu);
+
+  const kr = kartu.getBoundingClientRect();
+  let atas = r.bottom + sy + 14;
+  if (r.bottom + 14 + kr.height > window.innerHeight && r.top - 14 - kr.height > 0)
+    atas = r.top + sy - kr.height - 14;
+  let kiri = r.left + sx + r.width/2 - kr.width/2;
+  kiri = Math.max(sx + 12, Math.min(kiri, sx + window.innerWidth - kr.width - 12));
+  kartu.style.top = atas + 'px';
+  kartu.style.left = kiri + 'px';
+
+  kartu.querySelector('[data-t-maju]').onclick   = () => tutorMaju(1);
+  kartu.querySelector('[data-t-mundur]').onclick = () => tutorMaju(-1);
+  kartu.querySelector('[data-t-lewati]').onclick = () => tutorTutup(false);
+}
+
+function mulaiTutor(paksa){
+  /* Hanya langkah yang sasarannya benar-benar ada di layar yang dipakai, supaya
+     nomor "Langkah 3 dari 7" jujur — bukan 3 dari 12 lalu melompat-lompat. */
+  TUT.urut = TUTOR.filter(L => tutorElemen(L.cari));
+  if (!TUT.urut.length) return;
+  if (!paksa){
+    try { if (localStorage.getItem(TUTOR_KUNCI)) return; } catch(e){ return; }
+  }
+  TUT.i = 0; TUT.jalan = true;
+  document.addEventListener('keydown', tutorTombol);
+  window.addEventListener('resize', tutorGambar);
+  tutorGambar();
+}
+
 /* ====================== PASANG ====================== */
 $('tb-per').onclick  = () => setTipe('perorangan');
 $('tb-biro').onclick = () => setTipe('biro');
@@ -1039,12 +1228,18 @@ $('f-vou').oninput     = () => { if (S.vouOk) { S.vouOk=false; S.vouKode=null;
   $('vou-ket').textContent='Tekan Periksa untuk memeriksa kode ini.'; ringkasan(); } };
 $('f-anak').oninput    = ringkasan;
 $('kirim').onclick     = kirim;
+$('tombol-tutor').onclick = () => mulaiTutor(true);
 
 if (qs.get('t')) {
+  /* Halaman status bukan halaman pemesanan — tutorial "cara pesan" tidak relevan. */
+  $('tombol-tutor').classList.add('sembunyi');
   cekStatus(qs.get('t'));
 } else {
   setTipe('perorangan');
-  muat();
+  await muat();
+  /* Dijalankan setelah daftar produk tergambar; kalau langsung, sasaran langkah
+     pertama belum ada di layar. Hanya muncul sekali per browser. */
+  setTimeout(() => mulaiTutor(false), 700);
 }
 </script>
 </body>
