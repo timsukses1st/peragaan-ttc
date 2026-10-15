@@ -36,9 +36,43 @@ export default async function handler(req, res) {
   const URL_SB = process.env.SUPABASE_URL;
   const KUNCI  = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!URL_SB || !KUNCI) {
-    return res.status(500).json({ pesan:
-      'Server belum dikonfigurasi: SUPABASE_URL atau SUPABASE_SERVICE_ROLE_KEY '
-      + 'belum diisi di Environment Variables Vercel.' });
+    /* Pesan diagnostik, bukan sekadar "belum dikonfigurasi". Versi pertama cuma
+       menyebut dua nama variabel, jadi orang harus menebak antara: belum
+       ditambahkan / salah ketik / salah environment / belum redeploy. Di sini
+       disebutkan mana yang kurang DAN nama variabel SUPABASE apa saja yang
+       benar-benar terbaca server — itu langsung membedakan salah ketik dari
+       belum redeploy. Hanya NAMA yang ditampilkan, tidak pernah nilainya. */
+    const kurang = [
+      !URL_SB && 'SUPABASE_URL',
+      !KUNCI  && 'SUPABASE_SERVICE_ROLE_KEY',
+    ].filter(Boolean);
+    /* Saringannya SENGAJA longgar. Versi pertama mencari kata 'SUPABASE' persis,
+       dan justru meleset pada kasus yang paling butuh: salah ketik seperti
+       SUPABSE_URL tidak mengandung 'SUPABASE', jadi tidak ikut dilaporkan dan
+       orangnya tetap tidak tahu apa yang salah. Ditemukan oleh uji, bukan
+       oleh tebakan. */
+    const terbaca = Object.keys(process.env)
+      .filter(k => /SUP|SERVICE_ROLE|ROLE_KEY/i.test(k)).sort();
+    /* Tiga sebab yang berbeda, dan dulu ketiganya kutumpuk jadi satu pesan.
+       Yang membedakan: apakah NAMA yang kurang itu sendiri ada di daftar.
+         ada di daftar  -> variabelnya tersimpan tapi NILAINYA kosong
+         tidak ada, tapi ada nama mirip -> salah ketik
+         tidak ada apa pun -> belum tersimpan / salah environment / belum redeploy */
+    const kosong = kurang.filter(k => terbaca.includes(k));
+    const sebab = kosong.length
+      ? `Variabel ${kosong.join(' dan ')} TERSIMPAN tapi nilainya kosong. `
+        + 'Buka Environment Variables di Vercel, isi nilainya, lalu Redeploy.'
+      : terbaca.length
+        ? `Yang terbaca server sekarang: ${terbaca.join(', ')}. `
+          + 'Kalau ada nama di daftar itu yang mirip tapi beda walau satu huruf, '
+          + 'itu salah ketik — perbaiki namanya, lalu Redeploy.'
+        : 'Server tidak membaca satu pun variabel yang namanya mirip. Berarti '
+          + 'variabelnya belum tersimpan, tercentang untuk environment yang salah '
+          + '(Production harus ikut), atau deployment ini dibuat sebelum variabelnya '
+          + 'ditambahkan — tekan Redeploy di Vercel.';
+    return res.status(500).json({
+      pesan: `Server belum dikonfigurasi. Yang belum terbaca: ${kurang.join(' dan ')}. ${sebab}`,
+      kurang, terbaca, kosong });
   }
 
   const bearer = String(req.headers.authorization || '');
