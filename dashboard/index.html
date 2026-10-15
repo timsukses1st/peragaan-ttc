@@ -67,6 +67,22 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 tr:last-child td{border-bottom:0}
 tbody tr:hover td,table tr:hover td{background:#e3eefa}
 .nw{white-space:nowrap}
+/* ---------- Papan tabel: cari, urutkan, saring ----------
+   SOP dashboard KIG: search wajib ada dan mudah dijangkau di tiap board. */
+.papan-atas{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:11px}
+.papan-atas .cari{position:relative;margin-left:auto}
+.papan-atas .cari input{width:250px;padding-left:31px}
+.papan-atas .cari::before{content:'⌕';position:absolute;left:10px;top:50%;transform:translateY(-50%);
+  font-size:17px;color:var(--muted);pointer-events:none;line-height:1}
+.papan-atas select{width:auto;min-width:120px;padding:7px 9px;font-size:13.5px}
+.papan-info{font-size:12.5px;color:var(--muted);margin-top:9px}
+th.urut{cursor:pointer;user-select:none;position:relative;padding-right:19px}
+th.urut:hover{background:#cfdbe9}
+th.urut::after{content:'⇅';position:absolute;right:6px;top:50%;transform:translateY(-50%);
+  font-size:11px;opacity:.35}
+th.urut.naik::after{content:'↑';opacity:1;color:var(--sea)}
+th.urut.turun::after{content:'↓';opacity:1;color:var(--sea)}
+tr.kosong td{color:var(--muted);font-size:13px;padding:16px 8px}
 .kode-in{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;width:148px;padding:3px 7px;
   border:1.5px solid var(--sea);border-radius:6px;text-transform:none}
 /* Nama orang/biro bisa panjang: potong dengan elipsis, jangan pernah pecah jadi dua baris.
@@ -270,6 +286,130 @@ function buka(tab){
     akses:tabAkses}[tab] || (()=>{}))();
 }
 
+/* ====================================================================
+   PAPAN TABEL — satu alat untuk semua tabel dashboard
+   --------------------------------------------------------------------
+   Bekerja pada tabel yang SUDAH tergambar, bukan mengganti cara tiap tab
+   membuat barisnya. Alasannya: setiap tab punya bentuk sel sendiri (pil,
+   tautan, dropdown). Kalau pembuatan barisnya ikut diseragamkan, sembilan
+   tab harus ditulis ulang dan risikonya jauh lebih besar daripada untungnya.
+
+   Urutan nilai diambil dari, berurutan:
+     1. atribut data-urut pada sel      (dipakai untuk tanggal — teks "14 Okt"
+                                         tidak bisa diurutkan dengan benar)
+     2. angka, kalau selnya berkelas num (Rp16.302.000 -> 16302000)
+     3. teks apa adanya
+   ==================================================================== */
+const PAPAN = {};   /* keadaan per papan: { q, kolom, arah } */
+
+function lengkapiTabel(kunci, opsi = {}){
+  const tabel = typeof kunci === 'string' ? document.querySelector(kunci) : kunci;
+  if (!tabel) return;
+  const tbody = tabel.tBodies[0];
+  if (!tbody) return;
+
+  const st = PAPAN[opsi.id || kunci] ||= { q:'', kolom:null, arah:1, saring:{} };
+  const semua = [...tbody.rows].filter(r => !r.classList.contains('kosong'));
+
+  /* ---- baris alat di atas tabel ---- */
+  const bungkus = tabel.parentElement;
+  let atas = bungkus.querySelector(':scope > .papan-atas');
+  if (!atas){
+    atas = document.createElement('div');
+    atas.className = 'papan-atas';
+    atas.innerHTML =
+      (opsi.saring || []).map((s,i) =>
+        `<select data-saring="${i}">${
+          [`<option value="">${esc(s.semua || 'Semua')}</option>`]
+          .concat(s.pilihan.map(p => `<option value="${esc(p)}">${esc(p)}</option>`)).join('')
+        }</select>`).join('')
+      + `<span class="cari"><input type="search" data-cari placeholder="${
+           esc(opsi.petunjuk || 'Cari di tabel ini…')}" autocomplete="off"></span>`;
+    bungkus.insertBefore(atas, tabel);
+  }
+  const info = bungkus.querySelector(':scope > .papan-info')
+    || bungkus.appendChild(Object.assign(document.createElement('div'), {className:'papan-info'}));
+
+  /* ---- kepala tabel bisa diklik untuk mengurutkan ---- */
+  const kepala = [...(tabel.tHead?.rows[0] || tabel.rows[0] || {cells:[]}).cells];
+  kepala.forEach((th, i) => {
+    if ((opsi.takUrut || []).includes(i) || !th.textContent.trim()) return;
+    th.classList.add('urut');
+    th.onclick = () => {
+      st.arah = st.kolom === i ? -st.arah : 1;
+      st.kolom = i;
+      gambar();
+    };
+  });
+
+  const nilai = (baris, i) => {
+    const sel = baris.cells[i];
+    if (!sel) return '';
+    if (sel.dataset.urut !== undefined) {
+      const d = Number(sel.dataset.urut);
+      return Number.isFinite(d) ? d : sel.dataset.urut;
+    }
+    const teks = sel.textContent.trim();
+    if (sel.classList.contains('num')){
+      /* Ambil angka pertama; "6 2 anak" -> 6, "Rp16.302.000" -> 16302000 */
+      const m = teks.replace(/\./g,'').match(/-?\d+/);
+      return m ? Number(m[0]) : -Infinity;
+    }
+    return teks.toLowerCase();
+  };
+
+  function gambar(){
+    const q = st.q.trim().toLowerCase();
+    let tampil = semua.filter(r => {
+      if (q && !r.textContent.toLowerCase().includes(q)) return false;
+      return (opsi.saring || []).every((sg, i) => {
+        const v = st.saring[i];
+        if (!v) return true;
+        const sel = r.cells[sg.kolom];
+        return sel ? sel.textContent.toLowerCase().includes(v.toLowerCase()) : false;
+      });
+    });
+
+    if (st.kolom !== null){
+      tampil = [...tampil].sort((a,b) => {
+        const x = nilai(a, st.kolom), y = nilai(b, st.kolom);
+        if (typeof x === 'number' && typeof y === 'number') return (x - y) * st.arah;
+        return String(x).localeCompare(String(y), 'id') * st.arah;
+      });
+    }
+
+    kepala.forEach((th,i) => {
+      th.classList.remove('naik','turun');
+      if (i === st.kolom) th.classList.add(st.arah > 0 ? 'naik' : 'turun');
+    });
+
+    tbody.replaceChildren(...tampil);
+    if (!tampil.length){
+      const tr = document.createElement('tr');
+      tr.className = 'kosong';
+      const td = document.createElement('td');
+      td.colSpan = kepala.length || 1;
+      td.textContent = q || Object.values(st.saring).some(Boolean)
+        ? 'Tidak ada baris yang cocok dengan pencarian atau saringan.'
+        : 'Belum ada data.';
+      tr.appendChild(td); tbody.appendChild(tr);
+    }
+    info.textContent = `Menampilkan ${tampil.length} dari ${semua.length} baris`
+      + (st.kolom !== null ? ` · diurutkan menurut ${kepala[st.kolom]?.textContent.trim()}` : '');
+  }
+
+  const kolomCari = atas.querySelector('[data-cari]');
+  kolomCari.value = st.q;
+  kolomCari.oninput = () => { st.q = kolomCari.value; gambar(); };
+  atas.querySelectorAll('[data-saring]').forEach(sel => {
+    const i = Number(sel.dataset.saring);
+    sel.value = st.saring[i] || '';
+    sel.onchange = () => { st.saring[i] = sel.value; gambar(); };
+  });
+
+  gambar();
+}
+
 /* ============ RINGKASAN ============ */
 async function tabRingkas(){
   const [{data:r, error:er}, {data:lb}, {data:ord, error:eo}] = await Promise.all([
@@ -355,17 +495,17 @@ async function tabPesanan(){
   $('isi').innerHTML = `
     <div class="card scrollx">
       <h3>Pesanan <span class="pill p-mute">${data.length}</span></h3>
-      <table>
-        <tr><th class="nw">Kode</th><th class="nw">Dipesan</th><th class="nw">Berangkat</th>
+      <table data-papan="pesanan">
+        <thead><tr><th class="nw">Kode</th><th class="nw">Dipesan</th><th class="nw">Berangkat</th>
             <th>Pembeli</th><th class="nw">WhatsApp</th><th class="nw">Produk</th>
             <th class="num">Pax</th><th class="nw">Agen</th>
-            <th class="nw">Status</th><th class="num">Total</th></tr>
+            <th class="nw">Status</th><th class="num">Total</th></tr></thead><tbody>
         ${data.map(o=>{
           const st = STATUS[o.status]||[o.status,'p-mute'];
           return `<tr>
             <td class="mono nw">${esc(o.kode)}</td>
-            <td class="nw" style="color:var(--muted)">${tgl(o.dibuat)}</td>
-            <td class="nw">${o.tanggal_berangkat
+            <td class="nw" style="color:var(--muted)" data-urut="${Date.parse(o.dibuat)||0}">${tgl(o.dibuat)}</td>
+            <td class="nw" data-urut="${o.tanggal_berangkat?Date.parse(o.tanggal_berangkat):0}">${o.tanggal_berangkat
               ? `${tgl(o.tanggal_berangkat)}${o.kapal?.nama
                    ? ` <span class="pill p-sea">${esc(o.kapal.nama.replace(/^Kapal\s*/i,'K'))}</span>`
                    : ' <span class="pill p-warn">belum</span>'}`
@@ -380,11 +520,22 @@ async function tabPesanan(){
               :'<span class="pill p-mute">LANGSUNG</span>'}</td>
             <td class="nw"><span class="sel2"><span class="pill ${st[1]}">${st[0]}</span>${
               aksiStatus(o)}</span></td>
-            <td class="num nw">${rp(o.total)}</td></tr>`;
+            <td class="num nw" data-urut="${o.total}">${rp(o.total)}</td></tr>`;
         }).join('')}
-      </table>
+      </tbody></table>
     </div>`;
   pasangAksiStatus(tabPesanan);
+  lengkapiTabel('#isi table[data-papan="pesanan"]', {
+    id: 'pesanan',
+    petunjuk: 'Cari kode, pembeli, produk, agen…',
+    takUrut: [9],
+    saring: [
+      { kolom: 8, semua: 'Semua status',
+        pilihan: [...new Set((data||[]).map(o => (STATUS[o.status]||[o.status])[0]))] },
+      { kolom: 7, semua: 'Semua agen',
+        pilihan: [...new Set((data||[]).map(o => o.agen?.nama).filter(Boolean))] }
+    ]
+  });
 }
 
 /* ---- Aksi status pesanan ----
@@ -479,29 +630,36 @@ async function tabFollowUp(){
     return `<div class="fugrp">
       <h3>${judul} <span class="pill p-warn">${arr.length}</span></h3>
       <div class="hint" style="margin-bottom:9px">${ket}</div>
-      <div class="card tight scrollx"><table>
-        <tr><th class="nw">Kode</th><th>Nama</th><th class="nw">WhatsApp</th><th class="nw">Produk</th>
-            <th class="num">Nilai</th><th class="nw">Status FU</th><th class="nw">Terakhir</th><th></th></tr>
-        ${arr.map(o=>{
+      <div class="card tight scrollx"><table data-papan="fu-${st}">
+        <thead><tr><th class="nw">Kode</th><th>Nama</th><th class="nw">WhatsApp</th><th class="nw">Produk</th>
+            <th class="num">Nilai</th><th class="nw">Status FU</th><th class="nw">Terakhir</th><th></th></tr></thead>
+        <tbody>${arr.map(o=>{
           const f = FU[o.fu_status]||[o.fu_status,'p-mute'];
           return `<tr>
             <td class="mono nw">${esc(o.kode)}</td>
             <td class="nw"><span class="nama" title="${esc(o.pemesan_nama)}">${esc(o.pemesan_nama)}</span></td>
             <td class="nw">${selWa(o.pemesan_hp, `Halo ${o.pemesan_nama}, ini dari The Tamperan Cruise. Pesanan ${o.kode} masih kami simpan — ada yang bisa kami bantu?`)}</td>
             <td class="nw">${esc(o.produk?.nama)}</td>
-            <td class="num nw">${rp(o.total)}</td>
+            <td class="num nw" data-urut="${o.total}">${rp(o.total)}</td>
             <td class="nw"><span class="pill ${f[1]}">${f[0]}</span></td>
-            <td class="nw" style="color:var(--muted);font-size:12px">${jam(o.fu_terakhir)}</td>
+            <td class="nw" style="color:var(--muted);font-size:12px"
+                data-urut="${o.fu_terakhir?Date.parse(o.fu_terakhir):0}">${jam(o.fu_terakhir)}</td>
             <td><select data-fu="${esc(o.kode)}" style="min-width:140px">
               ${Object.entries(FU).map(([v,t])=>
                 `<option value="${v}" ${o.fu_status===v?'selected':''}>${t[0]}</option>`).join('')}
             </select></td></tr>`;
-        }).join('')}
+        }).join('')}</tbody>
       </table></div></div>`;
   }).join('') + `
     <div class="note"><b>Kenapa tiga kategori, bukan satu daftar</b>
       Orang yang belum bayar, yang kadaluwarsa, dan yang membatalkan sendiri butuh kalimat pembuka
       yang berbeda. Satu daftar campur membuat semuanya disapa dengan cara yang sama.</div>`;
+
+  /* Satu papan per kelompok status: tiap kelompok tabelnya sendiri, jadi
+     pencariannya juga per kelompok. */
+  $('isi').querySelectorAll('table[data-papan^="fu-"]').forEach(t =>
+    lengkapiTabel(t, { id: t.dataset.papan, takUrut: [7],
+      petunjuk: 'Cari kode, nama, produk…' }));
 
   $('isi').querySelectorAll('[data-fu]').forEach(sel => sel.onchange = async () => {
     sel.disabled = true;
@@ -584,11 +742,11 @@ async function tabManifest(){
     </div>
     <div class="card scrollx">
       <h3>Manifest Penumpang</h3>
-      <table>
-        <tr><th class="num">No</th><th>Kode</th><th>Nama</th><th>L/P</th><th class="num">Usia</th>
+      <table data-papan="manifest">
+        <thead><tr><th class="num">No</th><th>Kode</th><th>Nama</th><th>L/P</th><th class="num">Usia</th>
           ${kol.nik?'<th>NIK</th>':''}${kol.alamat?'<th>Alamat sesuai KTP</th><th>Provinsi</th>':''}
-          <th>Pesanan</th><th>Boarding</th></tr>
-        ${baris || '<tr><td colspan="9"><div class="hint">Belum ada pesanan sah.</div></td></tr>'}
+          <th>Pesanan</th><th>Boarding</th></tr></thead>
+        <tbody>${baris || '<tr class="kosong"><td colspan="9">Belum ada pesanan sah.</td></tr>'}</tbody>
       </table>
       <div class="note w"><b>Manifest ini jujur soal kedalaman pemeriksaannya</b>
         Diperiksa per nama: <b>${perNama} orang</b> · dihitung per kepala: <b>${dihitung} orang</b> ·
@@ -598,6 +756,16 @@ async function tabManifest(){
         Hanya ${atur.nik_siapa_boleh_lihat==='super_owner'?'Super Admin & Owner':'Super Admin'} yang melihat NIK penuh.
         Pengaturannya ada di tab Pengaturan.</div>`:''}
     </div>`;
+
+  /* Manifest paling panjang (ratusan baris) — pencarian di sini yang paling
+     sering dipakai petugas: ketik nama, langsung ketemu. */
+  lengkapiTabel('#isi table[data-papan="manifest"]', {
+    id: 'manifest',
+    petunjuk: 'Cari nama penumpang atau kode…',
+    saring: [{ kolom: kol.nik ? (kol.alamat ? 8 : 6) : (kol.alamat ? 7 : 5),
+               semua: 'Semua pesanan',
+               pilihan: [...new Set((ord||[]).map(o => o.kode))] }]
+  });
 }
 
 /* ============ AGEN ============ */
@@ -612,10 +780,10 @@ async function tabAgen(){
   $('isi').innerHTML = `
     <div class="card scrollx">
       <h3>Agen &amp; Kode Referral</h3>
-      <table>
-        <tr><th class="nw">Nama</th><th class="nw">Kode</th><th class="nw">WhatsApp</th>
-            <th class="nw">Jalur Biro</th><th class="nw">Status</th><th></th></tr>
-        ${agen.map(a=>`<tr>
+      <table data-papan="agen">
+        <thead><tr><th class="nw">Nama</th><th class="nw">Kode</th><th class="nw">WhatsApp</th>
+            <th class="nw">Jalur Biro</th><th class="nw">Status</th><th></th></tr></thead>
+        <tbody>${agen.map(a=>`<tr>
           <td class="nw"><b class="nama" title="${esc(a.nama)}">${esc(a.nama)}</b></td>
           <td class="mono nw" data-sel-kode="${a.id}">${selKode(a)}</td>
           <td class="nw" data-sel-wa="${a.id}">${selWaAgen(a, waOf[a.id])}</td>
@@ -625,7 +793,7 @@ async function tabAgen(){
             ? `<a class="aksi ghost" href="#" data-biro="${a.id}" data-nilai="${a.boleh_biro?0:1}">${
                  a.boleh_biro?'Cabut':'Beri akses'}</a>`
             : '<span style="color:var(--muted);font-size:11.5px">tidak bisa edit</span>'}</td>
-        </tr>`).join('')}
+        </tr>`).join('')}</tbody>
       </table>
     </div>
     <div class="note"><b>Nomor WhatsApp ini dipakai halaman pemesanan</b>
@@ -650,6 +818,13 @@ async function tabAgen(){
 
   pasangEditorKode();
   pasangEditorWa();
+  lengkapiTabel('#isi table[data-papan="agen"]', {
+    id: 'agen', takUrut: [5], petunjuk: 'Cari nama agen atau kode…',
+    saring: [
+      { kolom: 3, semua: 'Semua jalur biro', pilihan: ['BOLEH','TIDAK'] },
+      { kolom: 4, semua: 'Semua status',     pilihan: ['AKTIF','NONAKTIF'] }
+    ]
+  });
 }
 
 /* ---- Editor nomor WhatsApp agen (hanya super) ----
@@ -810,7 +985,7 @@ async function tabBerangkat(){
     </div>
     <div class="card scrollx">
       <h3>Tiket Terjual per Tanggal Keberangkatan</h3>
-      <table>
+      <table data-papan="berangkat">
         <thead><tr><th class="nw">Tanggal</th><th class="nw">Pelayaran</th>
           <th class="num">Pesanan</th><th class="num">Pax</th><th class="num">Anak</th>
           <th class="num">Belum berkapal</th>
@@ -832,6 +1007,12 @@ async function tabBerangkat(){
         sebelum itu tidak muncul di sini — bukan hilang, memang tanggalnya tidak
         pernah ditanyakan.</div>
     </div>`;
+
+  lengkapiTabel('#isi table[data-papan="berangkat"]', {
+    id: 'berangkat', petunjuk: 'Cari tanggal atau pelayaran…',
+    saring: [{ kolom: 1, semua: 'Semua pelayaran',
+               pilihan: [...new Set(baris.map(b => b.produk))] }]
+  });
 }
 
 /* ============ PEMBAGIAN KAPAL ============ */
@@ -952,7 +1133,7 @@ async function tabVoucher(){
     </div>` : ''}
     <div class="card scrollx">
       <h3>Kode Voucher</h3>
-      <table>
+      <table data-papan="voucher">
         <thead><tr><th class="nw">Kode</th><th>Keterangan</th><th class="nw">Status</th>
           <th class="nw">Dibuat</th><th></th></tr></thead>
         <tbody>${(data||[]).length ? data.map(v=>`<tr>
@@ -979,7 +1160,7 @@ async function tabVoucher(){
 
     <div class="card scrollx">
       <h3>Tambahan (Add-on)</h3>
-      <table>
+      <table data-papan="tambahan">
         <thead><tr><th class="nw">Nama</th><th class="nw">Satuan</th><th class="num">Harga</th>
           <th class="num">Maks</th><th class="nw">Status</th><th></th></tr></thead>
         <tbody>${(tamb||[]).map(t=>`<tr>
@@ -1038,6 +1219,14 @@ async function tabVoucher(){
     });
     pasangEditorHarga(tamb||[]);
   }
+
+  lengkapiTabel('#isi table[data-papan="voucher"]', {
+    id: 'voucher', takUrut: [4], petunjuk: 'Cari kode voucher…',
+    saring: [{ kolom: 2, semua: 'Semua status', pilihan: ['AKTIF','NONAKTIF'] }]
+  });
+  lengkapiTabel('#isi table[data-papan="tambahan"]', {
+    id: 'tambahan', takUrut: [5], petunjuk: 'Cari nama tambahan…'
+  });
 }
 
 /* ---- Editor harga add-on (hanya super) ----
@@ -1112,6 +1301,60 @@ const PERAN_LABEL = {
   boarding:['Petugas Boarding','Hanya daftar boarding']
 };
 
+/* Nama pengguna bisa diubah di tempat. Catatan audit LAMA tidak ikut berubah —
+   itu disengaja: audit harus menyimpan nama yang berlaku saat kejadian, bukan
+   nama terkini. Kalau ikut berubah, riwayat jadi bisa dipoles. */
+function selNama(u, bisa, sendiri){
+  const nm = `<b class="nama" title="${esc(u.nama)}">${esc(u.nama)}</b>${
+    sendiri ? ' <span class="pill p-sea">ANDA</span>' : ''}`;
+  if (!bisa) return nm;
+  return `<span class="sel2">${nm}
+    <a class="aksi ghost" href="#" data-ubah-nama="${u.id}" data-nama="${esc(u.nama)}">Ubah</a></span>`;
+}
+
+function pasangEditorNama(bisa, gambarUlangTabel){
+  if (!bisa) return;
+  $('baris-akses').querySelectorAll('[data-ubah-nama]').forEach(t => t.onclick = e => {
+    e.preventDefault();
+    const id  = t.dataset.ubahNama;
+    const u   = S.pengguna.find(x => x.id === id);
+    const sel = $('baris-akses').querySelector(`[data-sel-nama="${id}"]`);
+    sel.innerHTML = `<span class="sel2">
+      <input class="kode-in" style="width:160px;font-family:inherit" maxlength="60"
+             value="${esc(t.dataset.nama)}">
+      <a class="aksi ghost" href="#" data-simpan-nama>Simpan</a>
+      <a class="aksi" href="#" data-batal-nama style="color:var(--muted)">Batal</a></span>`;
+    const inp = sel.querySelector('.kode-in');
+    inp.focus(); inp.select();
+    const tutup = () => { sel.innerHTML = selNama(u, true, id === S.uid); pasangEditorNama(bisa, gambarUlangTabel); };
+    sel.querySelector('[data-batal-nama]').onclick = ev => { ev.preventDefault(); tutup(); };
+    sel.querySelector('[data-simpan-nama]').onclick = ev => {
+      ev.preventDefault(); simpanNama(id, u?.nama, inp, tutup);
+    };
+    inp.onkeydown = ev => {
+      if (ev.key === 'Enter')  sel.querySelector('[data-simpan-nama]').onclick(ev);
+      if (ev.key === 'Escape') tutup();
+    };
+  });
+}
+
+/* Pola panjang nama disamakan persis dengan penjagaan di ubah_nama_pengguna(),
+   supaya penolakan tidak datang belakangan setelah pengguna menekan Simpan. */
+const namaSah = v => { const t = String(v||'').trim(); return t.length >= 2 && t.length <= 60; };
+
+async function simpanNama(id, lama, inp, tutup){
+  const baru = inp.value.trim();
+  if (baru === (lama || '')) return tutup();
+  if (!namaSah(baru))
+    return pesan('<b>Ditolak</b> Nama harus 2–60 karakter.', 9000);
+  inp.disabled = true;
+  const { error } = await sb.rpc('ubah_nama_pengguna', { p_user: id, p_nama: baru });
+  inp.disabled = false;
+  if (error) return gagalPesan(error);
+  pesan(`Nama diubah jadi <b>${esc(baru)}</b>. Catatan audit lama tetap memakai nama sebelumnya.`, 9000);
+  tabAkses();
+}
+
 async function tabAkses(){
   const [{ data:orang, error:e1 }, { data:agen, error:e2 }] = await Promise.all([
     sb.rpc('daftar_pengguna'),
@@ -1126,6 +1369,18 @@ async function tabAkses(){
   $('isi').innerHTML = `
     <div class="card">
       <h3 style="margin:0 0 12px">Akun Saya</h3>
+      <div class="grid g2">
+        <div class="fld"><label for="nm-saya">Nama tampilan</label>
+          <div class="sel2" style="display:flex;gap:8px;align-items:flex-start">
+            <input id="nm-saya" maxlength="60" style="flex:1"
+                   value="${esc(S.pengguna.find(u=>u.id===S.uid)?.nama || '')}">
+            <button type="button" class="btn ghost" id="nm-simpan" style="padding:9px 16px">Simpan</button>
+          </div>
+          <div class="hint">Nama ini yang muncul di catatan audit untuk setiap tindakanmu.</div></div>
+        <div class="fld"><label>Email</label>
+          <input value="${esc(S.email)}" disabled>
+          <div class="hint">Email tidak bisa diubah dari sini — dia yang menautkan akun ke sistem login.</div></div>
+      </div>
       <div class="grid g2">
         <div class="fld"><label for="pw-baru">Ganti password</label>
           <input id="pw-baru" type="password" autocomplete="new-password" placeholder="Minimal 8 karakter">
@@ -1169,8 +1424,7 @@ async function tabAkses(){
       const sendiri = u.id === S.uid;
       const pl = PERAN_LABEL[u.peran] || [u.peran,''];
       return `<tr>
-        <td class="nw"><b class="nama" title="${esc(u.nama)}">${esc(u.nama)}</b>${
-          sendiri ? ' <span class="pill p-sea">ANDA</span>' : ''}</td>
+        <td class="nw" data-sel-nama="${u.id}">${selNama(u, bisa, sendiri)}</td>
         <td class="nw"><span class="nama" style="max-width:190px" title="${esc(u.email)}">${esc(u.email)}</span></td>
         <td class="nw">${bisa
           ? `<select data-peran="${u.id}" style="width:155px;padding:5px 7px;font-size:13px">
@@ -1202,6 +1456,8 @@ async function tabAkses(){
       </tr>`;
     }).join('') : `<tr><td colspan="7"><div class="hint">
       Tidak ada pengguna yang cocok dengan pencarian.</div></td></tr>`;
+
+    pasangEditorNama(bisa, gambar);
 
     if (!bisa) return;
 
@@ -1290,6 +1546,20 @@ async function tabAkses(){
 
   $('cari-akses').oninput = gambar;
   gambar();
+
+  /* --- ganti nama sendiri --- */
+  $('nm-simpan').onclick = async () => {
+    const baru = $('nm-saya').value.trim();
+    const lama = S.pengguna.find(u => u.id === S.uid)?.nama || '';
+    if (baru === lama) return pesan('Nama tidak berubah.');
+    if (!namaSah(baru)) return pesan('<b>Ditolak</b> Nama harus 2–60 karakter.', 9000);
+    $('nm-simpan').disabled = true;
+    const { error } = await sb.rpc('ubah_nama_pengguna', { p_user: S.uid, p_nama: baru });
+    $('nm-simpan').disabled = false;
+    if (error) return gagalPesan(error);
+    pesan(`Nama tampilan jadi <b>${esc(baru)}</b>.`, 9000);
+    tabAkses();
+  };
 
   /* --- ganti password sendiri --- */
   $('pw-simpan').onclick = async () => {
@@ -1418,10 +1688,10 @@ async function tabKomisi(){
         mana pun yang bisa kamu buka. Itu dijaga database, bukan tampilan.</div>
     </div>
     <div class="card scrollx"><h3>Pelanggan Saya <span class="pill p-mute">${pesananku.length}</span></h3>
-      <table>
-        <tr><th class="nw">Kode</th><th class="nw">Tgl</th><th>Pembeli</th><th class="nw">WhatsApp</th>
-            <th class="nw">Produk</th><th class="num">Pax</th><th class="num">Total</th><th class="nw">Status</th></tr>
-        ${pesananku.map(o=>{
+      <table data-papan="pelangganku">
+        <thead><tr><th class="nw">Kode</th><th class="nw">Tgl</th><th>Pembeli</th><th class="nw">WhatsApp</th>
+            <th class="nw">Produk</th><th class="num">Pax</th><th class="num">Total</th><th class="nw">Status</th></tr></thead>
+        <tbody>${pesananku.map(o=>{
           const st=STATUS[o.status]||[o.status,'p-mute'];
           return `<tr><td class="mono nw">${esc(o.kode)}</td>
             <td class="nw" style="color:var(--muted)">${tgl(o.dibuat)}</td>
@@ -1430,12 +1700,18 @@ async function tabKomisi(){
             <td class="nw">${esc(o.produk?.nama)}</td><td class="num">${o.pax}</td>
             <td class="num nw">${rp(o.total)}</td>
             <td class="nw"><span class="pill ${st[1]}">${st[0]}</span></td></tr>`;
-        }).join('')}
+        }).join('')}</tbody>
       </table>
       <div class="note"><b>Nomor lengkap, tapi hanya pelanggan sendiri</b>
         Kamu melihat nomor HP utuh supaya bisa follow up langsung. Pelanggan agen lain tidak pernah
         muncul, dan NIK serta alamat KTP tidak pernah ditampilkan ke peran agen.</div>
     </div>`;
+
+  lengkapiTabel('#isi table[data-papan="pelangganku"]', {
+    id: 'pelangganku', petunjuk: 'Cari kode, pembeli, produk…',
+    saring: [{ kolom: 7, semua: 'Semua status',
+               pilihan: [...new Set(pesananku.map(o => (STATUS[o.status]||[o.status])[0]))] }]
+  });
 }
 
 /* ============ BOARDING ============ */
@@ -1447,15 +1723,15 @@ async function tabBoarding(){
   if (error) return gagal(error);
   $('isi').innerHTML = `
     <div class="card scrollx"><h3>Daftar Boarding</h3>
-      <table>
-        <tr><th class="nw">Berangkat</th><th class="nw">Kapal</th><th class="nw">Kode</th>
+      <table data-papan="boarding">
+        <thead><tr><th class="nw">Berangkat</th><th class="nw">Kapal</th><th class="nw">Kode</th>
             <th>Pemesan</th><th class="nw">Produk</th><th class="num">Pax</th>
-            <th class="num">Naik</th><th class="nw">Status</th></tr>
-        ${(data||[]).map(o=>{
+            <th class="num">Naik</th><th class="nw">Status</th></tr></thead>
+        <tbody>${(data||[]).map(o=>{
           const sdh=(o.penumpang||[]).filter(p=>p.naik).length;
           const hariIni = new Date().toISOString().slice(0,10);
           return `<tr>
-            <td class="nw">${o.tanggal_berangkat
+            <td class="nw" data-urut="${o.tanggal_berangkat?Date.parse(o.tanggal_berangkat):0}">${o.tanggal_berangkat
               ? `${tgl(o.tanggal_berangkat)}${o.tanggal_berangkat===hariIni
                    ? ' <span class="pill p-ok">HARI INI</span>' : ''}`
               : '<span style="color:var(--muted)">—</span>'}</td>
@@ -1469,12 +1745,20 @@ async function tabBoarding(){
             <td class="num"><span class="pill ${sdh>=o.pax?'p-ok':'p-warn'}">${sdh}/${o.pax}</span></td>
             <td><span class="pill ${(STATUS[o.status]||['','p-mute'])[1]}">${(STATUS[o.status]||[o.status])[0]}</span></td>
           </tr>`;
-        }).join('')}
+        }).join('')}</tbody>
       </table>
       <div class="note w"><b>Halaman scan belum dibangun</b>
         Ini baru daftar bacanya. Pemindaian QR dan pencentangan per nama menyusul setelah
         dashboard dan landing page selesai.</div>
     </div>`;
+
+  /* Dipakai di dermaga: petugas mengetik nama atau kode, dan menyaring per kapal
+     supaya yang tampil hanya rombongan kapal yang sedang dinaiki. */
+  lengkapiTabel('#isi table[data-papan="boarding"]', {
+    id: 'boarding', petunjuk: 'Cari kode atau nama pemesan…',
+    saring: [{ kolom: 1, semua: 'Semua kapal',
+               pilihan: [...new Set((data||[]).map(o => o.kapal?.nama).filter(Boolean))] }]
+  });
 }
 
 /* ============ GALAT ============ */

@@ -158,7 +158,7 @@ footer{margin-top:40px;padding:22px 0 40px;border-top:1px solid var(--line);
 
 <div class="bar"><div class="in">
   <div class="brand">THE TAMPERAN CRUISE<small>Pelabuhan Tamperan · Pacitan</small></div>
-  <a href="#pesan">Pesan sekarang</a>
+  <a href="#pesan" id="tombol-pesan">Pesan sekarang</a>
 </div></div>
 
 <div class="hero"><div class="wrap">
@@ -890,6 +890,8 @@ function tampilkanHasil(kode, token, nama){
 /* ====================== CEK STATUS (?t=token) ====================== */
 async function cekStatus(token){
   document.querySelectorAll('#produk, #form-area, h2, .sub, .hero').forEach(el => el.classList.add('sembunyi'));
+  const tb = $('tombol-pesan');
+  if (tb){ tb.href = location.pathname; tb.textContent = 'Pesan lagi'; }
   const kotak = $('cek-status');
   kotak.classList.remove('sembunyi');
   kotak.innerHTML = `<h2 style="display:block">Status pesanan</h2>
