@@ -1659,7 +1659,38 @@ async function tabAgen(){
   if (e1) return gagal(e1);
   const waOf = Object.fromEntries((kontak||[]).map(k=>[k.agen_id,k.wa]));
 
+  const bolehTambah = S.peran === 'super';
+
   $('isi').innerHTML = `
+    ${bolehTambah ? `<div class="card" id="kartu-agen-baru">
+      <h3 style="margin:0 0 12px">Tambah Agen Baru</h3>
+      <div class="grid g2">
+        <div class="fld"><label for="ag-nama">Nama agen</label>
+          <input id="ag-nama" maxlength="60" placeholder="mis. Budi Santoso" autocomplete="off">
+          <div class="hint">Nama ini muncul di papan peringkat dan di catatan audit.</div></div>
+        <div class="fld"><label for="ag-kode">Kode referral</label>
+          <input id="ag-kode" maxlength="32" spellcheck="false" autocapitalize="characters"
+                 placeholder="mis. BUDI2026" autocomplete="off"
+                 style="font-family:ui-monospace,Menlo,monospace">
+          <div class="hint">3&ndash;32 karakter: huruf, angka, titik, titik dua bawah,
+            atau strip. Ini yang diketik pelanggan di halaman pemesanan.</div></div>
+      </div>
+      <div class="grid g2">
+        <div class="fld"><label for="ag-wa">Nomor WhatsApp <span style="font-weight:400;color:var(--muted)">(boleh dikosongkan)</span></label>
+          <input id="ag-wa" inputmode="tel" maxlength="15" placeholder="08xxxxxxxxxx" autocomplete="off">
+          <div class="hint">Pelanggan yang memakai kode agen ini diarahkan ke nomor tersebut.
+            Kalau kosong, jatuh ke nomor pusat &mdash; bisa diisi belakangan.</div></div>
+        <div class="fld"><label for="ag-biro">Jalur biro</label>
+          <label style="display:flex;gap:9px;align-items:flex-start;font-weight:400;cursor:pointer">
+            <input type="checkbox" id="ag-biro" style="width:auto;margin-top:3px">
+            <span style="font-size:13.5px">Boleh menjual paket rombongan/biro</span></label>
+          <div class="hint">Biarkan kosong kalau agen ini hanya melayani perorangan.</div></div>
+      </div>
+      <button type="button" class="btn" id="ag-simpan">Tambah agen</button>
+      <div class="note w" style="margin-bottom:0"><b>Kode tidak bisa dipakai dua agen</b>
+        Database menolak kode yang sudah terpakai, tidak peduli huruf besar atau kecil.
+        Kodenya masih bisa diganti kapan saja lewat tabel di bawah.</div>
+    </div>` : ''}
     <div class="card scrollx">
       <h3>Agen &amp; Kode Referral</h3>
       <table data-papan="agen">
@@ -1698,6 +1729,7 @@ async function tabAgen(){
     pesan('Penanda jalur biro diperbarui.'); tabAgen();
   });
 
+  if (bolehTambah) pasangTambahAgen(agen);
   pasangEditorKode();
   pasangEditorWa();
   lengkapiTabel('#isi table[data-papan="agen"]', {
@@ -1706,6 +1738,170 @@ async function tabAgen(){
       { kolom: 3, semua: 'Semua jalur biro', pilihan: ['BOLEH','TIDAK'] },
       { kolom: 4, semua: 'Semua status',     pilihan: ['AKTIF','NONAKTIF'] }
     ]
+  });
+}
+
+/* ---- Kelola armada kapal (hanya super) ----
+   Tabel kapal sudah dijaga policy kapal_kelola_super (ALL, peran()='super',
+   lengkap dengan WITH CHECK) plus CHECK kapasitas>0 dan nama tidak kosong.
+   Jadi tidak perlu fungsi SECURITY DEFINER; cukup DB.from('kapal').
+   CATATAN: database TIDAK mewajibkan nama kapal unik, jadi pemeriksaan nama
+   kembar di bawah ini hanya di sisi layar. Kalau mau dijamin, perlu satu
+   indeks unik lower(nama) — belum dipasang, menunggu persetujuan. */
+function selKapalBaris(k){
+  return `<b class="nama" title="${esc(k.nama)}">${esc(k.nama)}</b>`;
+}
+
+function pasangKelolaKapal(kapalSemua){
+  /* --- ubah baris yang ada --- */
+  $('isi').querySelectorAll('[data-ubah-kapal]').forEach(t => t.onclick = e => {
+    e.preventDefault();
+    const k = kapalSemua.find(x => x.id === t.dataset.ubahKapal);
+    if (!k) return;
+    const sel = $('isi').querySelector(`[data-sel-kapal="${k.id}"]`);
+    sel.innerHTML = `<span class="sel2" style="flex-wrap:wrap">
+      <input class="kode-in nm-k" style="width:120px;font-family:inherit" maxlength="60"
+             value="${esc(k.nama)}">
+      <input class="kode-in kap-k" style="width:62px" inputmode="numeric" maxlength="4"
+             placeholder="kap." value="${k.kapasitas ?? ''}">
+      <input class="kode-in urt-k" style="width:52px" inputmode="numeric" maxlength="3"
+             placeholder="urut" value="${k.urutan}">
+      <a class="aksi ghost" href="#" data-simpan-kapal>Simpan</a>
+      <a class="aksi" href="#" data-batal-kapal style="color:var(--muted)">Batal</a></span>`;
+    const nm = sel.querySelector('.nm-k'), kap = sel.querySelector('.kap-k'),
+          urt = sel.querySelector('.urt-k');
+    nm.focus(); nm.select();
+    const tutup = () => { sel.innerHTML = selKapalBaris(k); pasangKelolaKapal(kapalSemua); };
+    sel.querySelector('[data-batal-kapal]').onclick = ev => { ev.preventDefault(); tutup(); };
+    sel.querySelector('[data-simpan-kapal]').onclick = async ev => {
+      ev.preventDefault();
+      const nama = (nm.value || '').trim();
+      const kapTeks = (kap.value || '').trim();
+      const urtTeks = (urt.value || '').trim();
+      if (!nama) return pesan('Nama kapal tidak boleh kosong.', 6000);
+      if (kapasitasSalah(kapTeks)) return pesan('Kapasitas harus angka bulat lebih dari 0, '
+        + 'atau dikosongkan kalau izinnya belum keluar.', 9000);
+      if (urtTeks && !/^[0-9]{1,3}$/.test(urtTeks))
+        return pesan('Urutan harus angka 0&ndash;999.', 6000);
+      if (kapalSemua.some(x => x.id !== k.id && x.nama.toLowerCase() === nama.toLowerCase()))
+        return pesan(`Sudah ada kapal bernama <b>${esc(nama)}</b>.`, 7000);
+      const { error } = await DB.from('kapal').update({
+        nama,
+        kapasitas: kapTeks === '' ? null : parseInt(kapTeks, 10),
+        urutan:    urtTeks === '' ? k.urutan : parseInt(urtTeks, 10),
+      }).eq('id', k.id);
+      if (error) return gagalPesan(error);
+      pesan(`<b>${esc(nama)}</b> diperbarui. Kartu muatan ikut dihitung ulang.`, 7000);
+      tabKapal();
+    };
+    [nm, kap, urt].forEach(i => i.onkeydown = ev => {
+      if (ev.key === 'Enter')  sel.querySelector('[data-simpan-kapal]').onclick(ev);
+      if (ev.key === 'Escape') tutup();
+    });
+  });
+
+  /* --- aktif / nonaktif --- */
+  $('isi').querySelectorAll('[data-kapal-aktif]').forEach(b => b.onclick = async e => {
+    e.preventDefault(); b.style.pointerEvents = 'none';
+    const nyala = b.dataset.nilai === '1';
+    const { error } = await DB.from('kapal')
+      .update({ aktif: nyala }).eq('id', b.dataset.kapalAktif);
+    if (error){ b.style.pointerEvents = ''; return gagalPesan(error); }
+    pesan(nyala ? 'Kapal diaktifkan dan kembali muncul di pilihan penempatan.'
+                : 'Kapal dinonaktifkan. Pesanan yang sudah di kapal ini tidak diubah.', 8000);
+    tabKapal();
+  });
+
+  /* --- tambah kapal baru --- */
+  const tbl = $('kp-simpan');
+  tbl.onclick = async () => {
+    const nama = ($('kp-nama').value || '').trim();
+    const kapTeks = ($('kp-kap').value || '').trim();
+    if (!nama) return pesan('Nama kapal belum diisi.', 6000);
+    if (kapasitasSalah(kapTeks)) return pesan('Kapasitas harus angka bulat lebih dari 0, '
+      + 'atau dikosongkan kalau izinnya belum keluar.', 9000);
+    if (kapalSemua.some(x => x.nama.toLowerCase() === nama.toLowerCase()))
+      return pesan(`Sudah ada kapal bernama <b>${esc(nama)}</b>.`, 7000);
+
+    tbl.disabled = true; tbl.textContent = 'Menyimpan…';
+    const urutanBaru = Math.max(0, ...kapalSemua.map(x => x.urutan || 0)) + 1;
+    const { error } = await DB.from('kapal').insert({
+      nama, kapasitas: kapTeks === '' ? null : parseInt(kapTeks, 10),
+      aktif: true, urutan: urutanBaru,
+    });
+    if (error){ tbl.disabled = false; tbl.textContent = 'Tambah kapal'; return gagalPesan(error); }
+    pesan(`<b>${esc(nama)}</b> ditambahkan dan langsung bisa dipakai untuk penempatan.`, 8000);
+    tabKapal();
+  };
+  ['kp-nama','kp-kap'].forEach(id => $(id).onkeydown = e => {
+    if (e.key === 'Enter') tbl.onclick();
+  });
+}
+
+/* Kosong = boleh (kapasitas izin belum keluar). Selain itu harus bilangan bulat
+   positif — sama dengan CHECK kapal_kapasitas_check di database. */
+function kapasitasSalah(teks){
+  if (teks === '') return false;
+  if (!/^[0-9]{1,4}$/.test(teks)) return true;
+  return parseInt(teks, 10) < 1;
+}
+
+/* ---- Tambah agen baru (hanya super) ----
+   Tidak perlu fungsi SECURITY DEFINER: tabel agen sudah punya GRANT INSERT ke
+   'authenticated' DAN policy RLS agen_kelola_super (peran() = 'super'), jadi
+   penjagaannya sudah di database. Keunikan kode dijaga indeks unik
+   lower(kode); format dijaga CHECK agen_kode_format. Pemeriksaan di bawah ini
+   hanya supaya pesan salahnya enak dibaca, bukan pengganti penjagaan itu. */
+function pasangTambahAgen(agenAda){
+  const tbl = $('ag-simpan');
+  const ambil = () => ({
+    nama: ($('ag-nama').value || '').trim(),
+    kode: ($('ag-kode').value || '').trim(),
+    wa:   ($('ag-wa').value   || '').replace(/[^0-9]/g, ''),
+    biro: $('ag-biro').checked,
+  });
+
+  tbl.onclick = async () => {
+    const v = ambil();
+    if (!v.nama)                    return pesan('Nama agen belum diisi.', 6000);
+    if (!KODE_POLA.test(v.kode))    return pesan('Kode referral harus 3&ndash;32 karakter dan hanya '
+                                    + 'boleh huruf, angka, titik, garis bawah, atau strip.', 9000);
+    if ((agenAda || []).some(a => a.kode.toLowerCase() === v.kode.toLowerCase()))
+      return pesan(`Kode <b>${esc(v.kode)}</b> sudah dipakai agen lain.`, 8000);
+    if ($('ag-wa').value.trim() && !WA_POLA.test(v.wa))
+      return pesan('Nomor WhatsApp harus 9&ndash;15 angka, tanpa spasi atau tanda baca.', 8000);
+
+    tbl.disabled = true; tbl.textContent = 'Menyimpan…';
+    const pulih = () => { tbl.disabled = false; tbl.textContent = 'Tambah agen'; };
+
+    const { error } = await DB.from('agen')
+      .insert({ nama: v.nama, kode: v.kode, boleh_biro: v.biro, aktif: true });
+    if (error){ pulih(); return gagalPesan(error); }
+
+    /* Nomor WA tinggal di tabel terpisah, jadi butuh id barisnya. Diambil lewat
+       kode karena kode itu unik — insert().select() tidak dipakai supaya jalur
+       ini sama persis saat mode panduan. */
+    if (v.wa){
+      const { data: baru } = await DB.from('agen')
+        .select('id').eq('kode', v.kode).maybeSingle();
+      if (baru?.id){
+        const { error: e2 } = await DB.from('agen_kontak')
+          .upsert({ agen_id: baru.id, wa: v.wa }, { onConflict: 'agen_id' });
+        if (e2){
+          pulih();
+          return pesan(`Agen <b>${esc(v.nama)}</b> tersimpan, tapi nomor WhatsApp-nya `
+            + `gagal disimpan: ${esc(e2.message)}. Isi lewat kolom WhatsApp di tabel bawah.`, 12000);
+        }
+      }
+    }
+    pesan(`Agen <b>${esc(v.nama)}</b> ditambahkan. Kode <b>${esc(v.kode)}</b> langsung `
+        + 'berlaku di halaman pemesanan &mdash; tidak perlu deploy ulang.', 9000);
+    tabAgen();
+  };
+
+  /* Enter di kolom mana pun = tekan tombolnya. */
+  ['ag-nama','ag-kode','ag-wa'].forEach(id => $(id).onkeydown = e => {
+    if (e.key === 'Enter') tbl.onclick();
   });
 }
 
@@ -1899,8 +2095,10 @@ async function tabBerangkat(){
 
 /* ============ PEMBAGIAN KAPAL ============ */
 async function tabKapal(){
-  const [{data:kapal, error:e1}, {data:pes, error:e2}] = await Promise.all([
-    DB.from('kapal').select('id,nama,kapasitas,aktif').eq('aktif', true).order('urutan'),
+  const [{data:kapalSemua, error:e1}, {data:pes, error:e2}] = await Promise.all([
+    /* SEMUA kapal, termasuk nonaktif: kalau disaring aktif=true, kapal yang
+       pernah dinonaktifkan tidak akan pernah bisa diaktifkan lagi dari layar. */
+    DB.from('kapal').select('id,nama,kapasitas,aktif,urutan').order('urutan'),
     DB.from('pesanan')
       .select('id,kode,pax,anak,status,tanggal_berangkat,kapal_id,pemesan_nama,tipe,produk:produk_id(nama)')
       .not('tanggal_berangkat','is',null)
@@ -1909,7 +2107,9 @@ async function tabKapal(){
   ]);
   if (e1) return gagal(e1);
   if (e2) return gagal(e2);
-  S.kapal = kapal || [];
+  /* S.kapal = hanya yang aktif: dipakai KPI muatan dan dropdown penempatan,
+     dan kapal nonaktif memang tidak boleh jadi tujuan penempatan baru. */
+  S.kapal = (kapalSemua || []).filter(k => k.aktif);
 
   /* Dikelompokkan per tanggal: admin bekerja per keberangkatan, bukan per pesanan
      lepas. Kapasitas dihitung ulang tiap kali supaya langsung terlihat penuh/tidak. */
@@ -1917,7 +2117,44 @@ async function tabKapal(){
   (pes||[]).forEach(o => { (perTgl[o.tanggal_berangkat] ||= []).push(o); });
   const tanggal = Object.keys(perTgl).sort();
 
-  $('isi').innerHTML = tanggal.length ? tanggal.map(tg => {
+  const kelolaKapal = S.peran !== 'super' ? '' : `
+    <div class="card" id="kartu-kapal">
+      <h3 style="margin:0 0 4px">Armada Kapal</h3>
+      <div class="hint" style="margin-bottom:12px">Kapasitas di sini yang dipakai
+        kartu muatan di bawah. Isi sesuai <b>kapasitas izin</b> kapalnya, bukan perkiraan.</div>
+      <table data-papan="armada">
+        <thead><tr><th class="nw">Nama</th><th class="num">Kapasitas</th>
+          <th class="num">Urutan</th><th class="nw">Status</th><th></th></tr></thead>
+        <tbody>${(kapalSemua||[]).map(k => `<tr>
+          <td class="nw" data-sel-kapal="${k.id}">${selKapalBaris(k)}</td>
+          <td class="num nw" data-urut="${k.kapasitas ?? 0}">${k.kapasitas
+            ? k.kapasitas + ' orang'
+            : '<span class="pill p-warn">BELUM DIISI</span>'}</td>
+          <td class="num nw">${k.urutan}</td>
+          <td class="nw">${k.aktif
+            ? '<span class="pill p-ok">AKTIF</span>'
+            : '<span class="pill p-mute">NONAKTIF</span>'}</td>
+          <td class="nw"><span class="sel2">
+            <a class="aksi ghost" href="#" data-ubah-kapal="${k.id}">Ubah</a>
+            <a class="aksi ghost" href="#" data-kapal-aktif="${k.id}"
+               data-nilai="${k.aktif?0:1}">${k.aktif?'Nonaktifkan':'Aktifkan'}</a></span></td>
+        </tr>`).join('')}</tbody>
+      </table>
+      <div class="grid g2" style="margin-top:14px">
+        <div class="fld"><label for="kp-nama">Nama kapal baru</label>
+          <input id="kp-nama" maxlength="60" placeholder="mis. Kapal 3" autocomplete="off"></div>
+        <div class="fld"><label for="kp-kap">Kapasitas izin <span style="font-weight:400;color:var(--muted)">(boleh dikosongkan)</span></label>
+          <input id="kp-kap" inputmode="numeric" maxlength="4" placeholder="mis. 40" autocomplete="off">
+          <div class="hint">Kosongkan kalau izinnya belum keluar &mdash; kartu muatan
+            akan menulis &ldquo;kapasitas belum diisi&rdquo;, bukan menebak angka.</div></div>
+      </div>
+      <button type="button" class="btn" id="kp-simpan">Tambah kapal</button>
+      <div class="note w" style="margin-bottom:0"><b>Dinonaktifkan, bukan dihapus</b>
+        Kapal yang dinonaktifkan hilang dari pilihan penempatan, tapi pesanan lama
+        yang sudah terlanjur ditempatkan di situ tetap utuh beserta riwayatnya.</div>
+    </div>`;
+
+  $('isi').innerHTML = kelolaKapal + (tanggal.length ? tanggal.map(tg => {
     const daftar = perTgl[tg];
     const muat = {};
     S.kapal.forEach(k => muat[k.id] = daftar.filter(o=>o.kapal_id===k.id)
@@ -1972,7 +2209,15 @@ async function tabKapal(){
       dan setiap perubahannya tercatat di audit.</div>`
   : `<div class="card"><div class="note w"><b>Belum ada keberangkatan</b>
       Belum ada pesanan sah yang punya tanggal keberangkatan. Tanggal baru
-      dikumpulkan dari pesanan yang masuk lewat halaman pemesanan versi terbaru.</div></div>`;
+      dikumpulkan dari pesanan yang masuk lewat halaman pemesanan versi terbaru.</div></div>`);
+
+  if (S.peran === 'super'){
+    pasangKelolaKapal(kapalSemua || []);
+    lengkapiTabel('#isi table[data-papan="armada"]', {
+      id: 'armada', takUrut: [4], petunjuk: 'Cari nama kapal…',
+      saring: [{ kolom: 3, semua: 'Semua status', pilihan: ['AKTIF','NONAKTIF'] }]
+    });
+  }
 
   $('isi').querySelectorAll('[data-kapal]').forEach(sel => sel.onchange = async () => {
     const asal = sel.dataset.lama ?? '';
