@@ -158,6 +158,10 @@ a.ghost{background:#fff;color:var(--sea);border-color:#8fb3c9}
 .p-sea{background:var(--sky);color:var(--sea);border-color:#a4cbdc}
 .p-mute{background:#e2e8f0;color:var(--muted);border-color:#b6c2d1}
 .p-dang{background:var(--dangerbg);color:var(--danger);border-color:#e3a8a2}
+/* Tombol lepas (bukan di dalam .sel2 / .fld) perlu jarak bawah sendiri: kartu
+   punya margin-bottom 16px, tombol tidak, jadi tombol seperti "Simpan
+   pengaturan" menempel ke garis kartu berikutnya. */
+#isi > .btn{margin-bottom:16px}
 .btn{background:var(--sea);color:#fff;border:0;border-radius:9px;padding:10px 15px;font:inherit;
      font-size:13.5px;font-weight:600;cursor:pointer}
 .btn.ghost{background:#fff;color:var(--sea);border:1px solid var(--sea)}
@@ -1040,6 +1044,14 @@ const TUTOR = {
     { tab:'kapal', cari:'#isi [data-kapal]', judul:'Pembagian Kapal',
       teks:'Dikelompokkan per tanggal berangkat. Pilih kapal lewat dropdown di kolom Kapal — '
          + 'tersimpan langsung, tidak ada tombol Simpan. Kartu muatan di atas ikut berubah seketika.' },
+    { tab:'kapal', cari:'#isi #kartu-kapal', judul:'Armada Kapal',
+      teks:'Di sinilah kapal ditambah dan <b>kapasitas izin</b>-nya diisi. Angka kapasitas '
+         + 'inilah yang dipakai kartu muatan di bawah &mdash; isi sesuai izin kapalnya, '
+         + 'jangan diperkirakan. Boleh dikosongkan kalau izinnya belum keluar.' },
+    { tab:'agen', cari:'#isi #kartu-agen-baru', judul:'Tambah agen',
+      teks:'Agen baru didaftarkan dari sini: nama, kode referral, dan nomor WhatsApp-nya. '
+         + 'Kode itu yang diketik pelanggan di halaman pemesanan, dan langsung berlaku '
+         + 'begitu disimpan &mdash; tanpa deploy ulang.' },
     { tab:'agen', cari:'#isi [data-sel-wa]', judul:'Agen & Kode',
       teks:'Nomor WhatsApp di sini menentukan ke mana pelanggan diarahkan setelah memesan. '
          + 'Perubahannya langsung berlaku di situs, tanpa perlu apa-apa lagi.' },
@@ -1049,6 +1061,15 @@ const TUTOR = {
     { tab:'akses', cari:'#isi #baris-akses', judul:'Kelola Akses',
       teks:'Atur peran tiap pengguna, nonaktifkan akun, kirim tautan reset password, '
          + 'dan ganti nama tampilan Anda sendiri di bagian atas.' },
+    { tab:'atur', cari:'#isi table[data-papan="produk"]', judul:'Produk & Harga',
+      teks:'Harga jual ada di sini, dan hanya Super Admin yang bisa mengubahnya. '
+         + '<b>BERTINGKAT</b> berarti harga warga Pacitan beda dari harga umum; '
+         + '<b>HARGA SAMA</b> berarti satu harga untuk semua.' },
+    { tab:'atur', cari:'#isi #form-produk', judul:'Mengubah harga',
+      teks:'Tekan <b>Ubah</b> di baris produk, lalu formulir ini terisi sendiri. '
+         + 'Kolom harga ikut model yang dipilih &mdash; kalau bertingkat, dua harga wajib diisi. '
+         + 'Menaikkan harga hari ini <b>tidak mengubah tagihan</b> orang yang memesan kemarin, '
+         + 'karena tiap pesanan membekukan harganya sendiri saat dibuat.' },
     /* cari:null -> kartu di tengah layar. Tombol Panduan ada di bar yang menempel,
        dan sorotan elemen menempel gampang meleset saat halaman tergulir. */
     { cari:null, judul:'Selesai',
@@ -1121,7 +1142,34 @@ const TUTOR = {
          + 'tekan tombol <b>Panduan</b> di kanan atas layar.' },
   ],
 };
-TUTOR.owner = TUTOR.super;   /* Owner melihat tab yang sama, hanya tidak bisa mengubah */
+/* Owner melihat tab yang sama, tapi TIDAK bisa mengubah apa pun. Dulu di sini
+   cuma `TUTOR.owner = TUTOR.super`, dan akibatnya panduan owner menunjuk tombol
+   yang tidak pernah ada untuknya: Lunas, Armada Kapal, Tambah Agen, formulir
+   harga. Mesin tutorial memang MELEWATI sasaran yang tidak ketemu, jadi tidak
+   mogok — tapi diam-diam bolong, dan itu persis keluhan "panduan tidak relevan".
+
+   Sekarang: langkah khusus-super disaring menurut judulnya, lalu disisipkan satu
+   langkah yang menjelaskan kenapa tombolnya tidak ada. Diturunkan dari daftar
+   super supaya langkah baru ikut otomatis; kalau suatu saat ada langkah
+   khusus-super baru yang lupa didaftarkan di sini, uji panduan.mjs yang
+   menangkapnya. */
+const OWNER_LEWAT = new Set([
+  'Konfirmasi pembayaran',   /* tombol Lunas hanya untuk super & admin */
+  'Armada Kapal',            /* #kartu-kapal hanya super */
+  'Tambah agen',             /* #kartu-agen-baru hanya super */
+  'Mengubah harga',          /* #form-produk hanya super */
+]);
+TUTOR.owner = (() => {
+  const daftar = TUTOR.super.filter(l => !OWNER_LEWAT.has(l.judul));
+  const i = daftar.findIndex(l => l.judul === 'Deretan tab');
+  daftar.splice(i + 1, 0, {
+    cari: null, judul: 'Anda melihat, bukan mengubah',
+    teks: 'Peran Owner membuka <b>semua data</b> &mdash; semua pesanan, semua agen, semua '
+        + 'harga &mdash; tapi tidak ada tombol simpan di mana pun. Jadi silakan buka-buka '
+        + 'sepuasnya; tidak ada yang bisa rusak dari layar ini. Kalau ada angka yang perlu '
+        + 'diubah, mintakan ke Super Admin.' });
+  return daftar;
+})();
 
 let TUT = { langkah: [], i: 0, jalan: false };
 
