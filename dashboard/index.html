@@ -113,12 +113,16 @@ tr.kosong td{color:var(--muted);font-size:13px;padding:16px 8px}
 .tutor-titik i.on{background:var(--sea);width:16px;border-radius:3px}
 /* Pita pratinjau peran: sengaja mencolok supaya tidak ada yang lupa sedang
    melihat tampilan peran lain lalu mengira dashboardnya rusak. */
-#pita-pratinjau{background:#7a4f06;color:#fff;font-size:13px;position:sticky;top:0;z-index:30}
-#pita-pratinjau .in{max-width:1140px;margin:0 auto;padding:8px 16px;display:flex;
-  align-items:center;gap:12px;flex-wrap:wrap}
-#pita-pratinjau b{font-weight:800}
-#pita-pratinjau button{margin-left:auto;font:inherit;font-size:12.5px;font-weight:700;
-  background:#fff;color:#7a4f06;border:0;border-radius:7px;padding:5px 13px;cursor:pointer}
+#pita-pratinjau,#pita-latihan{color:#fff;font-size:13px;position:sticky;top:0;z-index:30}
+#pita-pratinjau{background:#7a4f06}
+#pita-latihan{background:#15603a}
+#pita-pratinjau .in,#pita-latihan .in{max-width:1140px;margin:0 auto;padding:8px 16px;
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+#pita-pratinjau b,#pita-latihan b{font-weight:800}
+#pita-pratinjau button,#pita-latihan button{margin-left:auto;font:inherit;font-size:12.5px;
+  font-weight:700;background:#fff;border:0;border-radius:7px;padding:5px 13px;cursor:pointer}
+#pita-pratinjau button{color:#7a4f06}
+#pita-latihan button{color:#15603a}
 #pilihPeran{font:inherit;font-size:12.5px;padding:5px 8px;border-radius:7px;
   border:1px solid #39618a;background:#1b3a5c;color:#e4f1f8;max-width:170px}
 #pita-agen{font:inherit;font-size:12.5px;padding:4px 8px;border-radius:7px;border:0;
@@ -214,8 +218,16 @@ input:focus,select:focus{outline:2px solid var(--sea);outline-offset:1px;border-
     <div class="sisa"><span id="labelUser"></span>
       <select id="pilihPeran" class="hide" title="Lihat tampilan peran lain"></select>
       <button class="btn sm" id="tblPanduan">Panduan</button>
+      <button class="btn ghost sm" id="tblLatihan">Latihan</button>
       <button class="btn ghost sm" id="tblKeluar">Keluar</button></div>
   </div></div>
+  <div id="pita-latihan" class="hide"><div class="in">
+    <span><b>MODE LATIHAN.</b> Semua angka dan nama di layar ini palsu.
+      Tekan tombol apa saja sesuka Anda &mdash; tidak ada yang tersimpan,
+      dan data sungguhan tidak tersentuh sama sekali.</span>
+    <button type="button" id="latihan-keluar">Keluar dari latihan</button>
+  </div></div>
+
   <div id="pita-pratinjau" class="hide"><div class="in">
     <span>Sedang melihat tampilan <b id="pita-peran">—</b>.
       <span id="pita-ket">Ini pratinjau tampilan, bukan pengujian pembatasan akses &mdash;
@@ -280,8 +292,9 @@ const JUDUL = {
 
 const S = { peran:null, agenId:null, email:null, uid:null, atur:null,
              kapal:[], pengguna:[], agenList:[], tabAktif:null,
-             peranAsli:null, agenIdAsli:null };  /* nilai sebenarnya; yang tanpa
+             peranAsli:null, agenIdAsli:null,  /* nilai sebenarnya; yang tanpa
                  akhiran 'Asli' boleh diubah pratinjau */
+             latihan:false };    /* true = seluruh data datang dari data latihan */
 
 /* ============ LOGIN ============ */
 $('tblMasuk').onclick = async () => {
@@ -296,13 +309,14 @@ $('tblMasuk').onclick = async () => {
 $('sandi').addEventListener('keydown', e => { if(e.key==='Enter') $('tblMasuk').click(); });
 $('tblKeluar').onclick = async () => { await sb.auth.signOut(); location.reload(); };
 $('tblPanduan').onclick = () => mulaiTutor(true);
+$('tblLatihan').onclick = () => masukLatihan(!S.latihan);
 
 /* ============ MULAI ============ */
 async function mulai(){
   const { data:{ user } } = await sb.auth.getUser();
   if (!user) return;
   const [{ data:peran, error:e1 }, { data:agenId }] =
-    await Promise.all([ sb.rpc('peran'), sb.rpc('agen_saya') ]);
+    await Promise.all([ DB.rpc('peran'), DB.rpc('agen_saya') ]);
   if (e1 || !peran){
     $('loginPesan').innerHTML = `<span style="color:var(--danger);font-weight:600">
       Akun ini belum punya profil atau sedang nonaktif. Minta Super Admin menautkannya.</span>`;
@@ -316,6 +330,8 @@ async function mulai(){
   $('layarApp').classList.remove('hide');
 
   /* Pemilih peran hanya untuk super admin, dan hanya mengubah TAMPILAN. */
+  $('latihan-keluar').onclick = () => masukLatihan(false);
+
   if (peran === 'super'){
     $('pilihPeran').innerHTML = Object.keys(JUDUL).map(k =>
       `<option value="${k}">${k === 'super' ? 'Lihat sebagai: Super Admin'
@@ -402,7 +418,7 @@ async function pratinjauPeran(peran){
 
 async function siapkanAgenPratinjau(){
   if (!S.agenList.length){
-    const { data } = await sb.from('agen').select('id,nama,kode').eq('aktif', true).order('nama');
+    const { data } = await DB.from('agen').select('id,nama,kode').eq('aktif', true).order('nama');
     S.agenList = data || [];
   }
   const sel = $('pita-agen');
@@ -427,6 +443,293 @@ function buka(tab){
     agen:tabAgen, atur:tabAtur, komisi:tabKomisi, boarding:tabBoarding,
     kapal:tabKapal, berangkat:tabBerangkat, voucher:tabVoucher,
     akses:tabAkses}[tab] || (()=>{}))();
+}
+
+/* ====================================================================
+   MODE LATIHAN
+   --------------------------------------------------------------------
+   Masalah yang diselesaikan: panduan yang memakai data asli jadi tidak
+   lengkap justru saat datanya bersih. Kalau tidak ada pesanan BELUM BAYAR,
+   langkah "Konfirmasi pembayaran" dilewati — padahal itu pekerjaan utamanya.
+
+   Yang TIDAK dilakukan: membuat halaman tutorial terpisah. Halaman terpisah
+   berarti salinan kedua dari UI, dan salinan selalu ketinggalan begitu
+   dashboard aslinya diubah. Panduan yang mengajarkan layar yang sudah tidak
+   ada lebih berbahaya daripada tidak ada panduan.
+
+   Yang dilakukan: halaman dan kode UI tetap SATU, hanya sumber datanya yang
+   dialihkan. Semua pemanggilan database lewat DB.from()/DB.rpc(); saat mode
+   latihan menyala, keduanya dilayani data bawaan di bawah ini, bukan Supabase.
+   Tidak ada satu pun tulisan yang sampai ke database.
+   ==================================================================== */
+const HARI = n => { const d = new Date(); d.setDate(d.getDate()+n);
+  return d.toISOString().slice(0,10); };
+const JAM  = n => new Date(Date.now() - n*3600e3).toISOString();
+
+/* Data latihan dirancang supaya SETIAP langkah panduan punya sasarannya:
+   ada pesanan belum bayar (tombol Lunas), ada yang lunas, ada rombongan biro
+   40 orang di kapal berkapasitas 25 (kartu muatan merah), ada yang belum
+   berkapal, ada voucher nonaktif, dan follow-up terisi di tiap kelompok. */
+function dataLatihan(){
+  const K1 = 'kapal-1', K2 = 'kapal-2';
+  const AG = { budi:'agen-budi', sari:'agen-sari', anto:'agen-anto' };
+  const pr = n => ({ nama:n });
+  return {
+    pesanan: [
+      { id:'o1', kode:'TTC-LAT01', tipe:'perorangan', pax:2, anak:0, total:285000,
+        subtotal:300000, diskon_nominal:15000, tambahan_nominal:0,
+        status:'pending', fu_status:'belum', fu_terakhir:null,
+        dibuat:JAM(3), diubah:JAM(3), tanggal_berangkat:HARI(2), kapal_id:null,
+        kode_voucher_beku:null, pemesan_nama:'Rani Puspita', pemesan_hp:'081200000001',
+        agen_id:AG.budi, produk:pr('Cruise PROMO'), agen:{nama:'Budi Santoso'}, kapal:null,
+        penumpang:[{naik:false},{naik:false}] },
+      { id:'o2', kode:'TTC-LAT02', tipe:'perorangan', pax:4, anak:1, total:380000,
+        subtotal:400000, diskon_nominal:20000, tambahan_nominal:0,
+        status:'waiting', fu_status:'dihubungi', fu_terakhir:JAM(5),
+        dibuat:JAM(6), diubah:JAM(5), tanggal_berangkat:HARI(2), kapal_id:K1,
+        kode_voucher_beku:'PACITAN', pemesan_nama:'Hendra Wijaya', pemesan_hp:'081200000002',
+        agen_id:AG.sari, produk:pr('Cruise Daily'), agen:{nama:'Sari Wulandari'},
+        kapal:{nama:'Kapal 1'}, penumpang:[{naik:false},{naik:false},{naik:false},{naik:false}] },
+      { id:'o3', kode:'TTC-LAT03', tipe:'biro', pax:40, anak:3, total:29640000,
+        subtotal:31200000, diskon_nominal:1560000, tambahan_nominal:0,
+        status:'paid', fu_status:'jadi', fu_terakhir:null,
+        dibuat:JAM(30), diubah:JAM(28), tanggal_berangkat:HARI(2), kapal_id:K2,
+        kode_voucher_beku:null, pemesan_nama:'Biro Wisata Anugerah', pemesan_hp:'081200000003',
+        agen_id:AG.budi, produk:pr('2 Day Journey'), agen:{nama:'Budi Santoso'},
+        kapal:{nama:'Kapal 2'}, penumpang:Array.from({length:40},(_,i)=>({naik:i<2})) },
+      { id:'o4', kode:'TTC-LAT04', tipe:'perorangan', pax:3, anak:0, total:427500,
+        subtotal:450000, diskon_nominal:22500, tambahan_nominal:0,
+        status:'paid', fu_status:'jadi', fu_terakhir:null,
+        dibuat:JAM(26), diubah:JAM(25), tanggal_berangkat:HARI(0), kapal_id:K1,
+        kode_voucher_beku:null, pemesan_nama:'Fajar Ramadhan', pemesan_hp:'081200000004',
+        agen_id:AG.sari, produk:pr('Cruise PROMO'), agen:{nama:'Sari Wulandari'},
+        kapal:{nama:'Kapal 1'}, penumpang:[{naik:true},{naik:true},{naik:false}] },
+      { id:'o5', kode:'TTC-LAT05', tipe:'perorangan', pax:2, anak:0, total:665000,
+        subtotal:300000, diskon_nominal:15000, tambahan_nominal:380000,
+        status:'boarded', fu_status:'jadi', fu_terakhir:null,
+        dibuat:JAM(50), diubah:JAM(20), tanggal_berangkat:HARI(0), kapal_id:K1,
+        kode_voucher_beku:'PACITAN', pemesan_nama:'Lestari Dewi', pemesan_hp:'081200000005',
+        agen_id:AG.anto, produk:pr('Cruise Daily'), agen:{nama:'Anto Prasetyo'},
+        kapal:{nama:'Kapal 1'}, penumpang:[{naik:true},{naik:true}] },
+      { id:'o6', kode:'TTC-LAT06', tipe:'perorangan', pax:2, anak:0, total:285000,
+        subtotal:300000, diskon_nominal:15000, tambahan_nominal:0,
+        status:'cancel_pembeli', fu_status:'tidak', fu_terakhir:JAM(9),
+        dibuat:JAM(12), diubah:JAM(9), tanggal_berangkat:HARI(5), kapal_id:null,
+        kode_voucher_beku:null, pemesan_nama:'Gilang Saputra', pemesan_hp:'081200000006',
+        agen_id:AG.anto, produk:pr('Cruise PROMO'), agen:{nama:'Anto Prasetyo'}, kapal:null,
+        penumpang:[{naik:false},{naik:false}] },
+    ],
+    kapal: [
+      { id:K1, nama:'Kapal 1', kapasitas:40, aktif:true, urutan:1 },
+      { id:K2, nama:'Kapal 2', kapasitas:25, aktif:true, urutan:2 },
+    ],
+    agen: [
+      { id:AG.anto, nama:'Anto Prasetyo',  kode:'ANTO01',      boleh_biro:false, aktif:true },
+      { id:AG.budi, nama:'Budi Santoso',   kode:'BUDI2026',    boleh_biro:true,  aktif:true },
+      { id:AG.sari, nama:'Sari Wulandari', kode:'SARIPACITAN', boleh_biro:true,  aktif:true },
+    ],
+    /* Anto sengaja tanpa nomor WA: langkah panduan soal "belum diisi" perlu contoh. */
+    agen_kontak: [
+      { agen_id:AG.budi, wa:'081311112222' },
+      { agen_id:AG.sari, wa:'081333334444' },
+    ],
+    kode_voucher: [
+      { id:'v1', kode:'PACITAN',     keterangan:'Harga warga Pacitan',      aktif:true,  dibuat:JAM(200) },
+      { id:'v2', kode:'WARGAPCT',    keterangan:'Kode pendek untuk lapangan',aktif:true,  dibuat:JAM(150) },
+      { id:'v3', kode:'PROMOLAMA',   keterangan:'Kode lama, tidak berlaku',  aktif:false, dibuat:JAM(900) },
+    ],
+    tambahan: [
+      { id:'t1', slug:'drone-pilot', nama:'Drone + Pilot', harga:400000, satuan:'pesanan',
+        maks:null, aktif:true, urutan:1, ket:'Dokumentasi udara, 1 video jadi.' },
+      { id:'t2', slug:'paddleboard', nama:'Sewa Paddleboard + Instruktur', harga:150000,
+        satuan:'unit', maks:null, aktif:true, urutan:2, ket:'Termasuk instruktur pendamping.' },
+    ],
+    pengaturan: [{ id:true, diskon_persen:'5.00', ambang_tier:20, komisi_bawah_persen:'5.00',
+      komisi_atas_persen:'10.00', retroaktif:true, periode_reset:'bulanan', komisi_dari:'bruto',
+      ambang_cek_boarding:10, lb_agen_mode:'penuh', retensi_nik_bulan:12,
+      nik_siapa_boleh_lihat:'super', kuota_kursi:null, kapasitas_izin:null, tahan_pending_jam:2,
+      kolom_manifest:{nama:true,gender:true,usia:true,nik:true,alamat:true,wn:false} }],
+    penumpang: [], audit: [], pesanan_tambahan: [],
+  };
+}
+
+let LATIH = null;
+
+/* Pembangun kueri tiruan. Hanya menirukan bagian supabase-js yang benar-benar
+   dipakai dashboard ini — bukan tiruan lengkap, dan memang tidak perlu. */
+function kueriLatihan(nama){
+  let baris = (LATIH[nama] || []).map(r => ({ ...r }));
+  const selesai = () => Promise.resolve({ data: baris, error: null });
+  const api = {
+    select(){ return api; },
+    order(k, o){
+      const naik = !(o && o.ascending === false);
+      baris.sort((a,b) => (a[k] > b[k] ? 1 : a[k] < b[k] ? -1 : 0) * (naik ? 1 : -1));
+      return api;
+    },
+    eq(k,v){  baris = baris.filter(r => r[k] === v); return api; },
+    in(k,a){  baris = baris.filter(r => a.includes(r[k])); return api; },
+    not(k,op,v){ if (op === 'is' && v === null) baris = baris.filter(r => r[k] != null); return api; },
+    limit(n){ baris = baris.slice(0,n); return api; },
+    maybeSingle(){ return Promise.resolve({ data: baris[0] ?? null, error:null }); },
+    single(){      return Promise.resolve({ data: baris[0] ?? null, error:null }); },
+    /* Tulisan tidak pernah sampai ke database: datanya diubah di memori saja,
+       supaya pengguna tetap melihat akibat tindakannya (mis. baris jadi LUNAS). */
+    update(nilai){
+      const kena = { eq(k,v){
+        (LATIH[nama] || []).forEach(r => { if (r[k] === v) Object.assign(r, nilai); });
+        return Promise.resolve({ data:null, error:null });
+      }};
+      return kena;
+    },
+    insert(nilai){
+      const arr = Array.isArray(nilai) ? nilai : [nilai];
+      arr.forEach(x => (LATIH[nama] ||= []).push({ id:'lat-'+Math.random().toString(36).slice(2,8),
+        dibuat:new Date().toISOString(), ...x }));
+      return Promise.resolve({ data:null, error:null });
+    },
+    upsert(nilai, opsi){
+      const kunci = opsi?.onConflict || 'id';
+      const arr = Array.isArray(nilai) ? nilai : [nilai];
+      arr.forEach(x => {
+        const ada = (LATIH[nama] ||= []).find(r => r[kunci] === x[kunci]);
+        if (ada) Object.assign(ada, x); else LATIH[nama].push({ ...x });
+      });
+      return Promise.resolve({ data:null, error:null });
+    },
+    then(ok, gagal){ return selesai().then(ok, gagal); },
+  };
+  return api;
+}
+
+/* Fungsi database (RPC) versi latihan. Yang membaca mengembalikan angka yang
+   konsisten dengan tabel di atas; yang menulis mengubah data di memori. */
+function rpcLatihan(nama, arg = {}){
+  const P = LATIH.pesanan;
+  const sah = o => ['pending','waiting','paid','boarded'].includes(o.status);
+  const jumlah = (arr, k) => arr.reduce((a,b) => a + (Number(b[k]) || 0), 0);
+
+  const hasil = {
+    peran:     () => S.peran,
+    agen_saya: () => S.agenId,
+
+    papan_peringkat: () => LATIH.agen.map(a => {
+      const mil = P.filter(o => o.agen_id === a.id && ['paid','boarded'].includes(o.status));
+      const tiket = jumlah(mil, 'pax');
+      const omzet = jumlah(mil, 'total');
+      const tarif = tiket >= 20 ? 10 : 5;
+      return { agen_id:a.id, nama:a.nama, tiket, omzet, tarif,
+               komisi: Math.round(omzet * tarif / 100) };
+    }).sort((x,y) => y.omzet - x.omzet),
+
+    ringkasan_dashboard: () => {
+      const lunas = P.filter(o => ['paid','boarded'].includes(o.status));
+      return [{ omzet: jumlah(lunas,'total'), tiket: jumlah(lunas,'pax'),
+                pesanan: lunas.length, komisi: Math.round(jumlah(lunas,'total') * 0.08),
+                pending: P.filter(o => o.status === 'pending').length,
+                batal: P.filter(o => o.status.startsWith('cancel')).length }];
+    },
+
+    keberangkatan: () => {
+      const peta = {};
+      P.filter(o => sah(o) && o.tanggal_berangkat).forEach(o => {
+        const k = o.tanggal_berangkat + '|' + o.produk.nama;
+        (peta[k] ||= { tanggal:o.tanggal_berangkat, produk:o.produk.nama, jml_pesanan:0,
+                       jml_pax:0, jml_anak:0, belum_kapal:0, omzet:0 });
+        const g = peta[k];
+        g.jml_pesanan++; g.jml_pax += o.pax; g.jml_anak += o.anak;
+        g.omzet += o.total; if (!o.kapal_id) g.belum_kapal++;
+      });
+      return Object.values(peta).sort((a,b) => b.tanggal.localeCompare(a.tanggal));
+    },
+
+    daftar_pengguna: () => [
+      { id:'u1', nama:'Dika Kurniawan', email:'super@contoh.test',  peran:'super',
+        aktif:true,  agen_nama:null, dibuat:JAM(2000), masuk_terakhir:JAM(1) },
+      { id:'u2', nama:'Uun Staf COO',   email:'admin@contoh.test',  peran:'admin',
+        aktif:true,  agen_nama:null, dibuat:JAM(900),  masuk_terakhir:JAM(20) },
+      { id:'u3', nama:'Budi Santoso',   email:'budi@contoh.test',   peran:'agen',
+        aktif:true,  agen_nama:'Budi Santoso', dibuat:JAM(800), masuk_terakhir:JAM(48) },
+      { id:'u4', nama:'Petugas Dermaga',email:'boarding@contoh.test',peran:'boarding',
+        aktif:false, agen_nama:null, dibuat:JAM(700),  masuk_terakhir:null },
+    ],
+
+    atur_kapal: () => {
+      const o = P.find(x => x.id === arg.p_pesanan_id);
+      if (o){
+        o.kapal_id = arg.p_kapal_id || null;
+        const k = LATIH.kapal.find(x => x.id === o.kapal_id);
+        o.kapal = k ? { nama:k.nama } : null;
+      }
+      return null;
+    },
+
+    ubah_status_pesanan: () => {
+      const o = P.find(x => x.kode === arg.p_kode);
+      if (!o) return null;
+      if (o.status === 'boarded')
+        throw { code:'22023', message:'Pesanan sudah berangkat, statusnya tidak bisa diubah lagi.' };
+      if (['cancel_pembeli','cancel_cuaca'].includes(arg.p_status)
+          && !String(arg.p_alasan || '').trim())
+        throw { code:'22023', message:'Alasan pembatalan wajib diisi.' };
+      o.status = arg.p_status;
+      o.fu_status = arg.p_status === 'paid' ? 'jadi'
+                  : arg.p_status.startsWith('cancel') ? 'tidak' : o.fu_status;
+      o.diubah = new Date().toISOString();
+      return null;
+    },
+
+    cek_kode: () => {
+      const a = LATIH.agen.find(x => x.kode.toLowerCase() === String(arg.p_kode||'').trim().toLowerCase());
+      const wa = a && LATIH.agen_kontak.find(k => k.agen_id === a.id)?.wa;
+      return [{ valid: !!(a && a.aktif), nama: a?.nama ?? null, wa: wa ?? null,
+                boleh_biro: !!a?.boleh_biro, alasan: a ? 'ok' : 'tidak_terdaftar' }];
+    },
+
+    /* Perubahan akses dan nama tidak disimulasikan dalam-dalam: cukup berhasil,
+       supaya alurnya terasa utuh tanpa memberi kesan data sungguhan berubah. */
+    ubah_peran:          () => null,
+    ubah_aktif_pengguna: () => null,
+    tautkan_agen:        () => null,
+    ubah_nama_pengguna:  () => null,
+  }[nama];
+
+  if (!hasil) return Promise.resolve({ data:null,
+    error:{ code:'LATIHAN', message:`Fungsi "${nama}" belum ada di mode latihan.` } });
+  try {
+    return Promise.resolve({ data: hasil(), error:null });
+  } catch (e) {
+    return Promise.resolve({ data:null, error:e });
+  }
+}
+
+/* Satu pintu untuk SELURUH akses data dashboard. Saat mode latihan mati, dia
+   meneruskan apa adanya ke Supabase — jadi jalur aslinya tidak berubah. */
+const DB = {
+  from: nama => S.latihan ? kueriLatihan(nama) : sb.from(nama),
+  rpc:  (nama, arg) => S.latihan ? rpcLatihan(nama, arg) : sb.rpc(nama, arg),
+};
+
+async function masukLatihan(nyala){
+  if (nyala){
+    LATIH = dataLatihan();
+    S.latihan = true;
+    if (TUT.jalan) tutorTutup(false);
+    $('pita-latihan').classList.remove('hide');
+    $('tblLatihan').textContent = 'Keluar latihan';
+    gambarMenu(S.peran);
+    pesan('Mode latihan menyala. Data ini palsu dan tidak tersimpan ke mana pun &mdash; '
+        + 'silakan tekan tombol apa saja.', 9000);
+    setTimeout(() => mulaiTutor(true), 900);
+  } else {
+    S.latihan = false;
+    LATIH = null;
+    if (TUT.jalan) tutorTutup(false);
+    $('pita-latihan').classList.add('hide');
+    $('tblLatihan').textContent = 'Latihan';
+    gambarMenu(S.peran);
+    pesan('Keluar dari mode latihan. Yang tampil sekarang data sungguhan.', 7000);
+  }
 }
 
 /* ====================================================================
@@ -875,9 +1178,9 @@ function mulaiTutor(paksa){
 /* ============ RINGKASAN ============ */
 async function tabRingkas(){
   const [{data:r, error:er}, {data:lb}, {data:ord, error:eo}] = await Promise.all([
-    sb.rpc('ringkasan_dashboard',{p_periode:null}),
-    sb.rpc('papan_peringkat',{p_periode:null}),
-    sb.from('pesanan').select('pax,total,status,produk(nama)').in('status',['paid','boarded'])
+    DB.rpc('ringkasan_dashboard',{p_periode:null}),
+    DB.rpc('papan_peringkat',{p_periode:null}),
+    DB.from('pesanan').select('pax,total,status,produk(nama)').in('status',['paid','boarded'])
   ]);
   if (er) return gagal(er);
   if (eo) return gagal(eo);
@@ -948,7 +1251,7 @@ async function tabRingkas(){
 
 /* ============ PESANAN ============ */
 async function tabPesanan(){
-  const { data, error } = await sb.from('pesanan')
+  const { data, error } = await DB.from('pesanan')
     .select('kode,tipe,pax,anak,total,status,dibuat,tanggal_berangkat,kode_voucher_beku,'
            + 'pemesan_nama,pemesan_hp,produk(nama),agen(nama),kapal(nama)')
     .order('dibuat',{ascending:false}).limit(300);
@@ -1047,7 +1350,7 @@ function pasangAksiStatus(muatUlang){
 
     const teksAsal = b.textContent;
     b.style.pointerEvents = 'none'; b.textContent = '…';
-    const { error } = await sb.rpc('ubah_status_pesanan', {
+    const { error } = await DB.rpc('ubah_status_pesanan', {
       p_kode: kode, p_status: ke, p_alasan: alasan
     });
     if (error){
@@ -1073,7 +1376,7 @@ const fmtHp = hp => {
 
 /* ============ FOLLOW-UP ============ */
 async function tabFollowUp(){
-  const { data: semua, error } = await sb.from('pesanan')
+  const { data: semua, error } = await DB.from('pesanan')
     .select('kode,status,fu_status,fu_terakhir,pemesan_nama,pemesan_hp,total,dibuat,agen_id,produk(nama)')
     .in('status',['pending','expired','cancel_pembeli'])
     .order('dibuat',{ascending:false});
@@ -1132,12 +1435,12 @@ async function tabFollowUp(){
 
   $('isi').querySelectorAll('[data-fu]').forEach(sel => sel.onchange = async () => {
     sel.disabled = true;
-    const { error } = await sb.from('pesanan').update({
+    const { error } = await DB.from('pesanan').update({
       fu_status: sel.value, fu_terakhir: new Date().toISOString()
     }).eq('kode', sel.dataset.fu);
     sel.disabled = false;
     if (error) return gagalPesan(error);
-    await sb.from('audit').insert({aktor_nama:S.email, aksi:'Follow-up',
+    await DB.from('audit').insert({aktor_nama:S.email, aksi:'Follow-up',
       objek:sel.dataset.fu, ke:sel.value});
     pesan(`<b>${esc(sel.dataset.fu)}</b> ditandai <b>${FU[sel.value][0]}</b>. Tercatat supaya tidak ada lead yang dihubungi dua kali atau terlewat.`);
     tabFollowUp();
@@ -1147,10 +1450,10 @@ async function tabFollowUp(){
 /* ============ MANIFEST ============ */
 async function tabManifest(){
   const [{data:ord, error:e1}, {data:atur}] = await Promise.all([
-    sb.from('pesanan').select(`kode,tipe,pax,anak,status,pemesan_nama,biro_pic,produk(nama),
+    DB.from('pesanan').select(`kode,tipe,pax,anak,status,pemesan_nama,biro_pic,produk(nama),
        penumpang(urut,nama,gender,usia,nik,alamat,provinsi,naik,naik_jam,cara)`)
       .in('status',['paid','boarded']).order('dibuat'),
-    sb.from('pengaturan').select('kolom_manifest,nik_siapa_boleh_lihat').single()
+    DB.from('pengaturan').select('kolom_manifest,nik_siapa_boleh_lihat').single()
   ]);
   if (e1) return gagal(e1);
   const kol = atur?.kolom_manifest || {};
@@ -1240,8 +1543,8 @@ async function tabManifest(){
 /* ============ AGEN ============ */
 async function tabAgen(){
   const [{data:agen, error:e1}, {data:kontak}] = await Promise.all([
-    sb.from('agen').select('id,nama,kode,boleh_biro,aktif').order('nama'),
-    sb.from('agen_kontak').select('agen_id,wa')
+    DB.from('agen').select('id,nama,kode,boleh_biro,aktif').order('nama'),
+    DB.from('agen_kontak').select('agen_id,wa')
   ]);
   if (e1) return gagal(e1);
   const waOf = Object.fromEntries((kontak||[]).map(k=>[k.agen_id,k.wa]));
@@ -1277,7 +1580,7 @@ async function tabAgen(){
 
   $('isi').querySelectorAll('[data-biro]').forEach(b => b.onclick = async e => {
     e.preventDefault(); b.style.pointerEvents='none';
-    const { error } = await sb.from('agen')
+    const { error } = await DB.from('agen')
       .update({boleh_biro: b.dataset.nilai==='1'}).eq('id', b.dataset.biro);
     if (error){ b.style.pointerEvents=''; return gagalPesan(error); }
     /* Tidak menulis audit dari sini. Trigger trg_agen_audit di database yang
@@ -1357,7 +1660,7 @@ async function simpanWa(id, waLama, nama, inp, tutup){
 
   inp.disabled = true;
   /* upsert: agen yang baru dibuat belum tentu punya baris di agen_kontak. */
-  const { error } = await sb.from('agen_kontak')
+  const { error } = await DB.from('agen_kontak')
     .upsert({ agen_id: id, wa: baru || null }, { onConflict: 'agen_id' });
   inp.disabled = false;
   if (error){
@@ -1418,7 +1721,7 @@ async function simpanKode(id, kodeLama, nama, inp, tutup){
     return;
 
   inp.disabled = true;
-  const { error } = await sb.from('agen').update({kode: baru}).eq('id', id);
+  const { error } = await DB.from('agen').update({kode: baru}).eq('id', id);
   inp.disabled = false;
   if (error){
     if (error.code === '23505') return pesan(`<b>Ditolak</b> Kode <b>${esc(baru)}</b> sudah dipakai agen lain (tidak peka huruf besar/kecil).`, 9000);
@@ -1431,7 +1734,7 @@ async function simpanKode(id, kodeLama, nama, inp, tutup){
 
 /* ============ KEBERANGKATAN (laporan per tanggal) ============ */
 async function tabBerangkat(){
-  const { data, error } = await sb.rpc('keberangkatan', { p_dari: null, p_sampai: null });
+  const { data, error } = await DB.rpc('keberangkatan', { p_dari: null, p_sampai: null });
   if (error) return gagal(error);
   const baris = data || [];
   const tot = baris.reduce((a,b)=>({
@@ -1487,8 +1790,8 @@ async function tabBerangkat(){
 /* ============ PEMBAGIAN KAPAL ============ */
 async function tabKapal(){
   const [{data:kapal, error:e1}, {data:pes, error:e2}] = await Promise.all([
-    sb.from('kapal').select('id,nama,kapasitas,aktif').eq('aktif', true).order('urutan'),
-    sb.from('pesanan')
+    DB.from('kapal').select('id,nama,kapasitas,aktif').eq('aktif', true).order('urutan'),
+    DB.from('pesanan')
       .select('id,kode,pax,anak,status,tanggal_berangkat,kapal_id,pemesan_nama,tipe,produk:produk_id(nama)')
       .not('tanggal_berangkat','is',null)
       .in('status',['pending','waiting','paid','boarded'])
@@ -1564,7 +1867,7 @@ async function tabKapal(){
   $('isi').querySelectorAll('[data-kapal]').forEach(sel => sel.onchange = async () => {
     const asal = sel.dataset.lama ?? '';
     sel.disabled = true;
-    const { error } = await sb.rpc('atur_kapal', {
+    const { error } = await DB.rpc('atur_kapal', {
       p_pesanan_id: sel.dataset.kapal,
       p_kapal_id:   sel.value || null
     });
@@ -1580,8 +1883,8 @@ async function tabKapal(){
 /* ============ VOUCHER ============ */
 async function tabVoucher(){
   const [{ data, error }, { data:tamb, error:e2 }] = await Promise.all([
-    sb.from('kode_voucher').select('id,kode,keterangan,aktif,dibuat').order('dibuat', {ascending:false}),
-    sb.from('tambahan').select('id,slug,nama,ket,harga,satuan,maks,aktif').order('urutan')
+    DB.from('kode_voucher').select('id,kode,keterangan,aktif,dibuat').order('dibuat', {ascending:false}),
+    DB.from('tambahan').select('id,slug,nama,ket,harga,satuan,maks,aktif').order('urutan')
   ]);
   if (error) return gagal(error);
   if (e2) return gagal(e2);
@@ -1661,7 +1964,7 @@ async function tabVoucher(){
       if (!/^[A-Za-z0-9._-]{3,32}$/.test(kode))
         return pesan('<b>Ditolak</b> Kode harus 3–32 karakter: huruf, angka, titik, garis bawah, atau strip.', 9000);
       $('v-buat').disabled = true;
-      const { error } = await sb.from('kode_voucher')
+      const { error } = await DB.from('kode_voucher')
         .insert({ kode, keterangan: $('v-ket').value.trim() || null });
       $('v-buat').disabled = false;
       if (error){
@@ -1673,7 +1976,7 @@ async function tabVoucher(){
     };
     $('isi').querySelectorAll('[data-vaktif]').forEach(b => b.onclick = async e => {
       e.preventDefault(); b.style.pointerEvents='none';
-      const { error } = await sb.from('kode_voucher')
+      const { error } = await DB.from('kode_voucher')
         .update({ aktif: b.dataset.nilai==='1', diubah: new Date().toISOString() })
         .eq('id', b.dataset.vaktif);
       if (error){ b.style.pointerEvents=''; return gagalPesan(error); }
@@ -1681,7 +1984,7 @@ async function tabVoucher(){
     });
     $('isi').querySelectorAll('[data-taktif]').forEach(b => b.onclick = async e => {
       e.preventDefault(); b.style.pointerEvents='none';
-      const { error } = await sb.from('tambahan')
+      const { error } = await DB.from('tambahan')
         .update({ aktif: b.dataset.nilai==='1' }).eq('id', b.dataset.taktif);
       if (error){ b.style.pointerEvents=''; return gagalPesan(error); }
       pesan('Status tambahan diperbarui. Halaman pemesanan langsung ikut.'); tabVoucher();
@@ -1751,7 +2054,7 @@ async function simpanHarga(t, inp, tutup){
       + `harganya sudah dibekukan saat pemesanan.`)) return;
 
   inp.disabled = true;
-  const { error } = await sb.from('tambahan').update({ harga: baru }).eq('id', t.id);
+  const { error } = await DB.from('tambahan').update({ harga: baru }).eq('id', t.id);
   inp.disabled = false;
   if (error) return gagalPesan(error);
   pesan(`Harga ${esc(t.nama)} jadi ${rp(baru)}. Tercatat di audit.`, 9000);
@@ -1817,7 +2120,7 @@ async function simpanNama(id, lama, inp, tutup){
   if (!namaSah(baru))
     return pesan('<b>Ditolak</b> Nama harus 2–60 karakter.', 9000);
   inp.disabled = true;
-  const { error } = await sb.rpc('ubah_nama_pengguna', { p_user: id, p_nama: baru });
+  const { error } = await DB.rpc('ubah_nama_pengguna', { p_user: id, p_nama: baru });
   inp.disabled = false;
   if (error) return gagalPesan(error);
   pesan(`Nama diubah jadi <b>${esc(baru)}</b>. Catatan audit lama tetap memakai nama sebelumnya.`, 9000);
@@ -1826,8 +2129,8 @@ async function simpanNama(id, lama, inp, tutup){
 
 async function tabAkses(){
   const [{ data:orang, error:e1 }, { data:agen, error:e2 }] = await Promise.all([
-    sb.rpc('daftar_pengguna'),
-    sb.from('agen').select('id,nama,kode').order('nama')
+    DB.rpc('daftar_pengguna'),
+    DB.from('agen').select('id,nama,kode').order('nama')
   ]);
   if (e1) return gagal(e1);
   if (e2) return gagal(e2);
@@ -1962,7 +2265,7 @@ async function tabAkses(){
         sel.value = u.peran; return;
       }
       sel.disabled = true;
-      const { error } = await sb.rpc('ubah_peran',
+      const { error } = await DB.rpc('ubah_peran',
         { p_user: id, p_peran: ke, p_agen: agenId });
       sel.disabled = false;
       if (error){ sel.value = u.peran; return gagalPesan(error); }
@@ -1973,7 +2276,7 @@ async function tabAkses(){
     /* --- pindah agen --- */
     $('baris-akses').querySelectorAll('[data-agen]').forEach(sel => sel.onchange = async () => {
       sel.disabled = true;
-      const { error } = await sb.rpc('tautkan_agen',
+      const { error } = await DB.rpc('tautkan_agen',
         { p_user: sel.dataset.agen, p_agen: sel.value });
       sel.disabled = false;
       if (error) return gagalPesan(error);
@@ -1989,7 +2292,7 @@ async function tabAkses(){
         ? `Nonaktifkan ${u?.nama}?\n\nAksesnya dicabut seketika. Dia tidak bisa login lagi sampai diaktifkan kembali.`
         : `Aktifkan kembali ${u?.nama}?`)) return;
       b.style.pointerEvents = 'none';
-      const { error } = await sb.rpc('ubah_aktif_pengguna',
+      const { error } = await DB.rpc('ubah_aktif_pengguna',
         { p_user: b.dataset.aktif, p_aktif: !nonaktif });
       if (error){ b.style.pointerEvents = ''; return gagalPesan(error); }
       pesan(`${esc(u?.nama)} ${nonaktif ? 'dinonaktifkan' : 'diaktifkan'}. Tercatat di audit.`, 9000);
@@ -2004,6 +2307,11 @@ async function tabAkses(){
         + `Password lama tetap berlaku sampai pemiliknya membuat yang baru lewat tautan itu.`)) return;
       const teksAsal = b.textContent;
       b.style.pointerEvents = 'none'; b.textContent = 'mengirim…';
+      if (S.latihan){
+        b.style.pointerEvents = ''; b.textContent = teksAsal;
+        return pesan('Di mode latihan email tidak benar-benar dikirim. '
+                   + 'Keluar dari latihan dulu kalau mau mengirim sungguhan.', 9000);
+      }
       const { error } = await sb.auth.resetPasswordForEmail(email, {
         redirectTo: location.origin + location.pathname
       });
@@ -2023,7 +2331,7 @@ async function tabAkses(){
     if (baru === lama) return pesan('Nama tidak berubah.');
     if (!namaSah(baru)) return pesan('<b>Ditolak</b> Nama harus 2–60 karakter.', 9000);
     $('nm-simpan').disabled = true;
-    const { error } = await sb.rpc('ubah_nama_pengguna', { p_user: S.uid, p_nama: baru });
+    const { error } = await DB.rpc('ubah_nama_pengguna', { p_user: S.uid, p_nama: baru });
     $('nm-simpan').disabled = false;
     if (error) return gagalPesan(error);
     pesan(`Nama tampilan jadi <b>${esc(baru)}</b>.`, 9000);
@@ -2035,6 +2343,9 @@ async function tabAkses(){
     const a = $('pw-baru').value, b = $('pw-ulang').value;
     if (a.length < 8) return pesan('<b>Ditolak</b> Password minimal 8 karakter.', 9000);
     if (a !== b)      return pesan('<b>Ditolak</b> Dua kolom password belum sama.', 9000);
+    if (S.latihan)
+      return pesan('Di mode latihan password tidak benar-benar diubah. '
+                 + 'Keluar dari latihan dulu.', 9000);
     $('pw-simpan').disabled = true;
     const { error } = await sb.auth.updateUser({ password: a });
     $('pw-simpan').disabled = false;
@@ -2046,7 +2357,7 @@ async function tabAkses(){
 
 /* ============ PENGATURAN ============ */
 async function tabAtur(){
-  const { data, error } = await sb.from('pengaturan').select('*').single();
+  const { data, error } = await DB.from('pengaturan').select('*').single();
   if (error) return gagal(error);
   S.atur = data;
   const ro = S.peran !== 'super';
@@ -2098,10 +2409,10 @@ async function tabAtur(){
     ['komisi_dari','periode_reset','lb_agen_mode','nik_siapa_boleh_lihat']
       .forEach(k=> isi[k]=$('set_'+k).value);
     isi.diubah = new Date().toISOString();
-    const { error } = await sb.from('pengaturan').update(isi).eq('id',true);
+    const { error } = await DB.from('pengaturan').update(isi).eq('id',true);
     b.disabled=false; b.textContent='Simpan pengaturan';
     if (error) return gagalPesan(error);
-    await sb.from('audit').insert({aktor_nama:S.email, aksi:'Ubah pengaturan', objek:'pengaturan'});
+    await DB.from('audit').insert({aktor_nama:S.email, aksi:'Ubah pengaturan', objek:'pengaturan'});
     pesan('Pengaturan tersimpan. Perubahan tercatat di audit log.');
   };
 }
@@ -2109,8 +2420,8 @@ async function tabAtur(){
 /* ============ AGEN: KOMISI & PELANGGAN SAYA ============ */
 async function tabKomisi(){
   const [{data:lb}, {data:semuaPesanan, error}] = await Promise.all([
-    sb.rpc('papan_peringkat',{p_periode:null}),
-    sb.from('pesanan')
+    DB.rpc('papan_peringkat',{p_periode:null}),
+    DB.from('pesanan')
       .select('kode,pax,total,status,dibuat,agen_id,pemesan_nama,pemesan_hp,produk(nama)')
       .order('dibuat',{ascending:false})
   ]);
@@ -2190,7 +2501,7 @@ async function tabKomisi(){
 
 /* ============ BOARDING ============ */
 async function tabBoarding(){
-  const { data, error } = await sb.from('pesanan')
+  const { data, error } = await DB.from('pesanan')
     .select('kode,pax,anak,tipe,status,tanggal_berangkat,pemesan_nama,'
           + 'produk(nama),kapal(nama),penumpang(naik)')
     .in('status',['paid','boarded']).order('tanggal_berangkat');
