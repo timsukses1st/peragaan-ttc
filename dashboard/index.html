@@ -296,7 +296,7 @@ const JUDUL = {
 
 const S = { peran:null, agenId:null, email:null, uid:null, atur:null,
              kapal:[], pengguna:[], agenList:[], tabAktif:null,
-             peranAsli:null, agenIdAsli:null,  /* nilai sebenarnya; yang tanpa
+             peranAsli:null, agenIdAsli:null, agenListDari:null,  /* nilai sebenarnya; yang tanpa
                  akhiran 'Asli' boleh diubah pratinjau */
              latihan:false };    /* true = seluruh data datang dari data latihan */
 
@@ -410,6 +410,8 @@ async function pratinjauPeran(peran){
      dibiarkan kosong tampilannya nol baris — itu bukan tampilan agen sungguhan.
      Maka super admin memilih berdiri sebagai agen siapa. */
   if (pratinjau && peran === 'agen'){
+    /* Ambil ulang kalau daftarnya datang dari sumber yang lain (db vs latihan). */
+    if (S.agenListDari !== (S.latihan ? 'latihan' : 'db')) S.agenList = [];
     await siapkanAgenPratinjau();
   } else {
     S.agenId = S.agenIdAsli;
@@ -426,6 +428,7 @@ async function siapkanAgenPratinjau(){
   if (!S.agenList.length){
     const { data } = await DB.from('agen').select('id,nama,kode').eq('aktif', true).order('nama');
     S.agenList = data || [];
+    S.agenListDari = S.latihan ? 'latihan' : 'db';
   }
   const sel = $('pita-agen');
   if (!S.agenList.length){
@@ -524,6 +527,72 @@ function dataLatihan(){
         kode_voucher_beku:null, pemesan_nama:'Gilang Saputra', pemesan_hp:'081200000006',
         agen_id:AG.anto, produk:pr('Cruise PROMO'), agen:{nama:'Anto Prasetyo'}, kapal:null,
         penumpang:[{naik:false},{naik:false}] },
+
+      /* --- Baris khusus Follow-Up ---
+         Tiga kelompok (Belum bayar / Kedaluwarsa / Batal oleh pembeli) harus
+         terisi untuk SETIAP agen, karena pratinjau peran agen menyaring ulang
+         per agen_id. Tanpa ini tab Follow-Up seorang agen bisa kosong total.
+         Status expired & cancel tidak ikut keberangkatan, manifest, boarding,
+         maupun pembagian kapal, jadi tambahan ini tidak mengubah kartu muatan
+         merah yang sengaja dibuat di o3. */
+      { id:'o7', kode:'TTC-LAT07', tipe:'perorangan', pax:2, anak:0, total:285000,
+        subtotal:300000, diskon_nominal:15000, tambahan_nominal:0,
+        status:'expired', fu_status:'belum', fu_terakhir:null,
+        dibuat:JAM(40), diubah:JAM(38), tanggal_berangkat:HARI(1), kapal_id:null,
+        kode_voucher_beku:null, pemesan_nama:'Yuni Astuti', pemesan_hp:'081200000007',
+        agen_id:AG.budi, produk:pr('Cruise Daily'), agen:{nama:'Budi Santoso'}, kapal:null,
+        penumpang:[{naik:false},{naik:false}] },
+      { id:'o8', kode:'TTC-LAT08', tipe:'perorangan', pax:5, anak:2, total:475000,
+        subtotal:500000, diskon_nominal:25000, tambahan_nominal:0,
+        status:'expired', fu_status:'dihubungi', fu_terakhir:JAM(11),
+        dibuat:JAM(44), diubah:JAM(11), tanggal_berangkat:HARI(1), kapal_id:null,
+        kode_voucher_beku:'WARGAPCT', pemesan_nama:'Teguh Prakoso', pemesan_hp:'081200000008',
+        agen_id:AG.sari, produk:pr('Cruise PROMO'), agen:{nama:'Sari Wulandari'}, kapal:null,
+        penumpang:Array.from({length:5},()=>({naik:false})) },
+      { id:'o9', kode:'TTC-LAT09', tipe:'perorangan', pax:2, anak:0, total:285000,
+        subtotal:300000, diskon_nominal:15000, tambahan_nominal:0,
+        status:'expired', fu_status:'belum', fu_terakhir:null,
+        dibuat:JAM(52), diubah:JAM(50), tanggal_berangkat:HARI(1), kapal_id:null,
+        kode_voucher_beku:null, pemesan_nama:'Dwi Lestari', pemesan_hp:'081200000009',
+        agen_id:AG.anto, produk:pr('Cruise Daily'), agen:{nama:'Anto Prasetyo'}, kapal:null,
+        penumpang:[{naik:false},{naik:false}] },
+      { id:'o10', kode:'TTC-LAT10', tipe:'perorangan', pax:3, anak:1, total:427500,
+        subtotal:450000, diskon_nominal:22500, tambahan_nominal:0,
+        status:'pending', fu_status:'belum', fu_terakhir:null,
+        dibuat:JAM(4), diubah:JAM(4), tanggal_berangkat:HARI(3), kapal_id:null,
+        kode_voucher_beku:null, pemesan_nama:'Nur Aisyah', pemesan_hp:'081200000010',
+        agen_id:AG.sari, produk:pr('Cruise PROMO'), agen:{nama:'Sari Wulandari'}, kapal:null,
+        penumpang:[{naik:false},{naik:false},{naik:false}] },
+      { id:'o11', kode:'TTC-LAT11', tipe:'perorangan', pax:2, anak:0, total:665000,
+        subtotal:300000, diskon_nominal:15000, tambahan_nominal:380000,
+        status:'pending', fu_status:'dihubungi', fu_terakhir:JAM(2),
+        dibuat:JAM(8), diubah:JAM(2), tanggal_berangkat:HARI(4), kapal_id:null,
+        kode_voucher_beku:'PACITAN', pemesan_nama:'Bagas Pratama', pemesan_hp:'081200000011',
+        agen_id:AG.anto, produk:pr('Cruise Daily'), agen:{nama:'Anto Prasetyo'}, kapal:null,
+        penumpang:[{naik:false},{naik:false}] },
+      { id:'o12', kode:'TTC-LAT12', tipe:'perorangan', pax:4, anak:0, total:570000,
+        subtotal:600000, diskon_nominal:30000, tambahan_nominal:0,
+        status:'cancel_pembeli', fu_status:'tidak', fu_terakhir:JAM(15),
+        dibuat:JAM(22), diubah:JAM(15), tanggal_berangkat:HARI(6), kapal_id:null,
+        kode_voucher_beku:null, pemesan_nama:'Rizal Mahendra', pemesan_hp:'081200000012',
+        agen_id:AG.budi, produk:pr('Cruise PROMO'), agen:{nama:'Budi Santoso'}, kapal:null,
+        penumpang:Array.from({length:4},()=>({naik:false})) },
+      { id:'o13', kode:'TTC-LAT13', tipe:'perorangan', pax:2, anak:0, total:285000,
+        subtotal:300000, diskon_nominal:15000, tambahan_nominal:0,
+        status:'cancel_pembeli', fu_status:'belum', fu_terakhir:null,
+        dibuat:JAM(18), diubah:JAM(16), tanggal_berangkat:HARI(7), kapal_id:null,
+        kode_voucher_beku:null, pemesan_nama:'Intan Permata', pemesan_hp:'081200000013',
+        agen_id:AG.sari, produk:pr('Cruise Daily'), agen:{nama:'Sari Wulandari'}, kapal:null,
+        penumpang:[{naik:false},{naik:false}] },
+      /* Batal karena cuaca: bukan kelompok follow-up (bukan salah pembeli),
+         tapi perlu ada supaya lencana BATAL - CUACA pernah terlihat di Pesanan. */
+      { id:'o14', kode:'TTC-LAT14', tipe:'perorangan', pax:6, anak:2, total:855000,
+        subtotal:900000, diskon_nominal:45000, tambahan_nominal:0,
+        status:'cancel_cuaca', fu_status:'jadi', fu_terakhir:null,
+        dibuat:JAM(70), diubah:JAM(60), tanggal_berangkat:HARI(-2), kapal_id:null,
+        kode_voucher_beku:null, pemesan_nama:'Rombongan SMPN 2', pemesan_hp:'081200000014',
+        agen_id:AG.budi, produk:pr('2 Day Journey'), agen:{nama:'Budi Santoso'}, kapal:null,
+        penumpang:Array.from({length:6},()=>({naik:false})) },
     ],
     kapal: [
       { id:K1, nama:'Kapal 1', kapasitas:40, aktif:true, urutan:1 },
@@ -716,10 +785,25 @@ const DB = {
   rpc:  (nama, arg) => S.latihan ? rpcLatihan(nama, arg) : sb.rpc(nama, arg),
 };
 
+/* Daftar yang diambil sekali lalu dipakai ulang. WAJIB dikosongkan tiap kali
+   sumber data berganti, kalau tidak: pratinjau agen di mode panduan memakai id
+   agen dari database SUNGGUHAN, tidak ada pesanan latihan yang cocok, dan
+   seluruh tabel tampil 0 padahal datanya ada. Berlaku dua arah — keluar dari
+   panduan dengan daftar palsu masih tersimpan sama bahayanya. */
+function kosongkanCache(){
+  S.agenList = [];
+  S.kapal    = [];
+  S.pengguna = [];
+  S.atur     = null;
+  S.agenListDari = null;
+  S.agenId   = S.agenIdAsli;
+}
+
 async function masukLatihan(nyala){
   if (nyala){
     LATIH = dataLatihan();
     S.latihan = true;
+    kosongkanCache();
     if (TUT.jalan) tutorTutup(false);
     $('pita-latihan').classList.remove('hide');
     $('tblPanduan').textContent = 'Akhiri panduan';
@@ -730,6 +814,7 @@ async function masukLatihan(nyala){
   } else {
     S.latihan = false;
     LATIH = null;
+    kosongkanCache();
     if (TUT.jalan) tutorTutup(false);
     $('pita-latihan').classList.add('hide');
     $('tblPanduan').textContent = 'Panduan';
@@ -2143,6 +2228,7 @@ async function tabAkses(){
   if (e2) return gagal(e2);
   S.pengguna = orang || [];
   S.agenList = agen || [];
+  S.agenListDari = S.latihan ? 'latihan' : 'db';
   const bisa = S.peran === 'super';
 
   $('isi').innerHTML = `
