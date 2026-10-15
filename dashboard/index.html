@@ -790,6 +790,22 @@ const DB = {
    agen dari database SUNGGUHAN, tidak ada pesanan latihan yang cocok, dan
    seluruh tabel tampil 0 padahal datanya ada. Berlaku dua arah — keluar dari
    panduan dengan daftar palsu masih tersimpan sama bahayanya. */
+/* Dipanggil setiap kali sumber data berganti DAN peran yang tampil adalah agen.
+   Tanpa ini, S.agenId kosong sementara dropdown masih menampilkan nama agen
+   yang lama — label benar, isi nol. */
+async function segarkanAgenAktif(){
+  if (S.peran !== 'agen'){
+    $('pita-agen').classList.add('hide');
+    S.agenId = S.agenIdAsli;
+    return;
+  }
+  if (S.peranAsli === 'agen'){      /* agen sungguhan: id-nya memang miliknya */
+    S.agenId = S.agenIdAsli;
+    return;
+  }
+  await siapkanAgenPratinjau();     /* super admin: pilih ulang dari sumber aktif */
+}
+
 function kosongkanCache(){
   S.agenList = [];
   S.kapal    = [];
@@ -807,6 +823,7 @@ async function masukLatihan(nyala){
     if (TUT.jalan) tutorTutup(false);
     $('pita-latihan').classList.remove('hide');
     $('tblPanduan').textContent = 'Akhiri panduan';
+    await segarkanAgenAktif();
     gambarMenu(S.peran);
     pesan('Panduan dimulai dengan data latihan. Semua yang tampil palsu dan tidak '
         + 'tersimpan ke mana pun &mdash; silakan tekan tombol apa saja.', 9000);
@@ -818,6 +835,7 @@ async function masukLatihan(nyala){
     if (TUT.jalan) tutorTutup(false);
     $('pita-latihan').classList.add('hide');
     $('tblPanduan').textContent = 'Panduan';
+    await segarkanAgenAktif();
     gambarMenu(S.peran);
     pesan('Panduan diakhiri. Yang tampil sekarang data sungguhan.', 7000);
   }
