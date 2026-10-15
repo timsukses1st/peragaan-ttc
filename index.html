@@ -1072,11 +1072,9 @@ const TUTOR = [
        + 'diambil langsung dari sistem kami, bukan ditulis tangan.' },
   { cari:'#gate', judul:'Kode agen dulu',
     teks:'Pemesanan di The Tamperan Cruise dilayani lewat agen resmi. Masukkan kode '
-       + 'yang diberikan agen Anda, lalu tekan Periksa. Form pemesanan baru terbuka '
-       + 'setelah kodenya terbukti sah.' },
-  { cari:'#bkode-ket', judul:'Hasil pemeriksaan kode',
-    teks:'Kalau kodenya benar, muncul tanda hijau SAH beserta nama agen Anda. '
-       + 'Kalau merah, kodenya salah ketik atau sudah tidak berlaku — tanyakan lagi ke agen.' },
+       + 'dari agen Anda, lalu tekan Periksa. Kalau kodenya benar muncul tanda hijau '
+       + 'SAH dan form pemesanan terbuka. Kalau merah, kodenya salah ketik atau sudah '
+       + 'tidak berlaku — tanyakan lagi ke agen Anda.' },
   { cari:'#tb-per', judul:'Perorangan atau biro',
     teks:'Pilih Perorangan untuk keluarga atau rombongan pribadi. Biro / Travel hanya '
        + 'untuk biro yang sudah bekerja sama, dan harus memakai kode biro.' },
@@ -1100,8 +1098,12 @@ const TUTOR = [
   { cari:'#kirim', judul:'Simpan pesanan',
     teks:'Halaman ini tidak menerima uang sama sekali. Setelah disimpan, Anda dapat kode '
        + 'pesanan dan tombol ke WhatsApp agen Anda untuk konfirmasi dan pembayaran.' },
-  { cari:'#tombol-tutor', judul:'Selesai',
-    teks:'Itu saja. Tekan tombol ini kapan saja kalau mau mengulang penjelasannya.' },
+  /* cari:null -> kartu di tengah layar tanpa sorotan. Dipakai untuk penutup,
+     karena tombol Cara pesan ada di bar yang menempel (sticky) dan sorotan
+     elemen menempel gampang meleset saat halaman tergulir. */
+  { cari:null, judul:'Selesai',
+    teks:'Itu saja. Kalau mau mengulang penjelasan ini, tekan tombol '
+       + '<b>Cara pesan</b> di kanan atas halaman.' },
 ];
 
 let TUT = { i: 0, jalan: false, urut: [] };
@@ -1142,11 +1144,42 @@ function tutorMaju(arah){
   tutorGambar();
 }
 
+/* Elemen di dalam bar yang menempel (position sticky/fixed) tidak boleh
+   diposisikan memakai scrollY: posisinya di layar tetap, tapi posisi
+   dokumennya ikut bergeser. Kalau dipaksa, sorotannya mendarat jauh di bawah
+   — itu yang membuat langkah penutup menyoroti harga, bukan tombolnya. */
+function elemenMenempel(el){
+  for (let n = el; n && n !== document.body; n = n.parentElement){
+    const pos = getComputedStyle(n).position;
+    if (pos === 'fixed' || pos === 'sticky') return true;
+  }
+  return false;
+}
+
+/* scrollIntoView dengan behavior:'smooth' berjalan asinkron. Mengukur posisi
+   tepat sesudahnya memberi angka SEBELUM halaman tergulir. Jadi ditunggu
+   sampai posisi gulir berhenti berubah, maksimal ~600ms. */
+function tungguGulirBerhenti(lalu){
+  let akhir = -1, diam = 0;
+  const cek = () => {
+    if (!TUT.jalan) return;
+    const y = window.scrollY;
+    diam = (y === akhir) ? diam + 1 : 0;
+    akhir = y;
+    if (diam >= 3 || diam > 40) return lalu();
+    requestAnimationFrame(cek);
+  };
+  requestAnimationFrame(cek);
+}
+
 function tutorGambar(){
   if (!TUT.jalan) return;
   const L = TUT.urut[TUT.i];
   if (!L) return;
   tutorBersih();
+
+  /* Langkah penutup tidak menunjuk apa pun: kartunya di tengah layar. */
+  if (L.cari === null) return tutorKartuTengah(L);
 
   /* Sasaran bisa hilang di tengah jalan (mis. pengguna menutup gerbang kode).
      Dilewati, bukan dibiarkan menggantung dengan layar gelap. */
@@ -1157,11 +1190,21 @@ function tutorGambar(){
   }
 
   el.scrollIntoView({ behavior:'smooth', block:'center' });
+  tungguGulirBerhenti(() => tutorLukis(L, el));
+}
+
+function tutorLukis(L, el){
+  if (!TUT.jalan) return;
+  tutorBersih();
+  const menempel = elemenMenempel(el);
   const r = el.getBoundingClientRect();
-  const sy = window.scrollY, sx = window.scrollX, p = 7;
+  const sy = menempel ? 0 : window.scrollY;
+  const sx = menempel ? 0 : window.scrollX;
+  const p = 7;
 
   const sorot = document.createElement('div');
   sorot.className = 'tutor-sorot';
+  sorot.style.position = menempel ? 'fixed' : 'absolute';
   Object.assign(sorot.style, {
     top:(r.top+sy-p)+'px', left:(r.left+sx-p)+'px',
     width:(r.width+p*2)+'px', height:(r.height+p*2)+'px'
@@ -1170,18 +1213,8 @@ function tutorGambar(){
 
   const kartu = document.createElement('div');
   kartu.className = 'tutor-kartu';
-  kartu.innerHTML = `
-    <div class="tnum">Langkah ${TUT.i+1} dari ${TUT.urut.length}</div>
-    <div class="tt">${esc(L.judul)}</div>
-    <div class="ts">${L.teks}</div>
-    <div class="tutor-titik">${TUT.urut.map((_,k) =>
-      `<i class="${k===TUT.i?'on':''}"></i>`).join('')}</div>
-    <div class="tutor-kaki">
-      <button class="lewati" data-t-lewati>Lewati</button>
-      <button class="tutor-btn ghost" data-t-mundur ${TUT.i===0?'disabled':''}>Kembali</button>
-      <button class="tutor-btn" data-t-maju>${
-        TUT.i===TUT.urut.length-1 ? 'Selesai' : 'Lanjut'}</button>
-    </div>`;
+  kartu.innerHTML = tutorIsiKartu(L);
+  kartu.style.position = menempel ? 'fixed' : 'absolute';
   document.body.appendChild(kartu);
 
   const kr = kartu.getBoundingClientRect();
@@ -1193,6 +1226,46 @@ function tutorGambar(){
   kartu.style.top = atas + 'px';
   kartu.style.left = kiri + 'px';
 
+  tutorPasangTombol(kartu);
+}
+
+/* Kartu di tengah layar, tanpa sorotan, dengan latar gelap penuh. */
+function tutorKartuTengah(L){
+  const lapis = document.createElement('div');
+  lapis.className = 'tutor-sorot';
+  lapis.style.position = 'fixed';
+  Object.assign(lapis.style, { top:'50%', left:'50%', width:'0', height:'0' });
+  document.body.appendChild(lapis);
+
+  const kartu = document.createElement('div');
+  kartu.className = 'tutor-kartu';
+  kartu.style.position = 'fixed';
+  kartu.innerHTML = tutorIsiKartu(L);
+  document.body.appendChild(kartu);
+  const kr = kartu.getBoundingClientRect();
+  kartu.style.top  = Math.max(12, (window.innerHeight - kr.height)/2) + 'px';
+  kartu.style.left = Math.max(12, (window.innerWidth  - kr.width)/2)  + 'px';
+  tutorPasangTombol(kartu);
+}
+
+/* Isi kartu dipakai dua tempat: kartu bersorotan dan kartu di tengah layar.
+   Satu fungsi supaya keduanya tidak pernah berbeda. */
+function tutorIsiKartu(L){
+  return `
+    <div class="tnum">Langkah ${TUT.i+1} dari ${TUT.urut.length}</div>
+    <div class="tt">${esc(L.judul)}</div>
+    <div class="ts">${L.teks}</div>
+    <div class="tutor-titik">${TUT.urut.map((_,k) =>
+      `<i class="${k===TUT.i?'on':''}"></i>`).join('')}</div>
+    <div class="tutor-kaki">
+      <button class="lewati" data-t-lewati>Lewati</button>
+      <button class="tutor-btn ghost" data-t-mundur ${TUT.i===0?'disabled':''}>Kembali</button>
+      <button class="tutor-btn" data-t-maju>${
+        TUT.i===TUT.urut.length-1 ? 'Selesai' : 'Lanjut'}</button>
+    </div>`;
+}
+
+function tutorPasangTombol(kartu){
   kartu.querySelector('[data-t-maju]').onclick   = () => tutorMaju(1);
   kartu.querySelector('[data-t-mundur]').onclick = () => tutorMaju(-1);
   kartu.querySelector('[data-t-lewati]').onclick = () => tutorTutup(false);
@@ -1201,7 +1274,7 @@ function tutorGambar(){
 function mulaiTutor(paksa){
   /* Hanya langkah yang sasarannya benar-benar ada di layar yang dipakai, supaya
      nomor "Langkah 3 dari 7" jujur — bukan 3 dari 12 lalu melompat-lompat. */
-  TUT.urut = TUTOR.filter(L => tutorElemen(L.cari));
+  TUT.urut = TUTOR.filter(L => L.cari === null || tutorElemen(L.cari));
   if (!TUT.urut.length) return;
   if (!paksa){
     try { if (localStorage.getItem(TUTOR_KUNCI)) return; } catch(e){ return; }

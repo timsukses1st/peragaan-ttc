@@ -578,7 +578,7 @@ const TUTOR = {
     { cari:'#navTab', judul:'Deretan tab',
       teks:'Semua pekerjaan dibagi per tab di sini. Yang terlihat tergantung peran akun. '
          + 'Sebagai Super Admin Anda melihat semuanya.' },
-    { tab:'pesanan', cari:'#isi table[data-papan="pesanan"] thead', judul:'Tab Pesanan',
+    { tab:'pesanan', cari:'#isi table[data-papan="pesanan"]', judul:'Tab Pesanan',
       teks:'Tab yang paling sering dibuka. Semua pesanan ada di sini, yang terbaru di atas. '
          + 'Klik judul kolom untuk mengurutkan.' },
     { tab:'pesanan', cari:'#isi .papan-atas .cari', judul:'Kotak cari',
@@ -587,27 +587,31 @@ const TUTOR = {
     { tab:'pesanan', cari:'#isi .papan-atas select', judul:'Saringan cepat',
       teks:'Pilih di sini untuk menampilkan hanya status tertentu, misalnya yang BELUM BAYAR saja, '
          + 'atau hanya pesanan dari satu agen.' },
-    { tab:'pesanan', cari:['#isi [data-status]','#isi table[data-papan="pesanan"] tbody tr'],
+    { tab:'pesanan', cari:'#isi [data-ke="paid"]',
       judul:'Konfirmasi pembayaran',
-      teks:'Di kolom Status ada tombol Lunas dan Batal. Tekan Lunas setelah uangnya benar-benar masuk. '
-         + 'Pembatalan wajib disertai alasan. Keduanya tercatat di audit atas nama Anda.' },
-    { tab:'berangkat', cari:'#isi .kpi', judul:'Keberangkatan',
+      teks:'Tombol <b>Lunas</b> ini hanya muncul pada pesanan yang belum bayar. Tekan setelah '
+         + 'uangnya benar-benar masuk. Di sebelahnya ada <b>Batal</b> yang wajib disertai alasan. '
+         + 'Keduanya tercatat di audit atas nama Anda.' },
+    { tab:'berangkat', cari:['#isi .kpi:nth-child(3)','#isi .kpi'], judul:'Keberangkatan',
       teks:'Tiket terjual per tanggal berangkat. Perhatikan "Belum dapat kapal" — kalau angkanya '
          + 'oranye, masih ada rombongan yang belum ditempatkan.' },
-    { tab:'kapal', cari:['#isi [data-kapal]','#isi .card'], judul:'Pembagian Kapal',
+    { tab:'kapal', cari:'#isi [data-kapal]', judul:'Pembagian Kapal',
       teks:'Dikelompokkan per tanggal berangkat. Pilih kapal lewat dropdown di kolom Kapal — '
          + 'tersimpan langsung, tidak ada tombol Simpan. Kartu muatan di atas ikut berubah seketika.' },
-    { tab:'agen', cari:['#isi [data-sel-wa]','#isi table[data-papan="agen"]'], judul:'Agen & Kode',
+    { tab:'agen', cari:'#isi [data-sel-wa]', judul:'Agen & Kode',
       teks:'Nomor WhatsApp di sini menentukan ke mana pelanggan diarahkan setelah memesan. '
          + 'Perubahannya langsung berlaku di situs, tanpa perlu apa-apa lagi.' },
-    { tab:'voucher', cari:['#isi table[data-papan="voucher"]','#isi .card'], judul:'Voucher & Tambahan',
+    { tab:'voucher', cari:'#isi table[data-papan="voucher"]', judul:'Voucher & Tambahan',
       teks:'Kode voucher membuka harga warga Pacitan. Di bawahnya ada harga add-on '
          + 'drone dan paddleboard yang bisa diubah dari sini.' },
-    { tab:'akses', cari:['#isi #baris-akses','#isi .card'], judul:'Kelola Akses',
+    { tab:'akses', cari:'#isi #baris-akses', judul:'Kelola Akses',
       teks:'Atur peran tiap pengguna, nonaktifkan akun, kirim tautan reset password, '
          + 'dan ganti nama tampilan Anda sendiri di bagian atas.' },
-    { cari:'#tblPanduan', judul:'Selesai',
-      teks:'Itu saja yang paling sering dipakai. Tekan tombol ini kapan saja untuk mengulang panduan.' },
+    /* cari:null -> kartu di tengah layar. Tombol Panduan ada di bar yang menempel,
+       dan sorotan elemen menempel gampang meleset saat halaman tergulir. */
+    { cari:null, judul:'Selesai',
+      teks:'Itu saja yang paling sering dipakai. Kalau mau mengulang panduan ini, '
+         + 'tekan tombol <b>Panduan</b> di kanan atas layar.' },
   ],
   admin: [
     { cari:'#judul', judul:'Selamat datang',
@@ -618,17 +622,21 @@ const TUTOR = {
          + 'Keberangkatan untuk melihat ringkasannya per tanggal.' },
     { tab:'pesanan', cari:'#isi .papan-atas .cari', judul:'Cari pesanan',
       teks:'Ketik kode pesanan yang disebut pelanggan di chat. Tidak perlu lengkap.' },
-    { tab:'pesanan', cari:['#isi [data-status]','#isi table[data-papan="pesanan"] tbody tr'],
+    { tab:'pesanan', cari:'#isi [data-ke="paid"]',
       judul:'Tandai lunas',
-      teks:'Tekan Lunas setelah uangnya benar-benar masuk. Tercatat di audit atas nama Anda. '
-         + 'Anda tidak bisa mengubah harga — itu memang bukan wewenang Admin.' },
-    { tab:'kapal', cari:['#isi [data-kapal]','#isi .card'], judul:'Bagi kapal',
+      teks:'Tombol <b>Lunas</b> ini hanya muncul pada pesanan yang belum bayar. Tekan setelah '
+         + 'uangnya benar-benar masuk; tercatat di audit atas nama Anda. Anda tidak bisa '
+         + 'mengubah harga &mdash; itu memang bukan wewenang Admin.' },
+    { tab:'kapal', cari:'#isi [data-kapal]', judul:'Bagi kapal',
       teks:'Pilih Kapal 1 atau Kapal 2 lewat dropdown. Perhatikan kartu muatan di atas: '
          + 'kalau merah, muatannya melebihi kapasitas kapal.' },
-    { tab:'berangkat', cari:'#isi .kpi', judul:'Periksa sebelum berangkat',
+    { tab:'berangkat', cari:['#isi .kpi:nth-child(3)','#isi .kpi'], judul:'Periksa sebelum berangkat',
       teks:'Pastikan "Belum dapat kapal" sudah nol untuk tanggal yang akan berangkat.' },
-    { cari:'#tblPanduan', judul:'Selesai',
-      teks:'Tekan tombol ini kapan saja untuk mengulang panduan.' },
+    /* cari:null -> kartu di tengah layar. Tombol Panduan ada di bar yang menempel,
+       dan sorotan elemen menempel gampang meleset saat halaman tergulir. */
+    { cari:null, judul:'Selesai',
+      teks:'Itu saja yang paling sering dipakai. Kalau mau mengulang panduan ini, '
+         + 'tekan tombol <b>Panduan</b> di kanan atas layar.' },
   ],
   agen: [
     { cari:'#judul', judul:'Selamat datang',
@@ -639,30 +647,36 @@ const TUTOR = {
     { tab:'komisi', cari:'#isi .kpi', judul:'Komisi Anda',
       teks:'Jumlah tiket, omzet, dan komisi Anda. Komisi naik dari 5% ke 10% setelah tembus '
          + '20 tiket, dan berlaku surut untuk semua tiket.' },
-    { tab:'komisi', cari:['#isi table[data-papan="pelangganku"]','#isi .card'],
+    { tab:'komisi', cari:'#isi table[data-papan="pelangganku"]',
       judul:'Pelanggan Anda',
       teks:'Nomor HP ditampilkan utuh supaya Anda bisa menghubungi langsung. '
          + 'Pelanggan agen lain tidak pernah muncul di sini.' },
-    { tab:'fu', cari:['#isi .fugrp','#isi .card'], judul:'Follow-Up',
+    { tab:'fu', cari:'#isi .fugrp', judul:'Follow-Up',
       teks:'Pesanan yang belum lunas, dikelompokkan menurut sudah dihubungi atau belum. '
          + 'Kerjakan kelompok BELUM dulu.' },
-    { cari:'#tblPanduan', judul:'Selesai',
-      teks:'Tekan tombol ini kapan saja untuk mengulang panduan.' },
+    /* cari:null -> kartu di tengah layar. Tombol Panduan ada di bar yang menempel,
+       dan sorotan elemen menempel gampang meleset saat halaman tergulir. */
+    { cari:null, judul:'Selesai',
+      teks:'Itu saja yang paling sering dipakai. Kalau mau mengulang panduan ini, '
+         + 'tekan tombol <b>Panduan</b> di kanan atas layar.' },
   ],
   boarding: [
     { cari:'#judul', judul:'Selamat datang',
       teks:'Panduan singkat untuk petugas boarding. Di sini hanya ada daftar penumpang '
          + 'yang berhak naik — tanpa data harga maupun komisi.' },
-    { tab:'boarding', cari:['#isi .papan-atas select','#isi .papan-atas'], judul:'Saring per kapal',
+    { tab:'boarding', cari:'#isi .papan-atas select', judul:'Saring per kapal',
       teks:'Pilih kapal yang sedang dinaiki, supaya yang tampil hanya rombongan kapal itu.' },
     { tab:'boarding', cari:'#isi .papan-atas .cari', judul:'Cari penumpang',
       teks:'Kalau pemesan lupa kodenya, ketik namanya di sini.' },
-    { tab:'boarding', cari:['#isi table[data-papan="boarding"] tbody tr','#isi .card'],
+    { tab:'boarding', cari:'#isi table[data-papan="boarding"] tbody tr',
       judul:'Pil HARI INI',
       teks:'Baris bertanda HARI INI adalah yang berangkat hari ini. Kolom Naik menunjukkan '
          + 'berapa orang dari rombongan itu yang sudah tercatat naik.' },
-    { cari:'#tblPanduan', judul:'Selesai',
-      teks:'Tekan tombol ini kapan saja untuk mengulang panduan.' },
+    /* cari:null -> kartu di tengah layar. Tombol Panduan ada di bar yang menempel,
+       dan sorotan elemen menempel gampang meleset saat halaman tergulir. */
+    { cari:null, judul:'Selesai',
+      teks:'Itu saja yang paling sering dipakai. Kalau mau mengulang panduan ini, '
+         + 'tekan tombol <b>Panduan</b> di kanan atas layar.' },
   ],
 };
 TUTOR.owner = TUTOR.super;   /* Owner melihat tab yang sama, hanya tidak bisa mengubah */
@@ -719,39 +733,34 @@ async function tutorKe(i){
   tutorGambarUlang();
 }
 
-function tutorGambarUlang(){
-  if (!TUT.jalan) return;
-  const L = TUT.langkah[TUT.i];
-  if (!L) return;
-  tutorBersih();
-
-  const el = tutorElemen(L.cari);
-  /* Sasaran tidak ketemu -> lewati, jangan mogok. Bisa terjadi kalau tabelnya
-     kosong atau tombolnya memang tidak ada untuk peran ini. */
-  if (!el){
-    if (TUT.i + 1 < TUT.langkah.length) return tutorKe(TUT.i + 1);
-    return tutorTutup(true);
+/* Elemen di dalam bar yang menempel (position sticky/fixed) tidak boleh
+   diposisikan memakai scrollY: posisinya di layar tetap, tapi posisi dokumennya
+   ikut bergeser. Kalau dipaksa, sorotannya mendarat jauh dari sasarannya. */
+function elemenMenempel(el){
+  for (let k = el; k && k !== document.body; k = k.parentElement){
+    const pos = getComputedStyle(k).position;
+    if (pos === 'fixed' || pos === 'sticky') return true;
   }
+  return false;
+}
 
-  el.scrollIntoView({ behavior:'smooth', block:'center' });
+/* scrollIntoView behavior:'smooth' berjalan asinkron. Mengukur tepat sesudahnya
+   memberi posisi SEBELUM halaman tergulir, jadi ditunggu sampai gulirannya diam. */
+function tungguGulirBerhenti(lalu){
+  let akhir = -1, diam = 0;
+  const cek = () => {
+    if (!TUT.jalan) return;
+    const y = window.scrollY;
+    diam = (y === akhir) ? diam + 1 : 0;
+    akhir = y;
+    if (diam >= 3 || diam > 40) return lalu();
+    requestAnimationFrame(cek);
+  };
+  requestAnimationFrame(cek);
+}
 
-  const r  = el.getBoundingClientRect();
-  const sy = window.scrollY, sx = window.scrollX;
-  const p  = 7;   /* jarak sorotan dari tepi elemen */
-
-  const sorot = document.createElement('div');
-  sorot.className = 'tutor-sorot';
-  Object.assign(sorot.style, {
-    top:  (r.top + sy - p) + 'px',
-    left: (r.left + sx - p) + 'px',
-    width:  (r.width + p*2) + 'px',
-    height: (r.height + p*2) + 'px',
-  });
-  document.body.appendChild(sorot);
-
-  const kartu = document.createElement('div');
-  kartu.className = 'tutor-kartu';
-  kartu.innerHTML = `
+function tutorIsiKartu(L){
+  return `
     <div class="tnum">Langkah ${TUT.i + 1} dari ${TUT.langkah.length}</div>
     <div class="tt">${esc(L.judul)}</div>
     <div class="ts">${L.teks}</div>
@@ -763,6 +772,59 @@ function tutorGambarUlang(){
       <button class="tutor-btn" data-tutor-maju>${
         TUT.i === TUT.langkah.length - 1 ? 'Selesai' : 'Lanjut'}</button>
     </div>`;
+}
+
+function tutorPasangTombol(kartu){
+  kartu.querySelector('[data-tutor-maju]').onclick   = () => tutorMaju(1);
+  kartu.querySelector('[data-tutor-mundur]').onclick = () => tutorMaju(-1);
+  kartu.querySelector('[data-tutor-lewati]').onclick = () => tutorTutup(false);
+}
+
+function tutorGambarUlang(){
+  if (!TUT.jalan) return;
+  const L = TUT.langkah[TUT.i];
+  if (!L) return;
+  tutorBersih();
+
+  /* Langkah penutup tidak menunjuk apa pun: kartunya di tengah layar. */
+  if (L.cari === null) return tutorKartuTengah(L);
+
+  const el = tutorElemen(L.cari);
+  /* Sasaran tidak ketemu -> lewati, jangan mogok. Bisa terjadi kalau tabelnya
+     kosong atau tombolnya memang tidak ada untuk peran ini. */
+  if (!el){
+    if (TUT.i + 1 < TUT.langkah.length) return tutorKe(TUT.i + 1);
+    return tutorTutup(true);
+  }
+
+  el.scrollIntoView({ behavior:'smooth', block:'center' });
+  tungguGulirBerhenti(() => tutorLukis(L, el));
+}
+
+function tutorLukis(L, el){
+  if (!TUT.jalan) return;
+  tutorBersih();
+  const menempel = elemenMenempel(el);
+  const r  = el.getBoundingClientRect();
+  const sy = menempel ? 0 : window.scrollY;
+  const sx = menempel ? 0 : window.scrollX;
+  const p  = 7;   /* jarak sorotan dari tepi elemen */
+
+  const sorot = document.createElement('div');
+  sorot.className = 'tutor-sorot';
+  sorot.style.position = menempel ? 'fixed' : 'absolute';
+  Object.assign(sorot.style, {
+    top:  (r.top + sy - p) + 'px',
+    left: (r.left + sx - p) + 'px',
+    width:  (r.width + p*2) + 'px',
+    height: (r.height + p*2) + 'px',
+  });
+  document.body.appendChild(sorot);
+
+  const kartu = document.createElement('div');
+  kartu.className = 'tutor-kartu';
+  kartu.innerHTML = tutorIsiKartu(L);
+  kartu.style.position = menempel ? 'fixed' : 'absolute';
   document.body.appendChild(kartu);
 
   /* Letak gelembung: di bawah sasaran kalau muat, kalau tidak di atasnya.
@@ -776,9 +838,26 @@ function tutorGambarUlang(){
   kartu.style.top  = atas + 'px';
   kartu.style.left = kiri + 'px';
 
-  kartu.querySelector('[data-tutor-maju]').onclick   = () => tutorMaju(1);
-  kartu.querySelector('[data-tutor-mundur]').onclick = () => tutorMaju(-1);
-  kartu.querySelector('[data-tutor-lewati]').onclick = () => tutorTutup(false);
+  tutorPasangTombol(kartu);
+}
+
+/* Kartu di tengah layar, tanpa sorotan, latar gelap penuh. */
+function tutorKartuTengah(L){
+  const lapis = document.createElement('div');
+  lapis.className = 'tutor-sorot';
+  lapis.style.position = 'fixed';
+  Object.assign(lapis.style, { top:'50%', left:'50%', width:'0', height:'0' });
+  document.body.appendChild(lapis);
+
+  const kartu = document.createElement('div');
+  kartu.className = 'tutor-kartu';
+  kartu.style.position = 'fixed';
+  kartu.innerHTML = tutorIsiKartu(L);
+  document.body.appendChild(kartu);
+  const kr = kartu.getBoundingClientRect();
+  kartu.style.top  = Math.max(12, (window.innerHeight - kr.height)/2) + 'px';
+  kartu.style.left = Math.max(12, (window.innerWidth  - kr.width)/2)  + 'px';
+  tutorPasangTombol(kartu);
 }
 
 function mulaiTutor(paksa){
