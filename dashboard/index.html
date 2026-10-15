@@ -123,6 +123,10 @@ tr.kosong td{color:var(--muted);font-size:13px;padding:16px 8px}
   font-weight:700;background:#fff;border:0;border-radius:7px;padding:5px 13px;cursor:pointer}
 #pita-pratinjau button{color:#7a4f06}
 #pita-latihan button{color:#15603a}
+/* Tautan tipis, bukan tombol: supaya pojok kanan atas tidak jadi berjejal tombol
+   yang mengerjakan hal mirip-mirip. */
+#pita-latihan button.tautan{background:none;color:#fff;text-decoration:underline;
+  padding:4px 0;font-weight:600}
 #pilihPeran{font:inherit;font-size:12.5px;padding:5px 8px;border-radius:7px;
   border:1px solid #39618a;background:#1b3a5c;color:#e4f1f8;max-width:170px}
 #pita-agen{font:inherit;font-size:12.5px;padding:4px 8px;border-radius:7px;border:0;
@@ -218,14 +222,14 @@ input:focus,select:focus{outline:2px solid var(--sea);outline-offset:1px;border-
     <div class="sisa"><span id="labelUser"></span>
       <select id="pilihPeran" class="hide" title="Lihat tampilan peran lain"></select>
       <button class="btn sm" id="tblPanduan">Panduan</button>
-      <button class="btn ghost sm" id="tblLatihan">Latihan</button>
       <button class="btn ghost sm" id="tblKeluar">Keluar</button></div>
   </div></div>
   <div id="pita-latihan" class="hide"><div class="in">
-    <span><b>MODE LATIHAN.</b> Semua angka dan nama di layar ini palsu.
-      Tekan tombol apa saja sesuka Anda &mdash; tidak ada yang tersimpan,
-      dan data sungguhan tidak tersentuh sama sekali.</span>
-    <button type="button" id="latihan-keluar">Keluar dari latihan</button>
+    <span><b>MODE PANDUAN.</b> Semua angka dan nama di layar ini palsu. Tekan tombol
+      apa saja sesuka Anda &mdash; tidak ada yang tersimpan, dan data sungguhan tidak
+      tersentuh sama sekali. Tekan <b>Akhiri panduan</b> di kanan atas untuk kembali
+      ke data sungguhan.</span>
+    <button type="button" id="latihan-ulang" class="tautan">Ulangi dari awal</button>
   </div></div>
 
   <div id="pita-pratinjau" class="hide"><div class="in">
@@ -308,8 +312,10 @@ $('tblMasuk').onclick = async () => {
 };
 $('sandi').addEventListener('keydown', e => { if(e.key==='Enter') $('tblMasuk').click(); });
 $('tblKeluar').onclick = async () => { await sb.auth.signOut(); location.reload(); };
-$('tblPanduan').onclick = () => mulaiTutor(true);
-$('tblLatihan').onclick = () => masukLatihan(!S.latihan);
+/* Satu tombol saja. Panduan SELALU memakai data latihan: dengan data sungguhan,
+   langkah seperti "Konfirmasi pembayaran" bisa hilang begitu tidak ada pesanan
+   yang belum bayar — panduannya jadi paling tidak lengkap justru saat datanya rapi. */
+$('tblPanduan').onclick = () => masukLatihan(!S.latihan);
 
 /* ============ MULAI ============ */
 async function mulai(){
@@ -330,7 +336,7 @@ async function mulai(){
   $('layarApp').classList.remove('hide');
 
   /* Pemilih peran hanya untuk super admin, dan hanya mengubah TAMPILAN. */
-  $('latihan-keluar').onclick = () => masukLatihan(false);
+  $('latihan-ulang').onclick = () => mulaiTutor(true);
 
   if (peran === 'super'){
     $('pilihPeran').innerHTML = Object.keys(JUDUL).map(k =>
@@ -716,19 +722,19 @@ async function masukLatihan(nyala){
     S.latihan = true;
     if (TUT.jalan) tutorTutup(false);
     $('pita-latihan').classList.remove('hide');
-    $('tblLatihan').textContent = 'Keluar latihan';
+    $('tblPanduan').textContent = 'Akhiri panduan';
     gambarMenu(S.peran);
-    pesan('Mode latihan menyala. Data ini palsu dan tidak tersimpan ke mana pun &mdash; '
-        + 'silakan tekan tombol apa saja.', 9000);
+    pesan('Panduan dimulai dengan data latihan. Semua yang tampil palsu dan tidak '
+        + 'tersimpan ke mana pun &mdash; silakan tekan tombol apa saja.', 9000);
     setTimeout(() => mulaiTutor(true), 900);
   } else {
     S.latihan = false;
     LATIH = null;
     if (TUT.jalan) tutorTutup(false);
     $('pita-latihan').classList.add('hide');
-    $('tblLatihan').textContent = 'Latihan';
+    $('tblPanduan').textContent = 'Panduan';
     gambarMenu(S.peran);
-    pesan('Keluar dari mode latihan. Yang tampil sekarang data sungguhan.', 7000);
+    pesan('Panduan diakhiri. Yang tampil sekarang data sungguhan.', 7000);
   }
 }
 
@@ -1007,7 +1013,8 @@ function tutorTutup(selesai){
   document.removeEventListener('keydown', tutorTombol);
   window.removeEventListener('resize', tutorGambarUlang);
   try { localStorage.setItem(tutorKunci(), selesai ? 'selesai' : 'lewati'); } catch(e){}
-  if (selesai) pesan('Panduan selesai. Tekan <b>Panduan</b> di kanan atas kalau mau mengulang.', 8000);
+  if (selesai) pesan('Langkah panduan selesai. Masih di data latihan &mdash; silakan coba-coba '
+                   + 'sendiri. Tekan <b>Akhiri panduan</b> di kanan atas kalau sudah.', 10000);
 }
 
 const tutorTombol = e => {
