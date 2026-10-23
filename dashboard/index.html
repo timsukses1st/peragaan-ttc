@@ -320,7 +320,7 @@ const FU = {belum:['BELUM','p-warn'], dihubungi:['DIHUBUNGI','p-sea'],
 const JUDUL = {
   super:['Dashboard Super Admin','Semua akses — semua agen, semua pelanggan, bisa mengubah harga & komisi'],
   owner:['Dashboard Owner','Lihat semua data, tidak bisa mengubah apa pun'],
-  admin:['Dashboard Admin','Konfirmasi pembayaran, pembagian kapal & keberangkatan — tidak bisa mengubah harga, tidak melihat komisi maupun kontak agen'],
+  admin:['Dashboard Admin','Konfirmasi pembayaran, pembagian kapal, keberangkatan, dan harga jual — tidak melihat komisi agen maupun kontak agen, tidak bisa kelola akses'],
   agen:['Dashboard Agen','Hanya pelanggan & komisi milikmu'],
   boarding:['Petugas Boarding','Tanpa akses ke data penjualan maupun komisi']
 };
@@ -458,7 +458,11 @@ function menuPeran(peran){
   return peran==='agen'     ? [['komisi','Komisi & Pelanggan Saya'],['fu','Follow-Up Saya']]
        : peran==='boarding' ? [['boarding','Daftar Boarding']]
        : peran==='admin'    ? [['pesanan','Pesanan'],['kapal','Pembagian Kapal'],
-                               ['berangkat','Keberangkatan']]
+                               ['berangkat','Keberangkatan'],
+                               /* 23 Okt 2026: Admin diberi izin mengubah harga.
+                                  Dua tab ini ikut dibuka supaya dia punya tempat
+                                  mengerjakannya. Kelola Akses tetap tertutup. */
+                               ['voucher','Voucher & Tambahan'],['atur','Pengaturan']]
        : [['ringkas','Ringkasan'],['pesanan','Pesanan'],['berangkat','Keberangkatan'],
           ['kapal','Pembagian Kapal'],['fu','Follow-Up'],['manifest','Manifest'],
           ['agen','Agen & Kode'],['voucher','Voucher & Tambahan'],
@@ -1188,9 +1192,10 @@ const TUTOR = {
     { cari:'#judul', judul:'Selamat datang',
       teks:'Panduan singkat untuk peran Admin. Tugas Anda dua: mengonfirmasi pembayaran, '
          + 'dan membagi penumpang ke kapal sebelum berangkat.' },
-    { cari:'#navTab', judul:'Tiga tab Anda',
+    { cari:'#navTab', judul:'Lima tab Anda',
       teks:'Pesanan untuk konfirmasi pembayaran, Pembagian Kapal untuk menempatkan rombongan, '
-         + 'Keberangkatan untuk melihat ringkasannya per tanggal.' },
+         + 'Keberangkatan untuk melihat ringkasannya per tanggal, lalu '
+         + 'Voucher &amp; Tambahan dan Pengaturan untuk mengatur harga.' },
     { tab:'pesanan', cari:'#isi .papan-atas .cari', judul:'Cari pesanan',
       teks:'Ketik kode pesanan yang disebut pelanggan di chat. Tidak perlu lengkap.' },
     { tab:'pesanan', cari:'#isi [data-ke="paid"]',
@@ -1203,6 +1208,19 @@ const TUTOR = {
          + 'kalau merah, muatannya melebihi kapasitas kapal.' },
     { tab:'berangkat', cari:['#isi .kpi:nth-child(3)','#isi .kpi'], judul:'Periksa sebelum berangkat',
       teks:'Pastikan "Belum dapat kapal" sudah nol untuk tanggal yang akan berangkat.' },
+    { tab:'voucher', cari:'#isi table[data-papan="tambahan"]', judul:'Harga add-on',
+      teks:'Harga Drone dan Paddleboard bisa Anda ubah dari sini: tekan <b>Ubah</b> di kolom Harga. '
+         + 'Berlaku seketika di halaman pemesanan. Kode voucher di tabel atas <b>bukan</b> wewenang '
+         + 'Anda &mdash; itu tetap Super Admin.' },
+    { tab:'atur', cari:'#isi table[data-papan="produk"]', judul:'Harga jual produk',
+      teks:'Tekan <b>Ubah</b> di baris produk, lalu formulir di bawahnya terisi sendiri. '
+         + 'Menaikkan harga hari ini <b>tidak mengubah tagihan</b> orang yang memesan kemarin &mdash; '
+         + 'tiap pesanan membekukan harganya sendiri saat dibuat.' },
+    { tab:'atur', cari:'#isi .kpi, #isi .card', judul:'Diskon & komisi',
+      teks:'Di kartu paling atas ada diskon konsumen dan tarif komisi agen. '
+         + '<b>Hati-hati dengan komisi:</b> tarifnya berlaku <b>retroaktif</b>, jadi mengubahnya '
+         + 'di tengah bulan ikut mengubah bayaran seluruh tiket bulan itu. '
+         + 'Setiap perubahan tercatat di audit atas nama Anda.' },
     /* cari:null -> kartu di tengah layar. Tombol Panduan ada di bar yang menempel,
        dan sorotan elemen menempel gampang meleset saat halaman tergulir. */
     { cari:null, judul:'Selesai',
@@ -2819,7 +2837,12 @@ async function tabVoucher(){
   ]);
   if (error) return gagal(error);
   if (e2) return gagal(e2);
-  const bisa = S.peran === 'super';
+  /* Dua izin terpisah, sengaja. Admin boleh mengubah HARGA ADD-ON (diminta
+     23 Okt 2026) tapi TIDAK menerbitkan kode voucher — di database pun
+     kode_voucher masih super-only, jadi kalau disamakan tombolnya akan muncul
+     lalu gagal saat ditekan, dan itu lebih membingungkan daripada tidak ada. */
+  const bisa  = S.peran === 'super';                                   /* voucher */
+  const bisaT = S.peran === 'super' || S.peran === 'admin';            /* add-on  */
 
   $('isi').innerHTML = `
     ${bisa ? `<div class="card">
@@ -2870,11 +2893,11 @@ async function tabVoucher(){
           <td class="nw"><b class="nama" title="${esc(t.nama)}">${esc(t.nama)}</b>
             ${t.ket?`<div class="hint">${esc(t.ket)}</div>`:''}</td>
           <td class="nw">${({pesanan:'per pesanan',orang:'per orang',unit:'per unit'}[t.satuan])||esc(t.satuan)}</td>
-          <td class="num nw" data-sel-harga="${t.id}">${selHarga(t, bisa)}</td>
+          <td class="num nw" data-sel-harga="${t.id}">${selHarga(t, bisaT)}</td>
           <td class="num nw">${t.maks ?? '—'}</td>
           <td class="nw">${t.aktif
             ? '<span class="pill p-ok">AKTIF</span>' : '<span class="pill p-mute">NONAKTIF</span>'}</td>
-          <td class="nw">${bisa
+          <td class="nw">${bisaT
             ? `<a class="aksi ghost" href="#" data-taktif="${t.id}" data-nilai="${t.aktif?0:1}">${
                  t.aktif?'Nonaktifkan':'Aktifkan'}</a>`
             : '<span style="color:var(--muted);font-size:11.5px">tidak bisa edit</span>'}</td>
@@ -2913,6 +2936,13 @@ async function tabVoucher(){
       if (error){ b.style.pointerEvents=''; return gagalPesan(error); }
       pesan('Status voucher diperbarui.'); tabVoucher();
     });
+  }
+
+  /* Blok add-on TERPISAH dari blok voucher. Kalau tetap digabung, tombol
+     add-on akan tampil untuk Admin (karena markup-nya memakai bisaT) tapi
+     tidak pernah dipasangi handler — jadi kelihatan bisa ditekan padahal
+     diam saja. Itu lebih buruk daripada tombolnya tidak ada. */
+  if (bisaT){
     $('isi').querySelectorAll('[data-taktif]').forEach(b => b.onclick = async e => {
       e.preventDefault(); b.style.pointerEvents='none';
       const { error } = await DB.from('tambahan')
@@ -3003,7 +3033,7 @@ const PERAN_LABEL = {
   menunggu:['Menunggu Akses','Sudah daftar, belum diberi peran'],
   super:   ['Super Admin','Semua akses, pemegang master'],
   owner:   ['Owner','Lihat semua, tidak bisa mengubah'],
-  admin:   ['Admin','Konfirmasi bayar & bagi kapal'],
+  admin:   ['Admin','Konfirmasi bayar, bagi kapal, atur harga'],
   agen:    ['Agen','Hanya pelanggan & komisi sendiri'],
   boarding:['Petugas Boarding','Hanya daftar boarding']
 };
@@ -3353,7 +3383,9 @@ async function tabAtur(){
     'Baris pengaturan tidak ditemukan. Tabel pengaturan harus berisi tepat satu '
     + 'baris dengan id = true. Hubungi tim Delta sebelum mengubah apa pun.' });
   S.atur = data;
-  const ro = S.peran !== 'super';
+  /* 23 Okt 2026: Admin ikut boleh mengubah harga, diskon, dan komisi.
+     Owner tetap hanya melihat. */
+  const ro = !(S.peran === 'super' || S.peran === 'admin');
   const f = (k,l,hint='') => `<div class="fld"><label>${l}</label>
     <input id="set_${k}" type="number" value="${data[k] ?? ''}" ${ro?'disabled':''}>
     ${hint?`<div class="hint">${hint}</div>`:''}</div>`;

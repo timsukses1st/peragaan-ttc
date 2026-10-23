@@ -115,6 +115,74 @@ td input,td select{padding:6px 8px;font-size:14px}
 .rk span:last-child{font-variant-numeric:tabular-nums;white-space:nowrap}
 
 /* ---------- lain ---------- */
+
+html{scroll-padding-top:60px}
+
+/* ====================================================================
+   LAYAR SEMPIT (HP)
+   --------------------------------------------------------------------
+   Sebelum ini halaman tidak punya satu pun @media query — semua ukuran
+   dibuat untuk desktop. Di iPhone 16 (393px) akibatnya: merek pecah jadi
+   tiga baris, header menempel setinggi ~160px, dan isi di bawahnya
+   tertutup header karena header-nya position:sticky.
+
+   Yang diperbaiki di sini: tinggi header, ukuran huruf judul, dan jarak
+   kartu. Bukan menyembunyikan sesuatu — semua isinya tetap ada.
+   ==================================================================== */
+@media (max-width: 640px){
+  /* --- header: BENAR-BENAR satu baris ---
+     Header ini position:sticky, jadi tingginya dibayar terus-menerus: tiap
+     piksel header menutupi isi di bawahnya sepanjang halaman digulir. Di 393px
+     merek aslinya pecah 2 baris + keterangan 1 baris = ~85px. Keterangan
+     lokasinya disembunyikan karena hero di bawahnya sudah menyebut hal yang
+     sama, dan merek dipaksa satu baris. Hasilnya ~44px. */
+  .bar .in{padding:7px 12px;gap:8px;flex-wrap:nowrap}
+  /* Nama merek TIDAK dipotong: label tombol yang dipendekkan (lihat .sempit).
+     Merek terpotong jadi "THE TAMPERAN CRU..." lebih buruk daripada tombol
+     berbunyi "Pesan" saja. */
+  .brand{font-size:11.5px;letter-spacing:.2px;line-height:1.2;white-space:nowrap;flex:0 0 auto}
+  /* Kekhususan sengaja dinaikkan dengan .bar: aturan global .sempit{display:none}
+     letaknya SESUDAH blok @media ini di dalam berkas, jadi kalau selektornya
+     sama-sama satu kelas, yang global menang dan tombolnya jadi kosong
+     melompong. Ketahuan waktu dilihat, bukan waktu ditulis. */
+  .bar .lebar{display:none}
+  .bar .sempit{display:inline}
+  .brand small{display:none}
+  .bar a,#tombol-tutor{font-size:12px;padding:6px 9px;flex:0 0 auto}
+  #tombol-tutor{margin-left:auto}
+
+  /* --- hero: judul jangan sampai memakan satu layar penuh --- */
+  .hero{padding:26px 0 24px}
+  .hero h1{font-size:25px;letter-spacing:-.4px}
+  .hero p{font-size:15px;margin-bottom:16px}
+  .fak{font-size:12px;padding:5px 11px}
+
+  /* --- isi --- */
+  .wrap{padding:0 12px}
+  h2{font-size:19px;margin:24px 0 4px}
+  .sub{font-size:13.5px}
+  .card{padding:14px;border-radius:11px}
+  .grid{gap:11px}
+  .fld{margin-bottom:11px}
+
+  /* Tombol utama dibuat selebar layar: di HP, tombol kecil di tengah
+     kartu gampang meleset ditekan jempol. */
+  .btn{width:100%;padding:13px 16px;font-size:15.5px}
+  /* kecuali tombol yang memang berpasangan di satu baris */
+  .sel2 .btn,.bar .btn{width:auto}
+
+  /* Jangkar #pesan jangan berhenti di balik header yang menempel. */
+  :target{scroll-margin-top:56px}
+}
+
+/* Layar sangat sempit (<=360px): tombol dikecilkan lagi supaya nama
+   mereknya tidak ikut terpotong elipsis. */
+@media (max-width: 360px){
+  .brand{font-size:11px}
+  .bar a,#tombol-tutor{font-size:11px;padding:5px 7px}
+  .bar .in{gap:6px;padding:7px 10px}
+}
+
 .pesan{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:50;max-width:92vw;
   background:var(--navy);color:#fff;padding:12px 18px;border-radius:10px;font-size:14.5px;
   box-shadow:0 6px 22px rgba(15,39,68,.3);display:none}
@@ -124,6 +192,7 @@ td input,td select{padding:6px 8px;font-size:14px}
 footer{margin-top:40px;padding:22px 0 40px;border-top:1px solid var(--line);
   color:var(--muted);font-size:13px;text-align:center}
 .sembunyi{display:none}
+.sempit{display:none}
 
 /* ================= TUTORIAL HALAMAN PEMESANAN =================
    Pola yang sama dengan dashboard: satu kotak transparan di atas bagian yang
@@ -195,8 +264,8 @@ footer{margin-top:40px;padding:22px 0 40px;border-top:1px solid var(--line);
 
 <div class="bar"><div class="in">
   <div class="brand">THE TAMPERAN CRUISE<small>Pelabuhan Tamperan · Pacitan</small></div>
-  <button type="button" id="tombol-tutor" style="margin-left:auto">Cara pesan</button>
-  <a href="#pesan" id="tombol-pesan" style="margin-left:9px">Pesan sekarang</a>
+  <button type="button" id="tombol-tutor" style="margin-left:auto"><span class="lebar">Cara pesan</span><span class="sempit">Cara</span></button>
+  <a href="#pesan" id="tombol-pesan" style="margin-left:9px"><span class="lebar">Pesan sekarang</span><span class="sempit">Pesan</span></a>
 </div></div>
 
 <div class="hero"><div class="wrap">
