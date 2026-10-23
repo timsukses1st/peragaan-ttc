@@ -379,10 +379,21 @@ footer{margin-top:40px;padding:22px 0 40px;border-top:1px solid var(--line);
             <div class="hint">Konfirmasi pesanan dikirim ke nomor ini.</div></div>
         </div>
         <div class="grid g2">
+          <div class="fld"><label for="f-hp2">Nomor lain yang bisa dihubungi <span style="font-weight:400;color:var(--muted)">(boleh kosong)</span></label>
+            <input id="f-hp2" inputmode="tel" placeholder="08xxxxxxxxxx" autocomplete="tel">
+            <div class="hint">Dipakai kalau nomor utama tidak aktif. Boleh nomor keluarga
+              atau teman seperjalanan.</div></div>
           <div class="fld"><label for="f-email">Email <span style="font-weight:400;color:var(--muted)">(boleh kosong)</span></label>
             <input id="f-email" type="email" autocomplete="email"></div>
+        </div>
+        <div class="grid g2">
+          <div class="fld"><label for="f-alamat">Alamat sesuai KTP</label>
+            <textarea id="f-alamat" rows="2" autocomplete="street-address"
+              placeholder="Jalan, RT/RW, kelurahan, kecamatan, kabupaten/kota, provinsi"></textarea>
+            <div class="hint">Ditulis sesuai KTP untuk manifest resmi keberangkatan.</div></div>
           <div class="fld"><label for="f-prov">Provinsi asal <span style="font-weight:400;color:var(--muted)">(boleh kosong)</span></label>
-            <input id="f-prov" autocomplete="address-level1"></div>
+            <input id="f-prov" autocomplete="address-level1">
+            <div class="hint">Untuk pendataan asal wisatawan. Boleh beda dengan alamat KTP.</div></div>
         </div>
       </div>
 
@@ -858,6 +869,23 @@ async function kirim(){
   if (nama.length < 2)                 return pesan('Nama pemesan belum diisi.');
   if (hp.length < 9 || hp.length > 15) return pesan('Nomor WhatsApp belum benar.');
 
+  /* Alamat KTP diwajibkan karena dipakai manifest resmi keberangkatan.
+     Labelnya di formulir pun tidak bertanda "boleh kosong", jadi harus
+     diperiksa di sini -- kalau tidak, label dan perilakunya bertentangan. */
+  const alamat = $('f-alamat').value.trim();
+  if (alamat.length < 10)
+    return pesan('Alamat sesuai KTP belum diisi lengkap. Tulis minimal jalan, '
+               + 'kelurahan, dan kabupaten/kota.', 9000);
+
+  /* Nomor kedua opsional, tapi kalau diisi harus benar -- dan tidak boleh
+     sama dengan nomor utama, karena gunanya justru sebagai cadangan. */
+  const hp2 = $('f-hp2').value.replace(/\D/g,'');
+  if (hp2 && (hp2.length < 9 || hp2.length > 15))
+    return pesan('Nomor lain belum benar. Kosongkan saja kalau tidak ada.', 8000);
+  if (hp2 && hp2 === hp)
+    return pesan('Nomor lain sama dengan nomor WhatsApp utama. Isi nomor yang berbeda, '
+               + 'atau kosongkan saja.', 9000);
+
   if (!S.kodeOk || !S.kodeRef) return pesan('Kode agen belum diperiksa.');
   if (S.tipe === 'biro'){
     if (!S.bolehBiro) return pesan('Kode ini tidak punya akses jalur biro.');
@@ -920,8 +948,13 @@ async function kirim(){
                        : null,
     p_pemesan: {
       nama, hp,
+      /* pakai nilai yang SUDAH divalidasi di atas, jangan baca ulang dari DOM:
+         kalau cara merapikannya berbeda, yang divalidasi dan yang dikirim
+         bisa menyimpang tanpa ketahuan */
+      hp2:      hp2    || null,
       email:    $('f-email').value.trim() || null,
-      provinsi: $('f-prov').value.trim()  || null
+      provinsi: $('f-prov').value.trim()  || null,
+      alamat:   alamat || null
     },
     p_penumpang: penumpang,
     p_biro: S.tipe === 'biro' ? {

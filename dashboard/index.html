@@ -588,6 +588,8 @@ function dataLatihan(){
         status:'pending', fu_status:'belum', fu_terakhir:null,
         dibuat:JAM(3), diubah:JAM(3), tanggal_berangkat:HARI(2), kapal_id:null,
         kode_voucher_beku:null, pemesan_nama:'Rani Puspita', pemesan_hp:'081200000001',
+        pemesan_hp2:'085700000011',
+        pemesan_alamat:'Jl. Ahmad Yani No. 12, RT 03/RW 01, Kel. Ploso, Kec. Pacitan, Kab. Pacitan, Jawa Timur 63515',
         agen_id:AG.budi, produk:pr('Cruise PROMO'), agen:{nama:'Budi Santoso'}, kapal:null,
         penumpang:[{naik:false},{naik:false}] },
       { id:'o2', kode:'TTC-LAT02', tipe:'perorangan', pax:4, anak:1, total:380000,
@@ -595,6 +597,8 @@ function dataLatihan(){
         status:'waiting', fu_status:'dihubungi', fu_terakhir:JAM(5),
         dibuat:JAM(6), diubah:JAM(5), tanggal_berangkat:HARI(2), kapal_id:K1,
         kode_voucher_beku:'PACITAN', pemesan_nama:'Hendra Wijaya', pemesan_hp:'081200000002',
+        pemesan_hp2:'081355556666',
+        pemesan_alamat:'Perum Griya Asri Blok C-7, RT 05/RW 08, Kel. Sidoharjo, Kec. Pacitan, Jawa Timur 63513',
         agen_id:AG.sari, produk:pr('Cruise Daily'), agen:{nama:'Sari Wulandari'},
         kapal:{nama:'Kapal 1'}, penumpang:[{naik:false},{naik:false},{naik:false},{naik:false}] },
       { id:'o3', kode:'TTC-LAT03', tipe:'biro', pax:40, anak:3, total:29640000,
@@ -602,6 +606,8 @@ function dataLatihan(){
         status:'paid', fu_status:'jadi', fu_terakhir:null,
         dibuat:JAM(30), diubah:JAM(28), tanggal_berangkat:HARI(2), kapal_id:K2,
         kode_voucher_beku:null, pemesan_nama:'Biro Wisata Anugerah', pemesan_hp:'081200000003',
+        pemesan_hp2:'02177889900',
+        pemesan_alamat:'Jl. Raya Solo-Yogya KM 15, Ruko Pandawa No. 4, Klaten, Jawa Tengah 57438',
         agen_id:AG.budi, produk:pr('2 Day Journey'), agen:{nama:'Budi Santoso'},
         kapal:{nama:'Kapal 2'}, penumpang:Array.from({length:40},(_,i)=>({naik:i<2})) },
       { id:'o4', kode:'TTC-LAT04', tipe:'perorangan', pax:3, anak:0, total:427500,
@@ -609,6 +615,7 @@ function dataLatihan(){
         status:'paid', fu_status:'jadi', fu_terakhir:null,
         dibuat:JAM(26), diubah:JAM(25), tanggal_berangkat:HARI(0), kapal_id:K1,
         kode_voucher_beku:null, pemesan_nama:'Fajar Ramadhan', pemesan_hp:'081200000004',
+        pemesan_alamat:'Jl. Diponegoro No. 88, RT 01/RW 04, Kel. Baleharjo, Kec. Pacitan, Jawa Timur 63511',
         agen_id:AG.sari, produk:pr('Cruise PROMO'), agen:{nama:'Sari Wulandari'},
         kapal:{nama:'Kapal 1'}, penumpang:[{naik:true},{naik:true},{naik:false}] },
       { id:'o5', kode:'TTC-LAT05', tipe:'perorangan', pax:2, anak:0, total:665000,
@@ -1567,7 +1574,7 @@ async function tabRingkas(){
 async function tabPesanan(){
   const { data, error } = await DB.from('pesanan')
     .select('kode,tipe,pax,anak,total,status,dibuat,tanggal_berangkat,kode_voucher_beku,'
-           + 'pemesan_nama,pemesan_hp,produk(nama),agen(nama),kapal(nama)')
+           + 'pemesan_nama,pemesan_hp,pemesan_hp2,pemesan_alamat,produk(nama),agen(nama),kapal(nama)')
     .order('dibuat',{ascending:false}).limit(300);
   if (error) return gagal(error);
 
@@ -1591,8 +1598,11 @@ async function tabPesanan(){
               : '<span style="color:var(--muted)">—</span>'}</td>
             <td class="nw"><span class="nama" title="${esc(o.pemesan_nama)}">${esc(o.pemesan_nama)}</span>${
               o.tipe==='biro'?' <span class="pill p-sea">BIRO</span>':''}${
-              o.kode_voucher_beku?' <span class="pill p-ok">VOUCHER</span>':''}</td>
-            <td class="nw">${selWa(o.pemesan_hp, `Halo ${o.pemesan_nama}, ini dari The Tamperan Cruise soal pesanan ${o.kode}.`)}</td>
+              o.kode_voucher_beku?' <span class="pill p-ok">VOUCHER</span>':''}${
+              o.pemesan_alamat ? `<div class="hint nama" style="max-width:220px"
+                title="${esc(o.pemesan_alamat)}">${esc(o.pemesan_alamat)}</div>` : ''}</td>
+            <td class="nw">${selWa(o.pemesan_hp, `Halo ${o.pemesan_nama}, ini dari The Tamperan Cruise soal pesanan ${o.kode}.`)}${
+              selWa2(o.pemesan_hp2, o.pemesan_nama, o.kode)}</td>
             <td class="nw">${esc(o.produk?.nama)}</td>
             <td class="num nw">${o.pax}${o.anak?` <span class="pill p-warn">${o.anak} anak</span>`:''}</td>
             <td class="nw">${o.agen?`<span class="nama" style="max-width:130px" title="${esc(o.agen.nama)}">${esc(o.agen.nama)}</span>`
@@ -1683,6 +1693,17 @@ const selWa = (hp,teks) => !hp ? '<span style="color:var(--muted)">—</span>' :
   <span class="sel2"><span class="mono" style="font-size:12px">${esc(fmtHp(hp))}</span>
   <a class="aksi wa" href="https://wa.me/62${String(hp).replace(/\D/g,'').replace(/^0/,'')}?text=${
      encodeURIComponent(teks)}" target="_blank" rel="noopener">Chat</a></span>`;
+/* Nomor cadangan ditempel di sel WhatsApp yang sudah ada, BUKAN jadi kolom
+   baru: tabel Pesanan sudah lebar dan menambah kolom membuatnya makin perlu
+   digeser menyamping. Kalau nomornya kosong, tidak ada apa pun yang tampil. */
+const selWa2 = (hp2, nama, kode) => !hp2 ? '' : `
+  <div class="sel2" style="margin-top:4px">
+    <span class="mono" style="font-size:11px;color:var(--muted)">cadangan ${esc(fmtHp(hp2))}</span>
+    <a class="aksi ghost" style="font-size:11px;padding:2px 7px"
+       href="https://wa.me/62${String(hp2).replace(/\D/g,'').replace(/^0/,'')}?text=${
+       encodeURIComponent(`Halo ${nama}, ini dari The Tamperan Cruise soal pesanan ${kode}.`)}"
+       target="_blank" rel="noopener">Chat</a></div>`;
+
 const fmtHp = hp => {
   const d = String(hp||'').replace(/\D/g,'');
   return d.length>9 ? d.replace(/^(\d{4})(\d{4})(\d+)$/,'$1-$2-$3') : d;
@@ -1691,7 +1712,7 @@ const fmtHp = hp => {
 /* ============ FOLLOW-UP ============ */
 async function tabFollowUp(){
   const { data: semua, error } = await DB.from('pesanan')
-    .select('kode,status,fu_status,fu_terakhir,pemesan_nama,pemesan_hp,total,dibuat,agen_id,produk(nama)')
+    .select('kode,status,fu_status,fu_terakhir,pemesan_nama,pemesan_hp,pemesan_hp2,total,dibuat,agen_id,produk(nama)')
     .in('status',['pending','expired','cancel_pembeli'])
     .order('dibuat',{ascending:false});
   if (error) return gagal(error);
@@ -1724,7 +1745,8 @@ async function tabFollowUp(){
           return `<tr>
             <td class="mono nw">${esc(o.kode)}</td>
             <td class="nw"><span class="nama" title="${esc(o.pemesan_nama)}">${esc(o.pemesan_nama)}</span></td>
-            <td class="nw">${selWa(o.pemesan_hp, `Halo ${o.pemesan_nama}, ini dari The Tamperan Cruise. Pesanan ${o.kode} masih kami simpan — ada yang bisa kami bantu?`)}</td>
+            <td class="nw">${selWa(o.pemesan_hp, `Halo ${o.pemesan_nama}, ini dari The Tamperan Cruise. Pesanan ${o.kode} masih kami simpan — ada yang bisa kami bantu?`)}${
+              selWa2(o.pemesan_hp2, o.pemesan_nama, o.kode)}</td>
             <td class="nw">${esc(o.produk?.nama)}</td>
             <td class="num nw" data-urut="${o.total}">${rp(o.total)}</td>
             <td class="nw"><span class="pill ${f[1]}">${f[0]}</span></td>
