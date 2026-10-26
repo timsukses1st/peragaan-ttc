@@ -178,6 +178,11 @@ input,select{width:100%;padding:9px 11px;border:1px solid var(--line);border-rad
              font:inherit;font-size:13.5px;background:#fff}
 input:focus,select:focus{outline:2px solid var(--sea);outline-offset:1px;border-color:var(--sea)}
 .hint{font-size:12px;color:var(--muted);margin-top:5px}
+/* Keterangan di BAWAH nama, bukan di sampingnya. .nama memaksa inline-block
+   (untuk memotong teks panjang dengan elipsis), jadi div.hint.nama ikut jadi
+   inline-block dan berdiri sebaris dengan namanya — alamat KTP di tab Pesanan
+   dan catatan biro keduanya kena. Elipsisnya tetap jalan sebagai block. */
+.hint.nama{display:block;margin-top:2px;line-height:1.35}
 .note{background:var(--sky);border-left:3px solid var(--sea);padding:11px 13px;border-radius:0 8px 8px 0;
       font-size:12.5px;margin:12px 0}
 .note b{display:block;margin-bottom:3px}
@@ -207,6 +212,15 @@ input:focus,select:focus{outline:2px solid var(--sea);outline-offset:1px;border-
 .lapis h3{margin:0 0 6px}
 .lapis .aksi-bar{display:flex;gap:9px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
 .lapis .mono{font-family:ui-monospace,Menlo,monospace}
+/* Formulir pesanan biro punya banyak kolom; 480px membuatnya jadi satu kolom
+   panjang yang harus digulir. Hanya kotak berkelas .lebar yang dilebarkan,
+   jadi pop-up konfirmasi hapus tidak ikut berubah. */
+.lapis .kotak.lebar{width:640px}
+/* Baris ringkasan uang di dalam pop-up: label kiri, angka kanan. */
+.uang{display:flex;justify-content:space-between;gap:12px;padding:6px 0;
+  border-bottom:1px dashed var(--line);font-size:13.5px}
+.uang:last-child{border-bottom:0}
+.uang b{font-variant-numeric:tabular-nums}
 @media (max-width:560px){ .lapis .aksi-bar .btn{flex:1} }
 
 #pesan{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--navy);color:#fff;
@@ -222,6 +236,10 @@ input:focus,select:focus{outline:2px solid var(--sea);outline-offset:1px;border-
 
 <div id="pesan"></div>
 <div id="lapis-hapus" class="lapis hide"></div>
+<!-- Lapisan kedua, khusus formulir (catat bayar, pesanan biro, deposit).
+     Sengaja dipisah dari lapis-hapus supaya alur hapus akun yang sudah jalan
+     tidak ikut tersentuh sama sekali. -->
+<div id="lapis-form" class="lapis hide"></div>
 
 <!-- ============ LOGIN ============ -->
 <div id="layarLogin" class="wrap mid">
@@ -335,6 +353,13 @@ const JUDUL = {
 const bisaKelola = () => S.peran === 'super' || S.peran === 'owner';   /* jualan & uang */
 const bisaHarga  = () => bisaKelola() || S.peran === 'admin';          /* harga katalog */
 const bisaAkses  = () => S.peran === 'super';                          /* akun login    */
+/* Mencatat uang masuk ikut Admin: dialah yang menerima transfer sehari-hari.
+   Sama persis dengan penjagaan di dalam catat_bayar() di database. */
+const bisaBayar  = () => bisaKelola() || S.peran === 'admin';
+/* Memindahkan uang ke deposit dan menetapkan harga nego TIDAK ikut Admin:
+   itu keputusan nilai, bukan pencatatan. Sama dengan penjagaan di dalam
+   buat_pesanan_biro(), porsi_tak_naik_ke_deposit(), dan dp_batal_ke_deposit(). */
+const bisaDeposit = () => bisaKelola();
 
 const S = { peran:null, agenId:null, email:null, uid:null, atur:null,
              kapal:[], pengguna:[], agenList:[], tabAktif:null,
@@ -476,7 +501,12 @@ function menuPeran(peran){
                                ['voucher','Voucher & Tambahan'],['atur','Pengaturan']]
        : [['ringkas','Ringkasan'],['pesanan','Pesanan'],['berangkat','Keberangkatan'],
           ['kapal','Pembagian Kapal'],['fu','Follow-Up'],['manifest','Manifest'],
-          ['agen','Agen & Kode'],['voucher','Voucher & Tambahan'],
+          ['agen','Agen & Kode'],
+          /* Biro & Deposit tidak diberikan ke Admin: di tab inilah harga nego
+             ditetapkan dan uang dipindahkan ke deposit. Admin boleh MENCATAT
+             uang masuk (dari tab Pesanan), bukan menetapkan nilainya. */
+          ['biro','Biro & Deposit'],
+          ['voucher','Voucher & Tambahan'],
           ['akses','Kelola Akses'],['atur','Pengaturan']];
 }
 
@@ -560,7 +590,7 @@ function buka(tab){
   ({ringkas:tabRingkas, pesanan:tabPesanan, fu:tabFollowUp, manifest:tabManifest,
     agen:tabAgen, atur:tabAtur, komisi:tabKomisi, boarding:tabBoarding,
     kapal:tabKapal, berangkat:tabBerangkat, voucher:tabVoucher,
-    akses:tabAkses}[tab] || (()=>{}))();
+    biro:tabBiro, akses:tabAkses}[tab] || (()=>{}))();
 }
 
 /* ====================================================================
@@ -591,7 +621,13 @@ const JAM  = n => new Date(Date.now() - n*3600e3).toISOString();
 function dataLatihan(){
   const K1 = 'kapal-1', K2 = 'kapal-2';
   const AG = { budi:'agen-budi', sari:'agen-sari', anto:'agen-anto' };
+  const BR = { anugerah:'biro-anugerah', pandawa:'biro-pandawa', mundur:'biro-mundur' };
   const pr = n => ({ nama:n });
+  /* Nama penumpang dipakai pop-up "porsi tak naik" untuk menyebut siapa yang
+     tidak datang. Tanpa nama, pop-up itu cuma menampilkan tanda hubung dan
+     langkah panduannya jadi tidak ada artinya. */
+  const orang = (n, naikSampai) => Array.from({length:n}, (_,i) =>
+    ({ nama:`Peserta ${i+1}`, naik: i < naikSampai }));
   return {
     pesanan: [
       { id:'o1', kode:'TTC-LAT01', tipe:'perorangan', pax:2, anak:0, total:285000,
@@ -612,17 +648,54 @@ function dataLatihan(){
         pemesan_alamat:'Perum Griya Asri Blok C-7, RT 05/RW 08, Kel. Sidoharjo, Kec. Pacitan, Jawa Timur 63513',
         agen_id:AG.sari, produk:pr('Cruise Daily'), agen:{nama:'Sari Wulandari'},
         kapal:{nama:'Kapal 1'}, penumpang:[{naik:false},{naik:false},{naik:false},{naik:false}] },
+      /* Rombongan biro 40 orang, LUNAS, dan baru 37 yang naik. Inilah sasaran
+         langkah panduan "porsi tak naik -> deposit": 3 x Rp780.000 = Rp2.340.000.
+         deposit_jam sengaja null supaya tombolnya masih ada. */
       { id:'o3', kode:'TTC-LAT03', tipe:'biro', pax:40, anak:3, total:29640000,
         subtotal:31200000, diskon_nominal:1560000, tambahan_nominal:0,
+        harga_satuan_beku:780000, diskon_persen_beku:'5.00',
+        biro_id:BR.anugerah, biro_nama:'Biro Wisata Anugerah',
+        biro_pic:'Pak Hendra', biro_pic_wa:'81288887777',
+        deposit_jam:null, deposit_sebab:null,
         status:'paid', fu_status:'jadi', fu_terakhir:null,
         dibuat:JAM(30), diubah:JAM(28), tanggal_berangkat:HARI(2), kapal_id:K2,
         kode_voucher_beku:null, pemesan_nama:'Biro Wisata Anugerah', pemesan_hp:'081200000003',
         pemesan_hp2:'02177889900',
         pemesan_alamat:'Jl. Raya Solo-Yogya KM 15, Ruko Pandawa No. 4, Klaten, Jawa Tengah 57438',
         agen_id:AG.budi, produk:pr('2 Day Journey'), agen:{nama:'Budi Santoso'},
-        kapal:{nama:'Kapal 2'}, penumpang:Array.from({length:40},(_,i)=>({naik:i<2})) },
+        kapal:{nama:'Kapal 2'}, penumpang:orang(40, 37) },
+
+      /* Pesanan biro HARGA NEGO yang baru DP separuh. Sasaran langkah panduan
+         "DP Rp X, sisa Rp Y" dan tombol Catat pelunasan. Harga nego Rp400.000
+         (katalog 1 Day Journey Rp490.000), diskon 0 karena sudah harga bersih. */
+      { id:'o15', kode:'TTC-LAT15', tipe:'biro', pax:25, anak:0, total:10000000,
+        subtotal:10000000, diskon_nominal:0, tambahan_nominal:0,
+        harga_satuan_beku:400000, diskon_persen_beku:'0.00',
+        biro_id:BR.pandawa, biro_nama:'Biro Pandawa Tour',
+        biro_pic:'Bu Ratih', biro_pic_wa:'81277776666',
+        deposit_jam:null, deposit_sebab:null,
+        status:'waiting', fu_status:'jadi', fu_terakhir:null,
+        dibuat:JAM(18), diubah:JAM(17), tanggal_berangkat:HARI(4), kapal_id:null,
+        kode_voucher_beku:null, pemesan_nama:'Bu Ratih', pemesan_hp:'081277776666',
+        agen_id:null, produk:pr('1 Day Journey'), agen:null,
+        kapal:null, penumpang:orang(25, 0) },
+
+      /* Pesanan biro yang DIBATALKAN PEMBELI dengan DP Rp3.000.000 sudah masuk.
+         Sasaran langkah panduan "DP -> deposit". */
+      { id:'o16', kode:'TTC-LAT16', tipe:'biro', pax:20, anak:0, total:9800000,
+        subtotal:9800000, diskon_nominal:0, tambahan_nominal:0,
+        harga_satuan_beku:490000, diskon_persen_beku:'0.00',
+        biro_id:BR.mundur, biro_nama:'Biro Mundur Jaya',
+        biro_pic:'Pak Slamet', biro_pic_wa:'81255554444',
+        deposit_jam:null, deposit_sebab:null,
+        status:'cancel_pembeli', fu_status:'tidak', fu_terakhir:JAM(20),
+        dibuat:JAM(60), diubah:JAM(20), tanggal_berangkat:HARI(8), kapal_id:null,
+        kode_voucher_beku:null, pemesan_nama:'Pak Slamet', pemesan_hp:'081255554444',
+        agen_id:null, produk:pr('1 Day Journey'), agen:null,
+        kapal:null, penumpang:orang(20, 0) },
       { id:'o4', kode:'TTC-LAT04', tipe:'perorangan', pax:3, anak:0, total:427500,
         subtotal:450000, diskon_nominal:22500, tambahan_nominal:0,
+        harga_satuan_beku:150000, deposit_jam:null, deposit_sebab:null,
         status:'paid', fu_status:'jadi', fu_terakhir:null,
         dibuat:JAM(26), diubah:JAM(25), tanggal_berangkat:HARI(0), kapal_id:K1,
         kode_voucher_beku:null, pemesan_nama:'Fajar Ramadhan', pemesan_hp:'081200000004',
@@ -631,6 +704,7 @@ function dataLatihan(){
         kapal:{nama:'Kapal 1'}, penumpang:[{naik:true},{naik:true},{naik:false}] },
       { id:'o5', kode:'TTC-LAT05', tipe:'perorangan', pax:2, anak:0, total:665000,
         subtotal:300000, diskon_nominal:15000, tambahan_nominal:380000,
+        harga_satuan_beku:150000, deposit_jam:null, deposit_sebab:null,
         status:'boarded', fu_status:'jadi', fu_terakhir:null,
         dibuat:JAM(50), diubah:JAM(20), tanggal_berangkat:HARI(0), kapal_id:K1,
         kode_voucher_beku:'PACITAN', pemesan_nama:'Lestari Dewi', pemesan_hp:'081200000005',
@@ -700,6 +774,41 @@ function dataLatihan(){
         kode_voucher_beku:null, pemesan_nama:'Intan Permata', pemesan_hp:'081200000013',
         agen_id:AG.sari, produk:pr('Cruise Daily'), agen:{nama:'Sari Wulandari'}, kapal:null,
         penumpang:[{naik:false},{naik:false}] },
+      /* PESANAN WARISAN: statusnya LUNAS tapi tidak ada satu pun baris
+         pembayaran. Ini bentuk data yang ditinggalkan tombol "Lunas" satu-klik
+         yang lama — ia hanya mengubah status, tanpa mencatat uang. Wajib ada di
+         data latihan karena inilah satu-satunya keadaan yang menguji gerbang
+         "porsi tak terpakai butuh lunas menurut PEMBUKUAN, bukan menurut
+         status". Tanpa baris ini, gerbang itu tidak pernah terpakai dan
+         uji pun tidak bisa menangkap kalau gerbangnya dilepas. */
+      { id:'o17', kode:'TTC-LAT17', tipe:'biro', pax:12, anak:0, total:5880000,
+        subtotal:5880000, diskon_nominal:0, tambahan_nominal:0,
+        harga_satuan_beku:490000, diskon_persen_beku:'0.00',
+        biro_id:BR.pandawa, biro_nama:'Biro Pandawa Tour',
+        biro_pic:'Bu Ratih', biro_pic_wa:'81277776666',
+        deposit_jam:null, deposit_sebab:null,
+        status:'paid', fu_status:'jadi', fu_terakhir:null,
+        dibuat:JAM(500), diubah:JAM(480), tanggal_berangkat:HARI(-5), kapal_id:K1,
+        kode_voucher_beku:null, pemesan_nama:'Bu Ratih', pemesan_hp:'081277776666',
+        agen_id:null, produk:pr('1 Day Journey'), agen:null,
+        kapal:{nama:'Kapal 1'}, penumpang:orang(12, 9) },
+
+      /* Batal karena CUACA tapi DP-nya sudah masuk. Perlu ada supaya penolakan
+         "jalur ini hanya untuk pembatalan oleh pembeli" benar-benar teruji —
+         kalau contohnya tidak punya uang masuk, yang menolak adalah pemeriksaan
+         lain dan aturan cuacanya lolos tanpa diperiksa. */
+      { id:'o18', kode:'TTC-LAT18', tipe:'biro', pax:15, anak:0, total:7350000,
+        subtotal:7350000, diskon_nominal:0, tambahan_nominal:0,
+        harga_satuan_beku:490000, diskon_persen_beku:'0.00',
+        biro_id:BR.anugerah, biro_nama:'Biro Wisata Anugerah',
+        biro_pic:'Pak Hendra', biro_pic_wa:'81288887777',
+        deposit_jam:null, deposit_sebab:null,
+        status:'cancel_cuaca', fu_status:'jadi', fu_terakhir:null,
+        dibuat:JAM(300), diubah:JAM(100), tanggal_berangkat:HARI(-3), kapal_id:null,
+        kode_voucher_beku:null, pemesan_nama:'Pak Hendra', pemesan_hp:'081288887777',
+        agen_id:null, produk:pr('1 Day Journey'), agen:null,
+        kapal:null, penumpang:orang(15, 0) },
+
       /* Batal karena cuaca: bukan kelompok follow-up (bukan salah pembeli),
          tapi perlu ada supaya lencana BATAL - CUACA pernah terlihat di Pesanan. */
       { id:'o14', kode:'TTC-LAT14', tipe:'perorangan', pax:6, anak:2, total:855000,
@@ -769,6 +878,70 @@ function dataLatihan(){
         harga_lokal:null, harga_umum:null, harga_flat:200000,
         dapat_voucher:false, aktif:false, urutan:5, dibuat:JAM(400),
         deskripsi:'Belum dijual, masih uji coba.' },
+    ],
+    /* Biro: tiga baris supaya setiap keadaan ada contohnya.
+         anugerah — langganan, diskon tetap 10%, sudah punya saldo deposit
+         pandawa  — selalu nego, diskon 0, ada pesanan DP separuh
+         belumpic — AKTIF tapi PIC/WA belum diisi, jadi tombol "Pesanan baru"
+                    memang tidak muncul. Itu sasaran langkah panduan soal
+                    kenapa biro tanpa PIC tidak bisa dipesankan. */
+    biro: [
+      { id:BR.anugerah, nama:'Biro Wisata Anugerah', pic:'Pak Hendra',
+        pic_wa:'81288887777', diskon_persen:'10.00', aktif:true, dibuat:JAM(2000),
+        catatan:'Langganan sejak 2025, rombongan sekolah.' },
+      { id:BR.pandawa,  nama:'Biro Pandawa Tour', pic:'Bu Ratih',
+        pic_wa:'81277776666', diskon_persen:'0.00', aktif:true, dibuat:JAM(600),
+        catatan:'Harga selalu dinego per rombongan.' },
+      { id:BR.mundur,   nama:'Biro Mundur Jaya', pic:'Pak Slamet',
+        pic_wa:'81255554444', diskon_persen:'0.00', aktif:true, dibuat:JAM(900),
+        catatan:'Pernah mundur H-3, DP jadi deposit.' },
+      { id:'biro-belumpic', nama:'Biro Baru Belum Lengkap', pic:null,
+        pic_wa:null, diskon_persen:'0.00', aktif:true, dibuat:JAM(5),
+        catatan:'Baru didaftarkan, PIC belum dikonfirmasi.' },
+    ],
+
+    /* Mutasi deposit. Satu masuk dari porsi tak terpakai pelayaran lalu, satu
+       keluar karena dipakai sebagai potongan pesanan berikutnya, dan satu atas
+       nama nomor HP (pesanan perorangan). Sisa saldo anugerah: 1.560.000. */
+    deposit_mutasi: [
+      { id:'d1', biro_id:BR.anugerah, pemesan_hp:null, pesanan_id:null, arah:'masuk',
+        nominal:2340000, waktu:JAM(400), aktor_nama:'Dika Kurniawan',
+        catatan:'3 dari 40 penumpang tidak naik di pelayaran 12 Sep. Tidak '
+              + 'dikembalikan, jadi saldo deposit.' },
+      { id:'d2', biro_id:BR.anugerah, pemesan_hp:null, pesanan_id:null, arah:'keluar',
+        nominal:780000, waktu:JAM(200), aktor_nama:'Dika Kurniawan',
+        catatan:'Dipakai sebagai potongan rombongan berikutnya.' },
+      { id:'d3', biro_id:null, pemesan_hp:'81312345678', pesanan_id:null, arah:'masuk',
+        nominal:300000, waktu:JAM(150), aktor_nama:'Dika Kurniawan',
+        catatan:'2 orang tidak naik di pesanan perorangan. Saldo atas nama nomor HP.' },
+    ],
+
+    /* Riwayat pembayaran. Dipakai ringkas_bayar/riwayat_bayar versi latihan.
+       o3, o4, o5 lunas; o15 baru DP separuh; o16 DP lalu dibatalkan. */
+    pembayaran: [
+      { id:'y1', pesanan_id:'o3', metode:'transfer', nominal_diterima:15000000,
+        referensi:'BCA 8821', catatan:'DP rombongan 50%', waktu:JAM(29),
+        diverifikasi_jam:JAM(29), oleh:'Dika Kurniawan' },
+      { id:'y2', pesanan_id:'o3', metode:'transfer', nominal_diterima:14640000,
+        referensi:'BCA 9043', catatan:'Pelunasan', waktu:JAM(27),
+        diverifikasi_jam:JAM(27), oleh:'Dika Kurniawan' },
+      { id:'y3', pesanan_id:'o4', metode:'qris_statis', nominal_diterima:427500,
+        referensi:null, catatan:null, waktu:JAM(25),
+        diverifikasi_jam:JAM(25), oleh:'Uun Staf COO' },
+      { id:'y4', pesanan_id:'o5', metode:'tunai', nominal_diterima:665000,
+        referensi:null, catatan:'Bayar di dermaga', waktu:JAM(20),
+        diverifikasi_jam:JAM(20), oleh:'Uun Staf COO' },
+      { id:'y5', pesanan_id:'o15', metode:'transfer', nominal_diterima:5000000,
+        referensi:'Mandiri 4417', catatan:'DP 50%', waktu:JAM(17),
+        diverifikasi_jam:JAM(17), oleh:'Dika Kurniawan' },
+      { id:'y6', pesanan_id:'o16', metode:'transfer', nominal_diterima:3000000,
+        referensi:'BRI 1102', catatan:'DP rombongan', waktu:JAM(58),
+        diverifikasi_jam:JAM(58), oleh:'Dika Kurniawan' },
+      /* o17 SENGAJA tidak punya baris di sini: itulah intinya — statusnya lunas
+         tapi pembukuannya kosong. */
+      { id:'y7', pesanan_id:'o18', metode:'transfer', nominal_diterima:2000000,
+        referensi:'BCA 7781', catatan:'DP, lalu batal karena cuaca', waktu:JAM(290),
+        diverifikasi_jam:JAM(290), oleh:'Dika Kurniawan' },
     ],
     penumpang: [], audit: [], pesanan_tambahan: [],
   };
@@ -921,6 +1094,204 @@ function rpcLatihan(nama, arg = {}){
                 boleh_biro: !!a?.boleh_biro, alasan: a ? 'ok' : 'tidak_terdaftar' }];
     },
 
+    /* ---------- LAPISAN UANG: DP, PELUNASAN, DEPOSIT ----------
+       Penjagaannya ditiru PERSIS seperti di database, termasuk penolakannya.
+       Kalau versi latihan lebih longgar, panduan mengajarkan hal yang nanti
+       ditolak saat dipakai sungguhan — dan itu lebih buruk daripada tidak
+       ada panduan. */
+    ringkas_bayar: () => {
+      const o = P.find(x => x.kode === arg.p_kode);
+      if (!o || !['super','owner','admin'].includes(S.peran)) return [];
+      return [ringkasLat(o)];
+    },
+
+    ringkas_bayar_banyak: () => {
+      if (!['super','owner','admin'].includes(S.peran)) return [];
+      const pilih = arg.p_kode && arg.p_kode.length
+        ? P.filter(o => arg.p_kode.includes(o.kode)) : P;
+      return pilih.map(o => ({ r_kode:o.kode, ...ringkasLat(o) }));
+    },
+
+    riwayat_bayar: () => {
+      const o = P.find(x => x.kode === arg.p_kode);
+      if (!o || !['super','owner','admin'].includes(S.peran)) return [];
+      return (LATIH.pembayaran || [])
+        .filter(y => y.pesanan_id === o.id)
+        .sort((a,b) => String(a.waktu).localeCompare(String(b.waktu)))
+        .map(y => ({ r_waktu:y.waktu, r_nominal:y.nominal_diterima, r_metode:y.metode,
+                     r_referensi:y.referensi, r_catatan:y.catatan, r_oleh:y.oleh }));
+    },
+
+    catat_bayar: () => {
+      if (!['super','owner','admin'].includes(S.peran))
+        throw { code:'42501', message:'Hanya Super Admin, Owner, atau Admin yang boleh '
+                                    + 'mencatat pembayaran.' };
+      if (!['qris_dinamis','qris_statis','va','transfer','tunai'].includes(arg.p_metode))
+        throw { code:'22023', message:`Metode pembayaran "${arg.p_metode}" tidak dikenal.` };
+      if (!(arg.p_nominal > 0))
+        throw { code:'22023', message:'Nominal pembayaran harus lebih dari nol.' };
+      const o = P.find(x => x.kode === arg.p_kode);
+      if (!o) throw { code:'22023', message:`Pesanan ${arg.p_kode} tidak ditemukan.` };
+      if (['cancel_pembeli','cancel_cuaca','expired'].includes(o.status))
+        throw { code:'22023', message:`Pesanan ${o.kode} sudah dibatalkan. `
+                                    + 'Tidak bisa menerima pembayaran baru.' };
+      const r = ringkasLat(o);
+      if (arg.p_nominal > r.r_sisa)
+        throw { code:'22023', message:`Nominal Rp${arg.p_nominal} melebihi sisa tagihan `
+                                    + `Rp${r.r_sisa}. Sisa itulah yang maksimal bisa dicatat.` };
+      (LATIH.pembayaran ||= []).push({
+        id:'y-'+Math.random().toString(36).slice(2,8), pesanan_id:o.id,
+        metode:arg.p_metode, nominal_diterima:arg.p_nominal,
+        referensi:arg.p_referensi || null, catatan:arg.p_catatan || null,
+        waktu:new Date().toISOString(), diverifikasi_jam:new Date().toISOString(),
+        oleh:'Anda (mode panduan)' });
+      const r2 = ringkasLat(o);
+      if (r2.r_sisa === 0 && ['pending','waiting'].includes(o.status)) o.status = 'paid';
+      else if (r2.r_sisa > 0 && o.status === 'pending')                o.status = 'waiting';
+      o.diubah = new Date().toISOString();
+      return [{ r_dibayar:r2.r_dibayar, r_sisa:r2.r_sisa, r_keadaan:r2.r_keadaan }];
+    },
+
+    saldo_deposit: () => {
+      if (!['super','owner','admin'].includes(S.peran)) return 0;
+      return saldoLat(arg.p_biro, arg.p_hp);
+    },
+
+    buat_pesanan_biro: () => {
+      if (!['super','owner'].includes(S.peran))
+        throw { code:'42501', message:'Hanya Super Admin atau Owner yang boleh membuat '
+                                    + 'pesanan biro dengan harga nego.' };
+      const b = (LATIH.biro || []).find(x => x.id === arg.p_biro_id);
+      if (!b)        throw { code:'22023', message:'Biro tidak ditemukan.' };
+      if (!b.aktif)  throw { code:'22023', message:`Biro ${b.nama} sudah tidak aktif.` };
+      if (!b.pic || !b.pic_wa)
+        throw { code:'22023', message:`Biro ${b.nama} belum punya nama PIC dan nomor WA. `
+                                    + 'Lengkapi dulu datanya di tab Biro.' };
+      const pax = arg.p_pax, anak = arg.p_anak || 0;
+      if (!(pax >= 1 && pax <= 200))
+        throw { code:'22023', message:'Jumlah penumpang tidak masuk akal.' };
+      if (!(anak >= 0 && anak <= pax))
+        throw { code:'22023', message:'Jumlah anak tidak masuk akal.' };
+      if (!arg.p_tanggal)
+        throw { code:'22023', message:'Tanggal keberangkatan wajib diisi.' };
+      if (arg.p_tanggal < new Date().toISOString().slice(0,10))
+        throw { code:'22023', message:'Tanggal keberangkatan sudah lewat.' };
+      const pk = (LATIH.produk || []).find(p => p.slug === arg.p_produk_slug && p.aktif);
+      if (!pk) throw { code:'22023', message:`Paket "${arg.p_produk_slug}" tidak ditemukan `
+                                            + 'atau tidak aktif.' };
+      let satuan, persen;
+      if (arg.p_harga_satuan != null){
+        if (arg.p_harga_satuan < 0)
+          throw { code:'22023', message:'Harga nego tidak boleh minus.' };
+        satuan = arg.p_harga_satuan; persen = 0;
+      } else {
+        satuan = pk.bertingkat ? (arg.p_lokal ? pk.harga_lokal : pk.harga_umum) : pk.harga_flat;
+        if (satuan == null)
+          throw { code:'22023', message:`Harga katalog paket ${pk.nama} belum diisi.` };
+        persen = Number(b.diskon_persen) || 0;
+      }
+      const sub = satuan * pax, disk = Math.round(sub * persen / 100), total = sub - disk;
+      const dp = arg.p_dp || 0;
+      if (dp < 0)     throw { code:'22023', message:'Nominal DP tidak masuk akal.' };
+      if (dp > total) throw { code:'22023', message:`DP Rp${dp} melebihi total tagihan Rp${total}.` };
+
+      const n = (LATIH.pesanan.length + 1);
+      const kode = 'TTC-LAT' + String(50 + n);
+      const id   = 'o-lat-' + Math.random().toString(36).slice(2,8);
+      LATIH.pesanan.unshift({
+        id, kode, tipe:'biro', pax, anak, total, subtotal:sub, diskon_nominal:disk,
+        tambahan_nominal:0, harga_satuan_beku:satuan,
+        diskon_persen_beku:persen.toFixed(2),
+        biro_id:b.id, biro_nama:b.nama, biro_pic:b.pic, biro_pic_wa:b.pic_wa,
+        deposit_jam:null, deposit_sebab:null,
+        status:'pending', fu_status:'jadi', fu_terakhir:null,
+        dibuat:new Date().toISOString(), diubah:new Date().toISOString(),
+        tanggal_berangkat:arg.p_tanggal, kapal_id:null, kode_voucher_beku:null,
+        pemesan_nama:(arg.p_pemesan && arg.p_pemesan.nama) || b.pic,
+        pemesan_hp:b.pic_wa, agen_id:null,
+        produk:{ nama:pk.nama }, agen:null, kapal:null,
+        penumpang:Array.from({length:pax}, (_,i) => ({ nama:`Penumpang ${i+1}`, naik:false })),
+      });
+      if (dp > 0) rpcLatihan('catat_bayar', { p_kode:kode, p_nominal:dp,
+        p_metode:arg.p_metode || 'transfer', p_referensi:null,
+        p_catatan:arg.p_catatan || ('DP pesanan biro ' + b.nama) });
+      const r = ringkasLat(LATIH.pesanan.find(x => x.kode === kode));
+      return [{ r_kode:kode, r_token:'token-latihan', r_total:total,
+                r_dibayar:r.r_dibayar, r_sisa:r.r_sisa }];
+    },
+
+    porsi_tak_naik_ke_deposit: () => {
+      if (!['super','owner'].includes(S.peran))
+        throw { code:'42501', message:'Hanya Super Admin atau Owner yang boleh memindahkan '
+                                    + 'porsi tak terpakai ke deposit.' };
+      const o = P.find(x => x.kode === arg.p_kode);
+      if (!o) throw { code:'22023', message:`Pesanan ${arg.p_kode} tidak ditemukan.` };
+      if (o.deposit_jam)
+        throw { code:'22023', message:`Pesanan ${o.kode} sudah pernah dipindahkan ke `
+                                    + 'deposit. Tidak bisa dua kali.' };
+      if (!['paid','boarded'].includes(o.status))
+        throw { code:'22023', message:`Pesanan ${o.kode} berstatus "${o.status}". Porsi tak `
+                 + 'terpakai baru bisa dihitung setelah pesanan lunas dan boarding selesai.' };
+      const r = ringkasLat(o);
+      if (r.r_dibayar < o.total)
+        throw { code:'22023', message:`Pesanan ${o.kode} belum lunas (baru Rp${r.r_dibayar} `
+                 + `dari Rp${o.total}). Lunasi dulu, baru porsi tak terpakai dipindahkan.` };
+      const pnp  = o.penumpang || [];
+      const naik = pnp.filter(p => p.naik).length;
+      const jml  = o.pax - naik;
+      if (naik === 0)
+        throw { code:'22023', message:`Belum ada satu pun penumpang pesanan ${o.kode} yang `
+                 + 'tercatat naik. Selesaikan boarding dulu; kalau memang tidak jalan, '
+                 + 'pakai pembatalan.' };
+      if (jml <= 0)
+        throw { code:'22023', message:`Semua ${o.pax} penumpang pesanan ${o.kode} sudah naik. `
+                                    + 'Tidak ada porsi yang tersisa.' };
+      const nominal = jml * (o.harga_satuan_beku || 0);
+      if (nominal <= 0)
+        throw { code:'22023', message:`Harga satuan pesanan ${o.kode} nol, jadi porsi tak `
+                                    + 'terpakai bernilai Rp0.' };
+      const nama = pnp.filter(p => !p.naik).map(p => p.nama).join(', ');
+      const hp   = o.biro_id ? null : hpPolos(o.pemesan_hp);
+      (LATIH.deposit_mutasi ||= []).unshift({
+        id:'d-'+Math.random().toString(36).slice(2,8), biro_id:o.biro_id || null,
+        pemesan_hp:hp, pesanan_id:o.id, arah:'masuk', nominal,
+        waktu:new Date().toISOString(), aktor_nama:'Anda (mode panduan)',
+        catatan:(arg.p_catatan ? arg.p_catatan + ' — ' : '')
+          + `${jml} dari ${o.pax} penumpang tidak naik di pesanan ${o.kode} (${nama}). `
+          + 'Tidak dikembalikan, jadi saldo deposit.' });
+      o.deposit_jam = new Date().toISOString(); o.deposit_sebab = 'tak_naik';
+      return [{ r_jumlah:jml, r_nominal:nominal,
+                r_saldo:saldoLat(o.biro_id, hp), r_nama_tak_naik:nama }];
+    },
+
+    dp_batal_ke_deposit: () => {
+      if (!['super','owner'].includes(S.peran))
+        throw { code:'42501', message:'Hanya Super Admin atau Owner yang boleh memindahkan '
+                                    + 'DP batal ke deposit.' };
+      const o = P.find(x => x.kode === arg.p_kode);
+      if (!o) throw { code:'22023', message:`Pesanan ${arg.p_kode} tidak ditemukan.` };
+      if (o.deposit_jam)
+        throw { code:'22023', message:`Pesanan ${o.kode} sudah pernah dipindahkan ke `
+                                    + 'deposit. Tidak bisa dua kali.' };
+      if (o.status !== 'cancel_pembeli')
+        throw { code:'22023', message:`Pesanan ${o.kode} berstatus "${o.status}". Jalur ini `
+                 + 'hanya untuk pembatalan oleh pembeli; batal karena cuaca diputuskan '
+                 + 'terpisah.' };
+      const r = ringkasLat(o);
+      if (r.r_dibayar <= 0)
+        throw { code:'22023', message:`Pesanan ${o.kode} belum ada uang masuk sama sekali.` };
+      const hp = o.biro_id ? null : hpPolos(o.pemesan_hp);
+      (LATIH.deposit_mutasi ||= []).unshift({
+        id:'d-'+Math.random().toString(36).slice(2,8), biro_id:o.biro_id || null,
+        pemesan_hp:hp, pesanan_id:o.id, arah:'masuk', nominal:r.r_dibayar,
+        waktu:new Date().toISOString(), aktor_nama:'Anda (mode panduan)',
+        catatan:(arg.p_catatan ? arg.p_catatan + ' — ' : '')
+          + `Pesanan ${o.kode} dibatalkan pembeli. Uang masuk Rp${r.r_dibayar} tidak `
+          + 'dikembalikan, jadi saldo deposit.' });
+      o.deposit_jam = new Date().toISOString(); o.deposit_sebab = 'batal';
+      return [{ r_nominal:r.r_dibayar, r_saldo:saldoLat(o.biro_id, hp) }];
+    },
+
     /* Perubahan akses dan nama tidak disimulasikan dalam-dalam: cukup berhasil,
        supaya alurnya terasa utuh tanpa memberi kesan data sungguhan berubah. */
     ubah_peran:          () => null,
@@ -936,6 +1307,39 @@ function rpcLatihan(nama, arg = {}){
   } catch (e) {
     return Promise.resolve({ data:null, error:e });
   }
+}
+
+/* ---- Pembantu lapisan uang versi latihan ----
+   Dipisah dari rpcLatihan supaya tiga fungsi yang memakainya (ringkas_bayar,
+   catat_bayar, porsi/dp ke deposit) menghitung dengan rumus yang SAMA. Dulu
+   sempat kutulis dua kali dan hasilnya langsung beda saat ada pembayaran
+   sebagian — itu sebabnya sekarang satu tempat. */
+function ringkasLat(o){
+  if (!o) return { r_total:0, r_dibayar:0, r_sisa:0, r_keadaan:'belum', r_jml_bayar:0 };
+  const baris = (LATIH.pembayaran || []).filter(y => y.pesanan_id === o.id
+                                              && y.nominal_diterima != null);
+  const dibayar = baris.reduce((a, y) => a + y.nominal_diterima, 0);
+  return {
+    r_total: o.total, r_dibayar: dibayar,
+    r_sisa: Math.max(o.total - dibayar, 0),
+    r_keadaan: dibayar === 0 ? 'belum' : dibayar < o.total ? 'sebagian'
+             : dibayar === o.total ? 'lunas' : 'lebih',
+    r_jml_bayar: baris.length,
+  };
+}
+
+function saldoLat(biroId, hp){
+  return (LATIH.deposit_mutasi || [])
+    .filter(m => (biroId && m.biro_id === biroId) || (hp && m.pemesan_hp === hp))
+    .reduce((a, m) => a + (m.arah === 'masuk' ? m.nominal : -m.nominal), 0);
+}
+
+/* Cermin dari fungsi hp_polos() di database: 0813…/+62813…/813… jadi 813…. */
+function hpPolos(hp){
+  let d = String(hp || '').replace(/\D/g, '');
+  if (d.startsWith('62'))     d = d.slice(2);
+  else if (d.startsWith('0')) d = d.slice(1);
+  return /^[0-9]{9,15}$/.test(d) ? d : null;
 }
 
 /* Satu pintu untuk SELURUH akses data dashboard. Saat mode latihan mati, dia
@@ -973,6 +1377,13 @@ function kosongkanCache(){
   S.atur     = null;
   S.agenListDari = null;
   S.agenId   = S.agenIdAsli;
+  /* Ringkasan uang dan daftar biro ikut dikosongkan. Kalau tidak: keluar dari
+     mode panduan dengan peta bayar PALSU masih tersimpan, lalu tabel Pesanan
+     sungguhan menggambar tombol "Catat pelunasan" dan "Porsi tak naik" di baris
+     yang keadaan uangnya sebenarnya lain. Ini bug yang sama persis dengan
+     kebocoran S.agenList dulu, cuma barangnya uang. */
+  S.bayarPeta = {};
+  S.biroList  = [];
 }
 
 async function masukLatihan(nyala){
@@ -1159,11 +1570,24 @@ const TUTOR = {
     { tab:'pesanan', cari:'#isi .papan-atas select', judul:'Saringan cepat',
       teks:'Pilih di sini untuk menampilkan hanya status tertentu, misalnya yang BELUM BAYAR saja, '
          + 'atau hanya pesanan dari satu agen.' },
-    { tab:'pesanan', cari:'#isi [data-ke="paid"]',
-      judul:'Konfirmasi pembayaran',
-      teks:'Tombol <b>Lunas</b> ini hanya muncul pada pesanan yang belum bayar. Tekan setelah '
-         + 'uangnya benar-benar masuk. Di sebelahnya ada <b>Batal</b> yang wajib disertai alasan. '
-         + 'Keduanya tercatat di audit atas nama Anda.' },
+    { tab:'pesanan', cari:'#isi [data-bayar]',
+      judul:'Mencatat uang masuk',
+      teks:'Tombol <b>Catat bayar</b> membuka formulir pencatatan: nominal, metode, dan '
+         + 'referensi transfernya. Nominalnya sudah terisi sebesar sisa tagihan &mdash; '
+         + 'ubah kalau yang masuk baru DP. Boleh dicatat berkali-kali sampai lunas; '
+         + 'begitu sisanya nol, status pesanan ikut jadi LUNAS sendiri.' },
+    { tab:'pesanan', cari:['#isi [data-porsi]','#isi [data-bayar]'],
+      judul:'Porsi yang tidak naik',
+      teks:'Pesanan biro yang sudah lunas dan sudah boarding punya tombol '
+         + '<b>Porsi tak naik &rarr; deposit</b>. Yang dipesan 40 orang, yang naik 37, '
+         + 'maka 3 porsi itu tidak dikembalikan uangnya tapi jadi saldo deposit '
+         + 'atas nama bironya. Hanya bisa sekali per pesanan.' },
+    { tab:'pesanan', cari:'#isi [data-ke="cancel_pembeli"]',
+      judul:'Membatalkan pesanan',
+      teks:'<b>Batal</b> wajib disertai alasan &mdash; database menolak yang kosong. '
+         + 'Kalau pesanannya sudah ada DP, setelah dibatalkan muncul tombol '
+         + '<b>DP &rarr; deposit</b> untuk memindahkan uangnya jadi saldo. '
+         + 'Semuanya tercatat di audit atas nama Anda.' },
     { tab:'berangkat', cari:['#isi .kpi:nth-child(3)','#isi .kpi'], judul:'Keberangkatan',
       teks:'Tiket terjual per tanggal berangkat. Perhatikan "Belum dapat kapal" — kalau angkanya '
          + 'oranye, masih ada rombongan yang belum ditempatkan.' },
@@ -1181,6 +1605,23 @@ const TUTOR = {
     { tab:'agen', cari:'#isi [data-sel-wa]', judul:'Agen & Kode',
       teks:'Nomor WhatsApp di sini menentukan ke mana pelanggan diarahkan setelah memesan. '
          + 'Perubahannya langsung berlaku di situs, tanpa perlu apa-apa lagi.' },
+    { tab:'biro', cari:'#isi #kartu-biro-baru', judul:'Biro & Deposit',
+      teks:'Biro berbeda dari agen: agen membawa pelanggan lewat kode referral dan dapat '
+         + 'komisi, biro memesan rombongan langsung lewat Anda dengan harga nego dan '
+         + '<b>tanpa komisi</b>. Nama PIC dan nomor WA wajib &mdash; tanpa itu pesanan '
+         + 'birónya ditolak database.' },
+    { tab:'biro', cari:['#isi [data-pesan-biro]','#isi table[data-papan="biro"]'],
+      judul:'Pesanan biro harga nego',
+      teks:'Tombol <b>Pesanan baru</b> membuka formulir harga nego: jumlah orang, harga '
+         + 'per orang hasil kesepakatan, dan DP yang sudah masuk. Totalnya dihitung di '
+         + 'layar supaya bisa dilihat dulu, tapi yang berlaku tetap hitungan database. '
+         + 'Nama penumpangnya terisi sementara dan diperbaiki belakangan di Manifest.' },
+    { tab:'biro', cari:'#isi table[data-papan="mutasi"]', judul:'Mutasi deposit',
+      teks:'Buku deposit ini <b>tambah saja</b>: barisnya tidak bisa diubah maupun dihapus '
+         + 'oleh siapa pun yang login lewat dashboard. Salah catat diperbaiki dengan '
+         + 'mutasi penyeimbang, bukan dengan menghapus jejaknya. Saldo di tabel atas '
+         + 'dijumlahkan dari sini tiap kali layar dibuka &mdash; tidak ada kolom saldo '
+         + 'tersimpan yang bisa melenceng.' },
     { tab:'voucher', cari:'#isi table[data-papan="voucher"]', judul:'Voucher & Tambahan',
       teks:'Kode voucher membuka harga warga Pacitan. Di bawahnya ada harga add-on '
          + 'drone dan paddleboard yang bisa diubah dari sini.' },
@@ -1216,11 +1657,18 @@ const TUTOR = {
          + 'Voucher &amp; Tambahan dan Pengaturan untuk mengatur harga.' },
     { tab:'pesanan', cari:'#isi .papan-atas .cari', judul:'Cari pesanan',
       teks:'Ketik kode pesanan yang disebut pelanggan di chat. Tidak perlu lengkap.' },
-    { tab:'pesanan', cari:'#isi [data-ke="paid"]',
-      judul:'Tandai lunas',
-      teks:'Tombol <b>Lunas</b> ini hanya muncul pada pesanan yang belum bayar. Tekan setelah '
-         + 'uangnya benar-benar masuk; tercatat di audit atas nama Anda. Anda tidak bisa '
-         + 'mengubah harga &mdash; itu memang bukan wewenang Admin.' },
+    { tab:'pesanan', cari:'#isi [data-bayar]',
+      judul:'Mencatat uang masuk',
+      teks:'Tombol <b>Catat bayar</b> membuka formulir pencatatan: nominal, metode, dan '
+         + 'referensi transfernya. Nominalnya terisi sebesar sisa tagihan &mdash; ubah '
+         + 'kalau yang masuk baru DP. Boleh dicatat berkali-kali sampai lunas; begitu '
+         + 'sisanya nol, status pesanan ikut jadi LUNAS sendiri. Semuanya tercatat di '
+         + 'audit atas nama Anda.' },
+    { cari:null, judul:'Yang bukan wewenang Anda',
+      teks:'Anda <b>mencatat</b> uang masuk, tapi tidak <b>menetapkan</b> nilainya: harga '
+         + 'nego pesanan biro dan pemindahan uang ke saldo deposit hanya bisa dilakukan '
+         + 'Super Admin atau Owner. Karena itu tab <b>Biro &amp; Deposit</b> tidak ada di '
+         + 'deretan tab Anda. Harga katalog tetap boleh Anda ubah di Pengaturan.' },
     { tab:'kapal', cari:'#isi [data-kapal]', judul:'Bagi kapal',
       teks:'Pilih Kapal 1 atau Kapal 2 lewat dropdown. Perhatikan kartu muatan di atas: '
          + 'kalau merah, muatannya melebihi kapasitas kapal.' },
@@ -1587,9 +2035,22 @@ async function tabRingkas(){
 async function tabPesanan(){
   const { data, error } = await DB.from('pesanan')
     .select('kode,tipe,pax,anak,total,status,dibuat,tanggal_berangkat,kode_voucher_beku,'
-           + 'pemesan_nama,pemesan_hp,pemesan_hp2,pemesan_alamat,produk(nama),agen(nama),kapal(nama)')
+           + 'pemesan_nama,pemesan_hp,pemesan_hp2,pemesan_alamat,biro_id,biro_nama,'
+           + 'deposit_jam,deposit_sebab,harga_satuan_beku,produk(nama),agen(nama),kapal(nama)')
     .order('dibuat',{ascending:false}).limit(300);
   if (error) return gagal(error);
+
+  /* Ringkasan uang per pesanan: satu panggilan untuk seluruh tabel.
+     TIDAK dibaca dari tabel pembayaran langsung — RLS-nya hanya super & owner,
+     jadi Admin (yang justru mencatat uang masuk) akan lihat kolomnya kosong.
+     Kalau fungsinya belum ada di database (deploy DB belum jalan), kolomnya
+     cuma tidak menampilkan rincian; tabelnya tetap tampil. */
+  let bayarPeta = {};
+  if (bisaBayar()){
+    const { data: rb, error: eb } = await DB.rpc('ringkas_bayar_banyak', { p_kode: null });
+    if (!eb) (rb || []).forEach(r => { bayarPeta[r.r_kode] = r; });
+  }
+  S.bayarPeta = bayarPeta;
 
   $('isi').innerHTML = `
     <div class="card scrollx">
@@ -1620,9 +2081,9 @@ async function tabPesanan(){
             <td class="num nw">${o.pax}${o.anak?` <span class="pill p-warn">${o.anak} anak</span>`:''}</td>
             <td class="nw">${o.agen?`<span class="nama" style="max-width:130px" title="${esc(o.agen.nama)}">${esc(o.agen.nama)}</span>`
               :'<span class="pill p-mute">LANGSUNG</span>'}</td>
-            <td class="nw"><span class="sel2"><span class="pill ${st[1]}">${st[0]}</span>${
+            <td class="nw"><span class="sel2" style="flex-wrap:wrap"><span class="pill ${st[1]}">${st[0]}</span>${
               aksiStatus(o)}</span></td>
-            <td class="num nw" data-urut="${o.total}">${rp(o.total)}</td></tr>`;
+            <td class="num nw" data-urut="${o.total}">${rp(o.total)}${selBayar(o, bayarPeta[o.kode])}</td></tr>`;
         }).join('')}
       </tbody></table>
     </div>`;
@@ -1645,15 +2106,83 @@ async function tabPesanan(){
    lewat fungsi ubah_status_pesanan() di database, bukan UPDATE langsung — admin
    tidak boleh punya akses tulis ke tabel pesanan karena RLS menjaga per baris,
    bukan per kolom (dia bisa ikut mengubah kolom total). */
-const BOLEH_UBAH_STATUS = ['super','admin'];
+/* 26 Okt 2026: 'owner' ditambahkan. Fungsi ubah_status_pesanan() di database
+   sejak awal mengizinkan super, owner, DAN admin — daftar di sini yang
+   ketinggalan saat peran Owner diperluas, jadi tombol Lunas dan Batal tidak
+   pernah tergambar untuk Owner padahal database menerimanya. Ditemukan saat
+   memasang lapisan DP, bukan oleh laporan dari lapangan. */
+const BOLEH_UBAH_STATUS = ['super','owner','admin'];
+
+/* ---- Sel rincian uang di kolom Total ----
+   Ditempel di bawah angka total, BUKAN jadi kolom baru: tabel Pesanan sudah
+   sepuluh kolom dan menambah satu lagi memaksa digeser menyamping di layar HP.
+   Yang lunas tidak diberi apa-apa — kebanyakan baris lunas, dan menuliskan
+   "lunas" di tiap baris cuma bikin ramai tanpa menambah keterangan. */
+function selBayar(o, rb){
+  if (!rb) return '';
+  if (['cancel_pembeli','cancel_cuaca','expired'].includes(o.status)){
+    if (!rb.r_dibayar) return '';
+    return `<div class="hint" style="text-align:right">uang masuk ${rp(rb.r_dibayar)}${
+      o.deposit_jam ? ' · <span class="pill p-sea">KE DEPOSIT</span>' : ''}</div>`;
+  }
+  if (rb.r_keadaan === 'sebagian')
+    return `<div class="hint" style="text-align:right;color:var(--warn)">
+      DP ${rp(rb.r_dibayar)} &middot; sisa <b>${rp(rb.r_sisa)}</b></div>`;
+  if (rb.r_keadaan === 'belum')
+    return `<div class="hint" style="text-align:right">belum ada uang masuk</div>`;
+  if (rb.r_keadaan === 'lebih')
+    return `<div class="hint" style="text-align:right;color:var(--danger)">
+      terbayar ${rp(rb.r_dibayar)} &mdash; <b>lebih</b></div>`;
+  /* lunas */
+  return o.deposit_jam
+    ? `<div class="hint" style="text-align:right"><span class="pill p-sea">PORSI KE DEPOSIT</span></div>`
+    : '';
+}
 
 function aksiStatus(o){
-  if (!BOLEH_UBAH_STATUS.includes(S.peran)) return '';
   const t = [];
+  const rb = (S.bayarPeta || {})[o.kode];
+  const dibayar = rb ? rb.r_dibayar : null;
+  const sisa    = rb ? rb.r_sisa    : null;
+  const hidup   = !['cancel_pembeli','cancel_cuaca','expired'].includes(o.status);
+
+  /* ---- Uang masuk ----
+     Tombol "Lunas" satu klik sengaja DIGANTI formulir pencatatan. Dulu ia
+     memanggil ubah_status_pesanan() yang hanya mengubah status, tanpa menulis
+     satu baris pun di tabel pembayaran. Akibatnya: pesanan tampak lunas, tapi
+     menurut pembukuan belum ada uang yang pernah masuk — dan porsi tak
+     terpakai tidak bisa dihitung karena syaratnya "jumlah uang masuk >= total".
+     Jadi sekarang setiap rupiah lewat catat_bayar(), termasuk pelunasan penuh.
+     Satu klik lebih banyak, tapi angkanya cocok dengan buku. */
+  if (bisaBayar() && rb){
+    if (hidup && sisa > 0)
+      t.push(`<a class="aksi ghost" href="#" data-bayar="${esc(o.kode)}">${
+        dibayar > 0 ? 'Pelunasan' : 'Catat bayar'}</a>`);
+    else if (dibayar > 0)
+      t.push(`<a class="aksi ghost" href="#" data-bayar="${esc(o.kode)}"
+         style="color:var(--muted)">Riwayat</a>`);
+  }
+
+  /* ---- Porsi tak naik -> deposit ----
+     Hanya setelah lunas dan boarding berjalan, dan hanya sekali per pesanan.
+     Tombolnya disembunyikan kalau sudah pernah dipindahkan, supaya tidak ada
+     yang mencoba menekan dua kali dan dapat penolakan. */
+  if (bisaDeposit() && ['paid','boarded'].includes(o.status)
+      && !o.deposit_jam && rb && rb.r_sisa === 0)
+    t.push(`<a class="aksi ghost" href="#" data-porsi="${esc(o.kode)}"
+       data-pax="${o.pax}" data-satuan="${o.harga_satuan_beku || 0}"
+       data-biro="${esc(o.biro_nama || '')}">Porsi &rarr; deposit</a>`);
+
+  /* ---- DP batal -> deposit ---- */
+  if (bisaDeposit() && o.status === 'cancel_pembeli'
+      && !o.deposit_jam && dibayar > 0)
+    t.push(`<a class="aksi ghost" href="#" data-dpbatal="${esc(o.kode)}"
+       data-nominal="${dibayar}" data-biro="${esc(o.biro_nama || '')}"
+       data-hp="${esc(o.pemesan_hp || '')}">DP &rarr; deposit</a>`);
+
+  if (!BOLEH_UBAH_STATUS.includes(S.peran)) return t.join(' ');
   /* 'waiting' tetap ditangani walau sudah tidak dipakai di alur baru —
      masih ada baris lama yang berstatus itu. */
-  if (['pending','waiting'].includes(o.status))
-    t.push(`<a class="aksi ghost" href="#" data-status="${esc(o.kode)}" data-ke="paid">Lunas</a>`);
   if (['pending','waiting','paid'].includes(o.status))
     t.push(`<a class="aksi" href="#" data-status="${esc(o.kode)}" data-ke="cancel_pembeli"
        style="background:var(--dangerbg);color:var(--danger);border-color:#e3a8a2">Batal</a>`);
@@ -1699,6 +2228,287 @@ function pasangAksiStatus(muatUlang){
     pesan(`<b>${esc(kode)}</b> ${kabar}. Tercatat di audit atas nama Anda.`, 9000);
     muatUlang();
   });
+  pasangAksiUang(muatUlang);
+}
+
+/* ====================================================================
+   POP-UP UANG — catat bayar, porsi tak naik, DP batal
+   --------------------------------------------------------------------
+   Semuanya lewat lapisan #lapis-form, bukan di dalam sel tabel. Alasan yang
+   sama dengan pop-up hapus akun: formulir di dalam sel membuat kolom melar dan
+   teksnya terpotong di kanan.
+   ==================================================================== */
+function bukaLapis(isi, lebar){
+  const lapis = $('lapis-form');
+  lapis.classList.remove('hide');
+  lapis.innerHTML = `<div class="kotak${lebar ? ' lebar' : ''}" role="dialog"
+    aria-modal="true">${isi}</div>`;
+  const tutup = () => { lapis.classList.add('hide'); lapis.innerHTML = ''; };
+  lapis.onclick = ev => { if (ev.target === lapis) tutup(); };
+  /* Escape menutup dari mana pun di dalam kotak, tidak cuma dari kolom isian. */
+  lapis.onkeydown = ev => { if (ev.key === 'Escape') tutup(); };
+  return { lapis, tutup, q: sel => lapis.querySelector(sel) };
+}
+
+/* Angka rupiah yang diketik orang: "1.000.000", "1 000 000", "Rp1000000".
+   Semua dibersihkan jadi 1000000. Mengembalikan null kalau bukan angka. */
+function angkaRp(teks){
+  const d = String(teks ?? '').replace(/[^0-9]/g, '');
+  if (d === '') return null;
+  const n = parseInt(d, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+const METODE = [['transfer','Transfer bank'],['tunai','Tunai'],
+                ['qris_statis','QRIS statis'],['qris_dinamis','QRIS dinamis'],
+                ['va','Virtual account']];
+
+function pasangAksiUang(muatUlang){
+  /* ---- Catat bayar / riwayat ---- */
+  $('isi').querySelectorAll('[data-bayar]').forEach(t => t.onclick = async e => {
+    e.preventDefault();
+    await popBayar(t.dataset.bayar, muatUlang);
+  });
+
+  /* ---- Porsi tak naik -> deposit ---- */
+  $('isi').querySelectorAll('[data-porsi]').forEach(t => t.onclick = async e => {
+    e.preventDefault();
+    await popPorsi(t.dataset.porsi, muatUlang);
+  });
+
+  /* ---- DP batal -> deposit ---- */
+  $('isi').querySelectorAll('[data-dpbatal]').forEach(t => t.onclick = e => {
+    e.preventDefault();
+    popDpBatal(t.dataset.dpbatal, Number(t.dataset.nominal || 0),
+               t.dataset.biro, t.dataset.hp, muatUlang);
+  });
+}
+
+/* ---- Pop-up: ringkasan + riwayat + formulir pencatatan ---- */
+async function popBayar(kode, muatUlang){
+  const [{ data: rs, error: e1 }, { data: rw }] = await Promise.all([
+    DB.rpc('ringkas_bayar',  { p_kode: kode }),
+    DB.rpc('riwayat_bayar',  { p_kode: kode }),
+  ]);
+  if (e1) return gagalPesan(e1);
+  const r = Array.isArray(rs) ? rs[0] : rs;
+  if (!r) return pesan('Ringkasan pembayaran tidak terbaca untuk pesanan ini.', 8000);
+
+  const riwayat = rw || [];
+  const bolehCatat = r.r_sisa > 0;
+
+  const { q, tutup } = bukaLapis(`
+    <h3>Pembayaran ${esc(kode)}</h3>
+    <div class="hint" style="margin-bottom:12px">Setiap pencatatan tersimpan sebagai
+      baris tersendiri dan tercatat di audit atas nama Anda. Tidak bisa dihapus.</div>
+
+    <div style="margin-bottom:14px">
+      <div class="uang"><span>Total tagihan</span><b>${rp(r.r_total)}</b></div>
+      <div class="uang"><span>Sudah masuk</span><b style="color:var(--ok)">${rp(r.r_dibayar)}</b></div>
+      <div class="uang"><span>Sisa</span><b style="color:${
+        r.r_sisa > 0 ? 'var(--warn)' : 'var(--muted)'}">${rp(r.r_sisa)}</b></div>
+    </div>
+
+    ${riwayat.length ? `<div class="card scrollx" style="margin:0 0 14px;padding:0;border:0">
+      <table style="margin:0"><thead><tr><th class="nw">Waktu</th><th class="num">Nominal</th>
+        <th class="nw">Metode</th><th class="nw">Referensi</th><th class="nw">Dicatat oleh</th>
+        </tr></thead><tbody>
+        ${riwayat.map(b => `<tr>
+          <td class="nw" style="color:var(--muted)">${tgl(b.r_waktu)}</td>
+          <td class="num nw">${rp(b.r_nominal)}</td>
+          <td class="nw">${esc((METODE.find(m => m[0] === b.r_metode) || [,b.r_metode])[1])}</td>
+          <td class="mono nw" style="font-size:11.5px">${esc(b.r_referensi || '—')}</td>
+          <td class="nw">${esc(b.r_oleh)}</td></tr>`).join('')}
+      </tbody></table></div>`
+      : '<div class="note" style="margin-bottom:14px"><b>Belum ada uang masuk</b>Pesanan ini belum pernah dicatat pembayarannya.</div>'}
+
+    ${bolehCatat ? `
+      <div class="grid g2" style="margin-bottom:0">
+        <div class="fld"><label for="by-nominal">Nominal diterima</label>
+          <input id="by-nominal" inputmode="numeric" autocomplete="off"
+                 value="${r.r_sisa}" placeholder="mis. 10000000">
+          <div class="hint">Terisi otomatis sebesar sisa tagihan. Ubah kalau ini DP.
+            Tidak boleh melebihi sisa.</div></div>
+        <div class="fld"><label for="by-metode">Metode</label>
+          <select id="by-metode">${METODE.map(([v,l]) =>
+            `<option value="${v}">${l}</option>`).join('')}</select>
+          <div class="hint">Dipakai untuk mencocokkan dengan mutasi rekening.</div></div>
+      </div>
+      <div class="grid g2">
+        <div class="fld"><label for="by-ref">Referensi <span
+          style="font-weight:400;color:var(--muted)">(boleh dikosongkan)</span></label>
+          <input id="by-ref" maxlength="80" autocomplete="off"
+                 placeholder="mis. 4 digit terakhir / ID transaksi"></div>
+        <div class="fld"><label for="by-cat">Catatan <span
+          style="font-weight:400;color:var(--muted)">(boleh dikosongkan)</span></label>
+          <input id="by-cat" maxlength="140" autocomplete="off"
+                 placeholder="mis. DP rombongan, pelunasan di dermaga"></div>
+      </div>` : ''}
+
+    <div class="aksi-bar">
+      <button type="button" class="btn ghost tbl-tutup">${bolehCatat ? 'Batal' : 'Tutup'}</button>
+      ${bolehCatat ? '<button type="button" class="btn tbl-simpan">Catat pembayaran</button>' : ''}
+    </div>`, true);
+
+  q('.tbl-tutup').onclick = tutup;
+  if (!bolehCatat) return;
+
+  const nom = q('#by-nominal');
+  nom.focus(); nom.select();
+  const tbl = q('.tbl-simpan');
+
+  tbl.onclick = async () => {
+    const n = angkaRp(nom.value);
+    if (n === null || n <= 0){ nom.focus();
+      return pesan('Nominal harus angka lebih dari nol.', 7000); }
+    if (n > r.r_sisa){ nom.focus();
+      return pesan(`Nominal ${rp(n)} melebihi sisa tagihan ${rp(r.r_sisa)}. `
+        + 'Database juga menolaknya.', 10000); }
+
+    tbl.disabled = true; tbl.innerHTML = '<span class="spin"></span> Menyimpan…';
+    const { data, error } = await DB.rpc('catat_bayar', {
+      p_kode: kode, p_nominal: n, p_metode: q('#by-metode').value,
+      p_referensi: (q('#by-ref').value || '').trim() || null,
+      p_catatan:   (q('#by-cat').value || '').trim() || null,
+    });
+    if (error){
+      tbl.disabled = false; tbl.textContent = 'Catat pembayaran';
+      return gagalPesan(error);
+    }
+    const h = Array.isArray(data) ? data[0] : data;
+    tutup();
+    pesan(h && h.r_keadaan === 'lunas'
+      ? `<b>${esc(kode)}</b> LUNAS. ${rp(n)} dicatat, sisa Rp0. Status pesanan ikut jadi LUNAS.`
+      : `${rp(n)} dicatat untuk <b>${esc(kode)}</b>. Sisa ${rp(h ? h.r_sisa : r.r_sisa - n)}.`,
+      10000);
+    muatUlang();
+  };
+  [nom, q('#by-ref'), q('#by-cat')].forEach(i => i && (i.onkeydown = ev => {
+    if (ev.key === 'Enter') tbl.onclick();
+  }));
+}
+
+/* ---- Pop-up: porsi tak naik -> deposit ---- */
+async function popPorsi(kode, muatUlang){
+  /* Jumlah yang naik dibaca ulang dari database, bukan dari atribut di tombol:
+     boarding bisa berubah di sela-sela layar ini dibuka. */
+  const { data: o, error } = await DB.from('pesanan')
+    .select('kode,pax,harga_satuan_beku,biro_nama,penumpang(nama,naik)')
+    .eq('kode', kode).maybeSingle();
+  if (error) return gagalPesan(error);
+  if (!o) return pesan('Pesanan tidak ditemukan.', 7000);
+
+  const pnp     = o.penumpang || [];
+  const naik    = pnp.filter(p => p.naik).length;
+  const takNaik = pnp.filter(p => !p.naik);
+  const jml     = o.pax - naik;
+  const nominal = jml * (o.harga_satuan_beku || 0);
+  const pemilik = o.biro_nama
+    ? `biro <b>${esc(o.biro_nama)}</b>`
+    : 'nomor HP pemesan (pesanan ini bukan pesanan biro)';
+
+  const { q, tutup } = bukaLapis(`
+    <h3>Porsi tak terpakai ${esc(kode)}</h3>
+    <div class="hint" style="margin-bottom:12px">Saldo masuk atas nama ${pemilik}.</div>
+
+    <div style="margin-bottom:14px">
+      <div class="uang"><span>Dipesan</span><b>${o.pax} orang</b></div>
+      <div class="uang"><span>Tercatat naik</span><b>${naik} orang</b></div>
+      <div class="uang"><span>Tidak naik</span><b style="color:var(--warn)">${jml} orang</b></div>
+      <div class="uang"><span>Harga satuan beku</span><b>${rp(o.harga_satuan_beku)}</b></div>
+      <div class="uang"><span>Masuk deposit</span><b style="color:var(--sea);font-size:16px">${rp(nominal)}</b></div>
+    </div>
+
+    ${takNaik.length ? `<div class="note"><b>Yang tidak naik</b>${
+      esc(takNaik.map(p => p.nama).join(', '))}</div>` : ''}
+
+    <div class="note w"><b>Hanya bisa sekali</b>Setelah dipindahkan, pesanan ini
+      ditandai dan tombolnya hilang. Saldonya tidak bisa ditarik kembali lewat
+      layar ini &mdash; yang ada hanya penambahan dan pemakaian.</div>
+
+    <div class="fld" style="margin-bottom:0">
+      <label for="pr-cat">Catatan tambahan <span
+        style="font-weight:400;color:var(--muted)">(boleh dikosongkan)</span></label>
+      <input id="pr-cat" maxlength="140" autocomplete="off"
+             placeholder="mis. rombongan datang kurang 3 orang">
+      <div class="hint">Nama-nama yang tidak naik sudah dicatat otomatis;
+        ini untuk keterangan Anda sendiri.</div>
+    </div>
+
+    <div class="aksi-bar">
+      <button type="button" class="btn ghost tbl-tutup">Batal</button>
+      <button type="button" class="btn tbl-simpan"${
+        jml > 0 && nominal > 0 ? '' : ' disabled'}>Pindahkan ke deposit</button>
+    </div>`, true);
+
+  q('.tbl-tutup').onclick = tutup;
+  if (!(jml > 0 && nominal > 0)) return;
+
+  const tbl = q('.tbl-simpan');
+  tbl.onclick = async () => {
+    tbl.disabled = true; tbl.innerHTML = '<span class="spin"></span> Memindahkan…';
+    const { data, error: e2 } = await DB.rpc('porsi_tak_naik_ke_deposit', {
+      p_kode: kode, p_catatan: (q('#pr-cat').value || '').trim() || null });
+    if (e2){
+      tbl.disabled = false; tbl.textContent = 'Pindahkan ke deposit';
+      return gagalPesan(e2);
+    }
+    const h = Array.isArray(data) ? data[0] : data;
+    tutup();
+    pesan(`${rp(h ? h.r_nominal : nominal)} dari <b>${esc(kode)}</b> masuk deposit`
+      + `${o.biro_nama ? ` atas nama <b>${esc(o.biro_nama)}</b>` : ''}.`
+      + `${h && h.r_saldo != null ? ` Saldo sekarang ${rp(h.r_saldo)}.` : ''}`, 11000);
+    muatUlang();
+  };
+}
+
+/* ---- Pop-up: DP pesanan batal -> deposit ---- */
+function popDpBatal(kode, nominal, biro, hp, muatUlang){
+  const { q, tutup } = bukaLapis(`
+    <h3>DP batal ${esc(kode)}</h3>
+    <div class="hint" style="margin-bottom:12px">Saldo masuk atas nama ${
+      biro ? `biro <b>${esc(biro)}</b>` : `nomor <span class="mono">${esc(fmtHp(hp))}</span>`}.</div>
+
+    <div style="margin-bottom:14px">
+      <div class="uang"><span>Uang yang sudah masuk</span><b>${rp(nominal)}</b></div>
+      <div class="uang"><span>Masuk deposit</span><b style="color:var(--sea);font-size:16px">${rp(nominal)}</b></div>
+    </div>
+
+    <div class="note w"><b>Tidak dikembalikan, dijadikan saldo</b>Ini aturan yang
+      Anda tetapkan: DP pesanan yang dibatalkan pembeli tidak dikembalikan, tapi
+      jadi saldo deposit yang bisa dipakai untuk pesanan berikutnya.</div>
+    <div class="note"><b>Batal karena cuaca tidak lewat sini</b>Pembatalan karena
+      cuaca bukan salah pembeli, jadi keputusannya tetap di tangan Anda &mdash;
+      tombol ini hanya muncul pada pesanan berstatus BATAL PEMBELI.</div>
+
+    <div class="fld" style="margin-bottom:0">
+      <label for="dp-cat">Catatan tambahan <span
+        style="font-weight:400;color:var(--muted)">(boleh dikosongkan)</span></label>
+      <input id="dp-cat" maxlength="140" autocomplete="off"
+             placeholder="mis. biro mundur H-3">
+    </div>
+
+    <div class="aksi-bar">
+      <button type="button" class="btn ghost tbl-tutup">Batal</button>
+      <button type="button" class="btn tbl-simpan">Pindahkan ke deposit</button>
+    </div>`, true);
+
+  q('.tbl-tutup').onclick = tutup;
+  const tbl = q('.tbl-simpan');
+  tbl.onclick = async () => {
+    tbl.disabled = true; tbl.innerHTML = '<span class="spin"></span> Memindahkan…';
+    const { data, error } = await DB.rpc('dp_batal_ke_deposit', {
+      p_kode: kode, p_catatan: (q('#dp-cat').value || '').trim() || null });
+    if (error){
+      tbl.disabled = false; tbl.textContent = 'Pindahkan ke deposit';
+      return gagalPesan(error);
+    }
+    const h = Array.isArray(data) ? data[0] : data;
+    tutup();
+    pesan(`${rp(h ? h.r_nominal : nominal)} dari <b>${esc(kode)}</b> masuk deposit.`
+      + `${h && h.r_saldo != null ? ` Saldo sekarang ${rp(h.r_saldo)}.` : ''}`, 11000);
+    muatUlang();
+  };
 }
 
 /* Satu sel: nomor + tautan chat, sebaris, tidak pernah membuat baris jadi dua tingkat */
@@ -1721,6 +2531,544 @@ const fmtHp = hp => {
   const d = String(hp||'').replace(/\D/g,'');
   return d.length>9 ? d.replace(/^(\d{4})(\d{4})(\d+)$/,'$1-$2-$3') : d;
 };
+
+/* ====================================================================
+   BIRO & DEPOSIT
+   --------------------------------------------------------------------
+   Satu tab untuk tiga hal yang saling nyambung:
+     1. daftar biro beserta diskon tetapnya
+     2. saldo deposit tiap biro
+     3. riwayat mutasi deposit (masuk & keluar)
+
+   KENAPA TABEL biro DIAKSES LANGSUNG, BUKAN LEWAT RPC
+   Tabel biro sudah punya GRANT ke 'authenticated' DAN policy RLS
+   biro_kelola_atas (peran() in super, owner). Jadi penjagaannya sudah di
+   database, persis seperti tabel agen dan kapal. Menambah fungsi SECURITY
+   DEFINER di atasnya hanya menambah permukaan tanpa menambah pengamanan.
+
+   deposit_mutasi SENGAJA tidak punya GRANT UPDATE maupun DELETE — hanya
+   INSERT dan SELECT. Jadi buku deposit itu buku tambah saja: salah catat
+   diperbaiki dengan mutasi penyeimbang, bukan dengan menghapus barisnya.
+   Itu pilihan sadar, supaya tidak ada cara menghilangkan jejak uang.
+   ==================================================================== */
+async function tabBiro(){
+  const [{ data: biro, error: e1 }, { data: mut }, { data: pes }] = await Promise.all([
+    DB.from('biro').select('id,nama,pic,pic_wa,diskon_persen,catatan,aktif,dibuat').order('nama'),
+    DB.from('deposit_mutasi')
+      .select('id,biro_id,pemesan_hp,pesanan_id,arah,nominal,catatan,aktor_nama,waktu')
+      .order('waktu', { ascending: false }).limit(200),
+    DB.from('pesanan').select('biro_id,total,status'),
+  ]);
+  if (e1) return gagal(e1);
+
+  const daftar = biro || [];
+  const mutasi = mut  || [];
+  S.biroList = daftar;
+
+  /* Saldo dihitung dari mutasinya, TIDAK disimpan sebagai kolom. Saldo
+     tersimpan bisa melenceng dari riwayatnya tanpa ada yang tahu; saldo
+     terhitung tidak bisa. Sama dengan fungsi saldo_deposit() di database. */
+  const saldoBiro = {};
+  mutasi.forEach(m => {
+    if (!m.biro_id) return;
+    saldoBiro[m.biro_id] = (saldoBiro[m.biro_id] || 0) + (m.arah === 'masuk' ? m.nominal : -m.nominal);
+  });
+  /* Deposit atas nama nomor HP (pesanan perorangan) dikelompokkan sendiri. */
+  const saldoHp = {};
+  mutasi.forEach(m => {
+    if (!m.pemesan_hp) return;
+    saldoHp[m.pemesan_hp] = (saldoHp[m.pemesan_hp] || 0) + (m.arah === 'masuk' ? m.nominal : -m.nominal);
+  });
+
+  const hitung = {};
+  (pes || []).forEach(o => {
+    if (!o.biro_id) return;
+    const g = hitung[o.biro_id] ||= { n: 0, omzet: 0 };
+    g.n++;
+    if (['paid','boarded'].includes(o.status)) g.omzet += Number(o.total) || 0;
+  });
+
+  const bisa      = bisaDeposit();
+  const totalSaldo = Object.values(saldoBiro).reduce((a, b) => a + b, 0)
+                   + Object.values(saldoHp).reduce((a, b) => a + b, 0);
+  const namaBiro = id => (daftar.find(b => b.id === id) || {}).nama;
+
+  $('isi').innerHTML = `
+    <div class="grid g4">
+      <div class="kpi"><div class="k">Biro terdaftar</div>
+        <div class="v">${daftar.filter(b => b.aktif).length}</div>
+        <div class="d">${daftar.length} termasuk nonaktif</div></div>
+      <div class="kpi"><div class="k">Saldo deposit</div>
+        <div class="v" style="color:${totalSaldo ? 'var(--sea)' : 'inherit'}">${rp(totalSaldo)}</div>
+        <div class="d">semua pemilik saldo</div></div>
+      <div class="kpi"><div class="k">Mutasi tercatat</div><div class="v">${mutasi.length}</div>
+        <div class="d">200 terbaru</div></div>
+      <div class="kpi"><div class="k">Pesanan lewat biro</div>
+        <div class="v">${Object.values(hitung).reduce((a, b) => a + b.n, 0)}</div>
+        <div class="d">sepanjang waktu</div></div>
+    </div>
+
+    ${bisa ? `<div class="card" id="kartu-biro-baru">
+      <h3 style="margin:0 0 12px">Tambah Biro Baru</h3>
+      <div class="grid g2">
+        <div class="fld"><label for="br-nama">Nama biro</label>
+          <input id="br-nama" maxlength="80" autocomplete="off"
+                 placeholder="mis. Biro Wisata Anugerah">
+          <div class="hint">Nama ini dibekukan ke setiap pesanan biro, jadi pesanan
+            lama tetap mencatat nama saat itu walau nanti diganti.</div></div>
+        <div class="fld"><label for="br-pic">Nama PIC</label>
+          <input id="br-pic" maxlength="60" autocomplete="off" placeholder="mis. Pak Hendra">
+          <div class="hint">Orang yang dihubungi. <b>Wajib</b> &mdash; tanpa PIC dan
+            nomor WA, pesanan biro ditolak database.</div></div>
+      </div>
+      <div class="grid g2">
+        <div class="fld"><label for="br-wa">Nomor WA PIC</label>
+          <input id="br-wa" inputmode="tel" maxlength="15" autocomplete="off"
+                 placeholder="08xxxxxxxxxx">
+          <div class="hint">9&ndash;15 angka. Boleh ditulis 0812&hellip; atau 812&hellip;,
+            nol di depan dibuang sendiri.</div></div>
+        <div class="fld"><label for="br-diskon">Diskon tetap (%)</label>
+          <input id="br-diskon" inputmode="decimal" maxlength="6" autocomplete="off"
+                 placeholder="mis. 10" value="0">
+          <div class="hint">Dipakai hanya kalau pesanan dibuat <b>tanpa</b> harga nego.
+            Isi 0 kalau harganya selalu dinego per rombongan.</div></div>
+      </div>
+      <div class="fld"><label for="br-cat">Catatan <span
+        style="font-weight:400;color:var(--muted)">(boleh dikosongkan)</span></label>
+        <input id="br-cat" maxlength="200" autocomplete="off"
+               placeholder="mis. langganan sejak 2025, selalu bayar DP 30%"></div>
+      <button type="button" class="btn" id="br-simpan">Tambah biro</button>
+      <div class="note" style="margin-bottom:0"><b>Biro berbeda dari agen</b>
+        Agen membawa pelanggan lewat kode referral dan dapat komisi. Biro memesan
+        rombongan langsung lewat Anda dengan harga nego, dan tidak ada komisi yang
+        terhitung &mdash; pesanannya memang tidak lewat agen mana pun.</div>
+    </div>` : ''}
+
+    <div class="card scrollx">
+      <h3>Biro <span class="pill p-mute">${daftar.length}</span></h3>
+      <table data-papan="biro">
+        <thead><tr><th class="nw">Nama</th><th class="nw">PIC</th><th class="nw">WhatsApp</th>
+          <th class="num">Diskon</th><th class="num">Saldo deposit</th>
+          <th class="num">Pesanan</th><th class="nw">Status</th><th></th></tr></thead>
+        <tbody>${daftar.length ? daftar.map(b => `<tr>
+          <td class="nw" data-sel-biro="${b.id}">${selBiroBaris(b)}</td>
+          <td class="nw">${b.pic ? esc(b.pic) : '<span class="pill p-warn">BELUM DIISI</span>'}</td>
+          <td class="nw">${b.pic_wa
+            ? selWa(b.pic_wa, `Halo ${b.pic || b.nama}, ini dari The Tamperan Cruise.`)
+            : '<span class="pill p-warn">BELUM DIISI</span>'}</td>
+          <td class="num nw">${Number(b.diskon_persen) ? Number(b.diskon_persen) + '%'
+            : '<span style="color:var(--muted)">—</span>'}</td>
+          <td class="num nw" data-urut="${saldoBiro[b.id] || 0}">${saldoBiro[b.id]
+            ? `<b style="color:var(--sea)">${rp(saldoBiro[b.id])}</b>`
+            : '<span style="color:var(--muted)">Rp0</span>'}</td>
+          <td class="num nw" data-urut="${(hitung[b.id] || {}).n || 0}">${
+            (hitung[b.id] || {}).n || '—'}</td>
+          <td class="nw">${b.aktif ? '<span class="pill p-ok">AKTIF</span>'
+            : '<span class="pill p-mute">NONAKTIF</span>'}</td>
+          <td class="nw">${bisa ? `<span class="sel2" style="flex-wrap:wrap">
+            ${b.aktif && b.pic && b.pic_wa
+              ? `<a class="aksi ghost" href="#" data-pesan-biro="${b.id}">Pesanan baru</a>` : ''}
+            <a class="aksi ghost" href="#" data-ubah-biro="${b.id}">Ubah</a>
+            <a class="aksi" href="#" data-biro-aktif="${b.id}"
+               data-nilai="${b.aktif ? 0 : 1}" style="color:var(--muted)">${
+               b.aktif ? 'Nonaktifkan' : 'Aktifkan'}</a></span>`
+            : '<span style="color:var(--muted);font-size:11.5px">tidak bisa edit</span>'}</td>
+        </tr>`).join('') : `<tr class="kosong"><td colspan="8"><div class="hint">
+          Belum ada biro terdaftar.${bisa ? ' Tambahkan lewat formulir di atas.' : ''}
+          </div></td></tr>`}</tbody>
+      </table>
+      <div class="note"><b>Saldo dihitung, bukan disimpan</b>
+        Angka saldo di atas dijumlahkan dari riwayat mutasi tiap kali layar ini
+        dibuka. Tidak ada kolom &ldquo;saldo&rdquo; yang bisa melenceng dari
+        riwayatnya.</div>
+    </div>
+
+    ${Object.keys(saldoHp).length ? `<div class="card scrollx">
+      <h3>Saldo Deposit atas Nama Nomor HP
+        <span class="pill p-mute">${Object.keys(saldoHp).length}</span></h3>
+      <table data-papan="dephp">
+        <thead><tr><th class="nw">Nomor</th><th class="num">Saldo</th></tr></thead>
+        <tbody>${Object.entries(saldoHp).map(([hp, s]) => `<tr>
+          <td class="nw">${selWa(hp, 'Halo, ini dari The Tamperan Cruise soal saldo deposit Anda.')}</td>
+          <td class="num nw" data-urut="${s}"><b>${rp(s)}</b></td></tr>`).join('')}
+        </tbody></table>
+      <div class="note"><b>Dari pesanan perorangan</b>
+        Pesanan yang bukan pesanan biro saldonya dicatat atas nama nomor HP
+        pemesan, karena tidak ada badan yang bisa dijadikan pemiliknya.</div>
+    </div>` : ''}
+
+    <div class="card scrollx">
+      <h3>Mutasi Deposit <span class="pill p-mute">${mutasi.length}</span></h3>
+      <table data-papan="mutasi">
+        <thead><tr><th class="nw">Waktu</th><th class="nw">Pemilik saldo</th>
+          <th class="nw">Arah</th><th class="num">Nominal</th>
+          <th>Keterangan</th><th class="nw">Dicatat oleh</th></tr></thead>
+        <tbody>${mutasi.length ? mutasi.map(m => `<tr>
+          <td class="nw" style="color:var(--muted)"
+              data-urut="${Date.parse(m.waktu) || 0}">${tgl(m.waktu)}</td>
+          <td class="nw">${m.biro_id
+            ? `<b class="nama" title="${esc(namaBiro(m.biro_id) || '')}">${
+                 esc(namaBiro(m.biro_id) || 'biro terhapus')}</b>`
+            : `<span class="mono" style="font-size:12px">${esc(fmtHp(m.pemesan_hp))}</span>`}</td>
+          <td class="nw">${m.arah === 'masuk'
+            ? '<span class="pill p-ok">MASUK</span>'
+            : '<span class="pill p-warn">KELUAR</span>'}</td>
+          <td class="num nw" data-urut="${m.arah === 'masuk' ? m.nominal : -m.nominal}">${
+            m.arah === 'masuk' ? '+' : '&minus;'}${rp(m.nominal)}</td>
+          <td><span class="nama" style="max-width:380px"
+              title="${esc(m.catatan || '')}">${esc(m.catatan || '—')}</span></td>
+          <td class="nw">${esc(m.aktor_nama || '—')}</td>
+        </tr>`).join('') : `<tr class="kosong"><td colspan="6"><div class="hint">
+          Belum ada mutasi deposit.</div></td></tr>`}</tbody>
+      </table>
+      <div class="note"><b>Buku tambah saja</b>
+        Baris mutasi tidak bisa diubah maupun dihapus &mdash; database memang tidak
+        memberi izin itu ke siapa pun yang login lewat dashboard. Salah catat
+        diperbaiki dengan mutasi penyeimbang, supaya jejaknya tetap utuh.</div>
+    </div>`;
+
+  if (bisa){
+    pasangTambahBiro(daftar);
+    pasangKelolaBiro(daftar);
+  }
+  lengkapiTabel('#isi table[data-papan="biro"]', {
+    id: 'biro', takUrut: [7], petunjuk: 'Cari nama biro atau PIC…',
+    saring: [{ kolom: 6, semua: 'Semua status', pilihan: ['AKTIF','NONAKTIF'] }]
+  });
+  lengkapiTabel('#isi table[data-papan="mutasi"]', {
+    id: 'mutasi', petunjuk: 'Cari pemilik saldo atau keterangan…',
+    saring: [{ kolom: 2, semua: 'Masuk & keluar', pilihan: ['MASUK','KELUAR'] }]
+  });
+}
+
+function selBiroBaris(b){
+  return `<b class="nama" title="${esc(b.nama)}">${esc(b.nama)}</b>${
+    b.catatan ? `<div class="hint nama" style="max-width:220px"
+      title="${esc(b.catatan)}">${esc(b.catatan)}</div>` : ''}`;
+}
+
+/* Diskon: 0&ndash;100, boleh pecahan dua angka. Sama dengan CHECK
+   biro_diskon_persen_check dan numeric(5,2) di database. */
+function diskonSalah(teks){
+  if (!/^[0-9]{1,3}([.,][0-9]{1,2})?$/.test(teks)) return true;
+  const n = parseFloat(String(teks).replace(',', '.'));
+  return !(n >= 0 && n <= 100);
+}
+
+function pasangTambahBiro(biroAda){
+  const tbl = $('br-simpan');
+  tbl.onclick = async () => {
+    const nama   = ($('br-nama').value   || '').trim();
+    const pic    = ($('br-pic').value    || '').trim();
+    const waAsli = ($('br-wa').value     || '').trim();
+    const wa     = waAsli.replace(/[^0-9]/g, '').replace(/^62/, '').replace(/^0/, '');
+    const dsk    = ($('br-diskon').value || '').trim() || '0';
+    const cat    = ($('br-cat').value    || '').trim();
+
+    if (!nama) return pesan('Nama biro belum diisi.', 6000);
+    if (biroAda.some(b => b.nama.toLowerCase() === nama.toLowerCase()))
+      return pesan(`Sudah ada biro bernama <b>${esc(nama)}</b>.`, 7000);
+    /* PIC dan WA diwajibkan di sini walau database membolehkan NULL. Sebabnya:
+       CHECK pesanan_biro_lengkap menolak pesanan biro tanpa ketiganya, jadi
+       biro tanpa PIC/WA adalah biro yang tidak bisa dipakai. Lebih baik
+       ditolak sekarang daripada baru ketahuan saat mau memesan. */
+    if (!pic)   return pesan('Nama PIC wajib diisi &mdash; tanpa itu pesanan biro '
+                           + 'akan ditolak database.', 9000);
+    if (!WA_POLA.test(wa)) return pesan('Nomor WA PIC harus 9&ndash;15 angka.', 8000);
+    if (diskonSalah(dsk)) return pesan('Diskon harus angka 0&ndash;100, '
+                                     + 'maksimal dua angka di belakang koma.', 8000);
+
+    tbl.disabled = true; tbl.textContent = 'Menyimpan…';
+    const { error } = await DB.from('biro').insert({
+      nama, pic, pic_wa: wa, catatan: cat || null,
+      diskon_persen: parseFloat(dsk.replace(',', '.')), aktif: true,
+    });
+    if (error){ tbl.disabled = false; tbl.textContent = 'Tambah biro';
+      return gagalPesan(error); }
+    pesan(`Biro <b>${esc(nama)}</b> ditambahkan. Pesanan rombongannya bisa langsung `
+        + 'dibuat lewat tombol <b>Pesanan baru</b> di tabel bawah.', 10000);
+    tabBiro();
+  };
+  ['br-nama','br-pic','br-wa','br-diskon','br-cat'].forEach(id =>
+    $(id).onkeydown = e => { if (e.key === 'Enter') tbl.onclick(); });
+}
+
+function pasangKelolaBiro(daftar){
+  /* --- aktif / nonaktif --- */
+  $('isi').querySelectorAll('[data-biro-aktif]').forEach(b => b.onclick = async e => {
+    e.preventDefault(); b.style.pointerEvents = 'none';
+    const nyala = b.dataset.nilai === '1';
+    const { error } = await DB.from('biro')
+      .update({ aktif: nyala }).eq('id', b.dataset.biroAktif);
+    if (error){ b.style.pointerEvents = ''; return gagalPesan(error); }
+    pesan(nyala ? 'Biro diaktifkan dan kembali bisa dibuatkan pesanan.'
+                : 'Biro dinonaktifkan. Pesanan dan saldo deposit yang sudah ada '
+                + 'tidak diubah &mdash; hanya tidak bisa dibuatkan pesanan baru.', 9000);
+    tabBiro();
+  });
+
+  /* --- ubah baris: nama, PIC, WA, diskon --- */
+  $('isi').querySelectorAll('[data-ubah-biro]').forEach(t => t.onclick = e => {
+    e.preventDefault();
+    const b = daftar.find(x => x.id === t.dataset.ubahBiro);
+    if (!b) return;
+    const sel = $('isi').querySelector(`[data-sel-biro="${b.id}"]`);
+    sel.innerHTML = `<span class="sel2" style="flex-wrap:wrap">
+      <input class="kode-in nm-b" style="width:130px;font-family:inherit" maxlength="80"
+             value="${esc(b.nama)}" placeholder="nama biro">
+      <input class="kode-in pc-b" style="width:110px;font-family:inherit" maxlength="60"
+             value="${esc(b.pic || '')}" placeholder="PIC">
+      <input class="kode-in wa-b" style="width:110px" maxlength="15"
+             value="${esc(b.pic_wa || '')}" placeholder="WA">
+      <input class="kode-in dk-b" style="width:56px" maxlength="6"
+             value="${Number(b.diskon_persen)}" placeholder="disk%">
+      <a class="aksi ghost" href="#" data-simpan-biro>Simpan</a>
+      <a class="aksi" href="#" data-batal-biro style="color:var(--muted)">Batal</a></span>`;
+    const nm = sel.querySelector('.nm-b'), pc = sel.querySelector('.pc-b'),
+          wa = sel.querySelector('.wa-b'), dk = sel.querySelector('.dk-b');
+    nm.focus(); nm.select();
+    const tutup = () => { sel.innerHTML = selBiroBaris(b); pasangKelolaBiro(daftar); };
+    sel.querySelector('[data-batal-biro]').onclick = ev => { ev.preventDefault(); tutup(); };
+    sel.querySelector('[data-simpan-biro]').onclick = async ev => {
+      ev.preventDefault();
+      const nama = (nm.value || '').trim();
+      const pic  = (pc.value || '').trim();
+      const waB  = (wa.value || '').replace(/[^0-9]/g, '').replace(/^62/, '').replace(/^0/, '');
+      const dsk  = (dk.value || '').trim() || '0';
+      if (!nama) return pesan('Nama biro tidak boleh kosong.', 6000);
+      if (daftar.some(x => x.id !== b.id && x.nama.toLowerCase() === nama.toLowerCase()))
+        return pesan(`Sudah ada biro bernama <b>${esc(nama)}</b>.`, 7000);
+      if (!pic) return pesan('Nama PIC tidak boleh kosong.', 6000);
+      if (!WA_POLA.test(waB)) return pesan('Nomor WA PIC harus 9&ndash;15 angka.', 8000);
+      if (diskonSalah(dsk)) return pesan('Diskon harus angka 0&ndash;100.', 7000);
+      const { error } = await DB.from('biro').update({
+        nama, pic, pic_wa: waB, diskon_persen: parseFloat(dsk.replace(',', '.')),
+      }).eq('id', b.id);
+      if (error) return gagalPesan(error);
+      pesan(`<b>${esc(nama)}</b> diperbarui. Pesanan yang sudah ada tetap memakai `
+          + 'nama dan PIC yang dibekukan saat pesanan itu dibuat.', 10000);
+      tabBiro();
+    };
+    [nm, pc, wa, dk].forEach(i => i.onkeydown = ev => {
+      if (ev.key === 'Enter')  sel.querySelector('[data-simpan-biro]').onclick(ev);
+      if (ev.key === 'Escape') tutup();
+    });
+  });
+
+  /* --- pesanan biro baru --- */
+  $('isi').querySelectorAll('[data-pesan-biro]').forEach(t => t.onclick = async e => {
+    e.preventDefault();
+    const b = daftar.find(x => x.id === t.dataset.pesanBiro);
+    if (b) await popPesananBiro(b);
+  });
+}
+
+/* ====================================================================
+   POP-UP: PESANAN BIRO BARU (harga nego)
+   --------------------------------------------------------------------
+   Semuanya lewat satu panggilan buat_pesanan_biro(). Perhitungan di layar ini
+   HANYA untuk diperlihatkan sebelum disimpan — angka yang dipakai adalah yang
+   dihitung ulang di database, jadi kalau keduanya beda, yang berlaku adalah
+   database. Itu sengaja: harga tidak boleh ditentukan oleh browser.
+   ==================================================================== */
+async function popPesananBiro(b){
+  const { data: produk, error } = await DB.from('produk')
+    .select('id,slug,nama,bertingkat,harga_lokal,harga_umum,harga_flat,aktif')
+    .eq('aktif', true).order('urutan');
+  if (error) return gagalPesan(error);
+  const pr = produk || [];
+  if (!pr.length) return pesan('Belum ada paket aktif. Isi dulu di Pengaturan.', 8000);
+
+  const esok = (() => { const d = new Date(); d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10); })();
+  const hariIni = new Date().toISOString().slice(0, 10);
+
+  const { q, tutup } = bukaLapis(`
+    <h3>Pesanan baru &mdash; ${esc(b.nama)}</h3>
+    <div class="hint" style="margin-bottom:12px">PIC ${esc(b.pic)} &middot;
+      <span class="mono">${esc(fmtHp(b.pic_wa))}</span>${
+      Number(b.diskon_persen) ? ` &middot; diskon tetap ${Number(b.diskon_persen)}%` : ''}</div>
+
+    <div class="grid g2">
+      <div class="fld"><label for="pb-produk">Paket</label>
+        <select id="pb-produk">${pr.map(p =>
+          `<option value="${esc(p.slug)}" data-bertingkat="${p.bertingkat ? 1 : 0}"
+             data-lokal="${p.harga_lokal ?? ''}" data-umum="${p.harga_umum ?? ''}"
+             data-flat="${p.harga_flat ?? ''}">${esc(p.nama)}</option>`).join('')}</select>
+        <div class="hint" id="pb-hint-produk"></div></div>
+      <div class="fld"><label for="pb-tanggal">Tanggal berangkat</label>
+        <input type="date" id="pb-tanggal" value="${esok}" min="${hariIni}">
+        <div class="hint">Tidak boleh tanggal yang sudah lewat.</div></div>
+    </div>
+
+    <div class="grid g2">
+      <div class="fld"><label for="pb-pax">Jumlah orang</label>
+        <input id="pb-pax" inputmode="numeric" maxlength="3" value="" placeholder="mis. 40">
+        <div class="hint">1&ndash;200. Nama penumpang boleh diisi belakangan di tab Manifest.</div></div>
+      <div class="fld"><label for="pb-anak">Di antaranya anak</label>
+        <input id="pb-anak" inputmode="numeric" maxlength="3" value="0">
+        <div class="hint">Untuk pendataan saja, tidak mengubah harga.</div></div>
+    </div>
+
+    <div class="fld">
+      <label style="display:flex;gap:9px;align-items:flex-start;font-weight:400;cursor:pointer">
+        <input type="checkbox" id="pb-nego" style="width:auto;margin-top:3px" checked>
+        <span style="font-size:13.5px"><b>Pakai harga nego</b> &mdash; masukkan harga
+          per orang hasil kesepakatan</span></label>
+      <div class="hint">Kalau dilepas, dipakai harga katalog dikurangi diskon tetap biro
+        (${Number(b.diskon_persen) || 0}%).</div>
+    </div>
+
+    <div class="grid g2">
+      <div class="fld" id="pb-fld-harga"><label for="pb-harga">Harga nego per orang</label>
+        <input id="pb-harga" inputmode="numeric" autocomplete="off" placeholder="mis. 400000">
+        <div class="hint">Harga bersih. Disimpan sebagai harga beku pesanan ini,
+          jadi perubahan katalog nanti tidak mengubahnya.</div></div>
+      <div class="fld hide" id="pb-fld-lokal">
+        <label style="display:flex;gap:9px;align-items:flex-start;font-weight:400;cursor:pointer">
+          <input type="checkbox" id="pb-lokal" style="width:auto;margin-top:3px">
+          <span style="font-size:13.5px">Pakai harga warga Pacitan</span></label>
+        <div class="hint">Hanya untuk paket bertingkat.</div></div>
+    </div>
+
+    <div style="margin:4px 0 14px" id="pb-ringkas"></div>
+
+    <div class="grid g2">
+      <div class="fld"><label for="pb-dp">DP yang sudah masuk</label>
+        <input id="pb-dp" inputmode="numeric" autocomplete="off" value="0" placeholder="0">
+        <div class="hint">Isi 0 kalau belum ada uang masuk. Tidak boleh melebihi total.</div></div>
+      <div class="fld"><label for="pb-metode">Metode DP</label>
+        <select id="pb-metode">${METODE.map(([v, l]) =>
+          `<option value="${v}">${l}</option>`).join('')}</select>
+        <div class="hint">Diabaikan kalau DP-nya 0.</div></div>
+    </div>
+
+    <div class="grid g2">
+      <div class="fld"><label for="pb-nm">Nama pemesan <span
+        style="font-weight:400;color:var(--muted)">(boleh dikosongkan)</span></label>
+        <input id="pb-nm" maxlength="60" autocomplete="off"
+               placeholder="${esc(b.pic)}">
+        <div class="hint">Dikosongkan = pakai nama PIC biro.</div></div>
+      <div class="fld"><label for="pb-cat">Catatan <span
+        style="font-weight:400;color:var(--muted)">(boleh dikosongkan)</span></label>
+        <input id="pb-cat" maxlength="140" autocomplete="off"
+               placeholder="mis. nego via WA 24 Okt, sisa dilunasi di dermaga"></div>
+    </div>
+
+    <div class="note w"><b>Tidak ada komisi agen</b>Pesanan ini tidak lewat kode
+      agen mana pun, jadi tidak ada komisi yang terhitung. Itu memang maksudnya:
+      ini penjualan langsung.</div>
+
+    <div class="aksi-bar">
+      <button type="button" class="btn ghost tbl-tutup">Batal</button>
+      <button type="button" class="btn tbl-simpan">Buat pesanan</button>
+    </div>`, true);
+
+  const el = {
+    produk: q('#pb-produk'), pax: q('#pb-pax'), anak: q('#pb-anak'),
+    nego: q('#pb-nego'), harga: q('#pb-harga'), lokal: q('#pb-lokal'),
+    dp: q('#pb-dp'), ringkas: q('#pb-ringkas'),
+    fldHarga: q('#pb-fld-harga'), fldLokal: q('#pb-fld-lokal'),
+    hintProduk: q('#pb-hint-produk'),
+  };
+
+  /* Hitung ulang tampilan tiap kali ada yang berubah. Tidak menyentuh database. */
+  const hitungUlang = () => {
+    const op  = el.produk.selectedOptions[0];
+    const bgt = op.dataset.bertingkat === '1';
+    el.fldLokal.classList.toggle('hide', !bgt || el.nego.checked);
+    el.fldHarga.classList.toggle('hide', !el.nego.checked);
+    el.hintProduk.innerHTML = bgt
+      ? `Bertingkat: warga Pacitan ${rp(Number(op.dataset.lokal) || 0)}, `
+        + `umum ${rp(Number(op.dataset.umum) || 0)}.`
+      : `Harga sama untuk semua: ${rp(Number(op.dataset.flat) || 0)}.`;
+
+    const pax = parseInt(el.pax.value, 10);
+    let satuan, persen;
+    if (el.nego.checked){
+      satuan = angkaRp(el.harga.value);
+      persen = 0;
+    } else {
+      satuan = bgt ? Number(el.lokal.checked ? op.dataset.lokal : op.dataset.umum)
+                   : Number(op.dataset.flat);
+      if (!Number.isFinite(satuan)) satuan = null;
+      persen = Number(b.diskon_persen) || 0;
+    }
+    if (!(pax > 0) || satuan == null){
+      el.ringkas.innerHTML = '<div class="hint">Isi jumlah orang dan harganya '
+        + 'untuk melihat totalnya.</div>';
+      return null;
+    }
+    const sub   = satuan * pax;
+    const disk  = Math.round(sub * persen / 100);
+    const total = sub - disk;
+    el.ringkas.innerHTML = `
+      <div class="uang"><span>${pax} orang &times; ${rp(satuan)}</span><b>${rp(sub)}</b></div>
+      ${persen ? `<div class="uang"><span>Diskon biro ${persen}%</span>
+        <b style="color:var(--ok)">&minus;${rp(disk)}</b></div>` : ''}
+      <div class="uang"><span>Total tagihan</span>
+        <b style="font-size:16px">${rp(total)}</b></div>`;
+    return { total, satuan, persen, pax };
+  };
+
+  [el.produk, el.pax, el.anak, el.harga, el.dp].forEach(i =>
+    i.oninput = hitungUlang);
+  [el.nego, el.lokal].forEach(i => i.onchange = hitungUlang);
+  hitungUlang();
+  el.pax.focus();
+
+  q('.tbl-tutup').onclick = tutup;
+  const tbl = q('.tbl-simpan');
+  tbl.onclick = async () => {
+    const h = hitungUlang();
+    const pax  = parseInt(el.pax.value, 10);
+    const anak = parseInt(el.anak.value, 10);
+    const tg   = q('#pb-tanggal').value;
+    const dp   = angkaRp(el.dp.value) ?? 0;
+
+    if (!(pax >= 1 && pax <= 200))   return pesan('Jumlah orang harus 1&ndash;200.', 7000);
+    if (!(anak >= 0 && anak <= pax)) return pesan('Jumlah anak tidak boleh lebih '
+                                                + 'dari jumlah orang.', 7000);
+    if (!tg)                         return pesan('Tanggal berangkat belum diisi.', 6000);
+    if (tg < hariIni)                return pesan('Tanggal berangkat sudah lewat.', 7000);
+    if (el.nego.checked && angkaRp(el.harga.value) == null)
+      return pesan('Harga nego belum diisi. Lepas centang kalau mau pakai '
+                 + 'harga katalog.', 9000);
+    if (!h)                          return pesan('Totalnya belum bisa dihitung. '
+                                                + 'Periksa jumlah orang dan harganya.', 8000);
+    if (dp > h.total)                return pesan(`DP ${rp(dp)} melebihi total `
+                                                + `${rp(h.total)}.`, 8000);
+
+    tbl.disabled = true; tbl.innerHTML = '<span class="spin"></span> Menyimpan…';
+    const { data, error: e2 } = await DB.rpc('buat_pesanan_biro', {
+      p_biro_id:      b.id,
+      p_produk_slug:  el.produk.value,
+      p_pax:          pax,
+      p_anak:         anak,
+      p_tanggal:      tg,
+      p_harga_satuan: el.nego.checked ? angkaRp(el.harga.value) : null,
+      p_lokal:        !el.nego.checked && el.lokal.checked,
+      p_pemesan:      (q('#pb-nm').value || '').trim()
+                        ? { nama: (q('#pb-nm').value || '').trim() } : null,
+      p_penumpang:    null,
+      p_dp:           dp,
+      p_metode:       q('#pb-metode').value,
+      p_catatan:      (q('#pb-cat').value || '').trim() || null,
+    });
+    if (e2){
+      tbl.disabled = false; tbl.textContent = 'Buat pesanan';
+      return gagalPesan(e2);
+    }
+    const r = Array.isArray(data) ? data[0] : data;
+    tutup();
+    pesan(`Pesanan <b>${esc(r ? r.r_kode : '')}</b> dibuat untuk `
+      + `<b>${esc(b.nama)}</b>. Total ${rp(r ? r.r_total : h.total)}`
+      + (dp ? `, DP ${rp(r ? r.r_dibayar : dp)} tercatat, sisa ${rp(r ? r.r_sisa : h.total - dp)}.`
+            : ', belum ada uang masuk.')
+      + ' Nama penumpangnya terisi sementara &mdash; perbaiki di tab Manifest.', 14000);
+    tabBiro();
+  };
+}
 
 /* ============ FOLLOW-UP ============ */
 async function tabFollowUp(){
