@@ -319,11 +319,22 @@ const FU = {belum:['BELUM','p-warn'], dihubungi:['DIHUBUNGI','p-sea'],
             tidak:['TIDAK TERTARIK','p-mute'], jadi:['JADI','p-ok']};
 const JUDUL = {
   super:['Dashboard Super Admin','Semua akses — semua agen, semua pelanggan, bisa mengubah harga & komisi'],
-  owner:['Dashboard Owner','Lihat semua data, tidak bisa mengubah apa pun'],
+  owner:['Dashboard Owner','Semua akses jualan dan harga — hanya pengelolaan akun login yang dipegang tim Delta'],
   admin:['Dashboard Admin','Konfirmasi pembayaran, pembagian kapal, keberangkatan, dan harga jual — tidak melihat komisi agen maupun kontak agen, tidak bisa kelola akses'],
   agen:['Dashboard Agen','Hanya pelanggan & komisi milikmu'],
   boarding:['Petugas Boarding','Tanpa akses ke data penjualan maupun komisi']
 };
+
+/* ---- Izin di sisi TAMPILAN ----
+   Pagar yang sebenarnya tetap di database (RLS). Tiga fungsi ini hanya
+   menentukan tombolnya digambar atau tidak. Dikumpulkan di satu tempat karena
+   sebelumnya tersebar di 12 kondisi terpisah, dan begitu peran Owner berubah
+   (26 Okt 2026) ada beberapa yang nyaris terlewat.
+
+   Aturannya satu kalimat: Owner bisa semua, kecuali Kelola Akses. */
+const bisaKelola = () => S.peran === 'super' || S.peran === 'owner';   /* jualan & uang */
+const bisaHarga  = () => bisaKelola() || S.peran === 'admin';          /* harga katalog */
+const bisaAkses  = () => S.peran === 'super';                          /* akun login    */
 
 const S = { peran:null, agenId:null, email:null, uid:null, atur:null,
              kapal:[], pengguna:[], agenList:[], tabAktif:null,
@@ -1286,21 +1297,23 @@ const TUTOR = {
    super supaya langkah baru ikut otomatis; kalau suatu saat ada langkah
    khusus-super baru yang lupa didaftarkan di sini, uji panduan.mjs yang
    menangkapnya. */
-const OWNER_LEWAT = new Set([
-  'Konfirmasi pembayaran',   /* tombol Lunas hanya untuk super & admin */
-  'Armada Kapal',            /* #kartu-kapal hanya super */
-  'Tambah agen',             /* #kartu-agen-baru hanya super */
-  'Mengubah harga',          /* #form-produk hanya super */
-]);
+/* 26 Okt 2026: Owner TIDAK lagi read-only -- pemilik usaha memakai peran ini.
+   Daftar pengecualiannya dikosongkan, bukan dihapus: kalau suatu saat ada lagi
+   langkah yang khusus Super Admin, tinggal diisi lagi di sini dan uji
+   panduan.mjs akan memeriksa sasarannya. Satu-satunya yang masih khusus Super
+   Admin sekarang adalah Kelola Akses, dan langkah panduannya memang hanya
+   menunjuk tabel penggunanya -- yang Owner tetap boleh LIHAT. */
+const OWNER_LEWAT = new Set([]);
 TUTOR.owner = (() => {
   const daftar = TUTOR.super.filter(l => !OWNER_LEWAT.has(l.judul));
   const i = daftar.findIndex(l => l.judul === 'Deretan tab');
   daftar.splice(i + 1, 0, {
-    cari: null, judul: 'Anda melihat, bukan mengubah',
-    teks: 'Peran Owner membuka <b>semua data</b> &mdash; semua pesanan, semua agen, semua '
-        + 'harga &mdash; tapi tidak ada tombol simpan di mana pun. Jadi silakan buka-buka '
-        + 'sepuasnya; tidak ada yang bisa rusak dari layar ini. Kalau ada angka yang perlu '
-        + 'diubah, mintakan ke Super Admin.' });
+    cari: null, judul: 'Satu yang bukan wewenang Anda',
+    teks: 'Peran Owner membuka <b>semua</b> &mdash; pesanan, harga, komisi, agen, kapal, '
+        + 'voucher. Satu-satunya yang tidak: <b>membuat, menghapus, dan mengubah peran '
+        + 'akun login</b>. Itu dipegang tim Delta, supaya urusan akses sistem terpisah '
+        + 'dari urusan jualan. Daftar penggunanya tetap bisa Anda lihat di Kelola Akses, '
+        + 'hanya tombolnya yang tidak ada.' });
   return daftar;
 })();
 
@@ -1646,7 +1659,7 @@ function aksiStatus(o){
        style="background:var(--dangerbg);color:var(--danger);border-color:#e3a8a2">Batal</a>`);
   /* Menghidupkan ulang pesanan batal sengaja hanya untuk super admin — database
      juga menolaknya untuk admin, ini cuma menyembunyikan tombol yang pasti gagal. */
-  if (['cancel_pembeli','cancel_cuaca','expired'].includes(o.status) && S.peran === 'super')
+  if (['cancel_pembeli','cancel_cuaca','expired'].includes(o.status) && bisaKelola())
     t.push(`<a class="aksi ghost" href="#" data-status="${esc(o.kode)}" data-ke="pending">Aktifkan lagi</a>`);
   return t.join(' ');
 }
@@ -1885,7 +1898,7 @@ async function tabAgen(){
   if (e1) return gagal(e1);
   const waOf = Object.fromEntries((kontak||[]).map(k=>[k.agen_id,k.wa]));
 
-  const bolehTambah = S.peran === 'super';
+  const bolehTambah = bisaKelola();
 
   $('isi').innerHTML = `
     ${bolehTambah ? `<div class="card" id="kartu-agen-baru">
@@ -1928,7 +1941,7 @@ async function tabAgen(){
           <td class="nw" data-sel-wa="${a.id}">${selWaAgen(a, waOf[a.id])}</td>
           <td class="nw">${a.boleh_biro?'<span class="pill p-sea">BOLEH</span>':'<span class="pill p-mute">TIDAK</span>'}</td>
           <td class="nw">${a.aktif?'<span class="pill p-ok">AKTIF</span>':'<span class="pill p-mute">NONAKTIF</span>'}</td>
-          <td class="nw">${S.peran==='super'
+          <td class="nw">${bisaKelola()
             ? `<a class="aksi ghost" href="#" data-biro="${a.id}" data-nilai="${a.boleh_biro?0:1}">${
                  a.boleh_biro?'Cabut':'Beri akses'}</a>`
             : '<span style="color:var(--muted);font-size:11.5px">tidak bisa edit</span>'}</td>
@@ -2529,7 +2542,7 @@ function pasangTambahAgen(agenAda){
 const WA_POLA = /^[0-9]{9,15}$/;    /* sama persis dengan CHECK di database */
 
 function selWaAgen(a, wa){
-  const bisaUbah = S.peran === 'super';
+  const bisaUbah = bisaKelola();
   if (!wa){
     /* Peran agen memang tidak boleh melihat nomor agen lain — bedakan "tidak
        berhak lihat" dari "memang belum diisi", supaya tidak menyesatkan. */
@@ -2602,7 +2615,7 @@ async function simpanWa(id, waLama, nama, inp, tutup){
 const KODE_POLA = /^[A-Za-z0-9._-]{3,32}$/;   /* sama persis dengan CHECK agen_kode_format */
 
 function selKode(a){
-  if (S.peran !== 'super') return esc(a.kode);
+  if (!bisaKelola()) return esc(a.kode);
   return `<span class="sel2"><span>${esc(a.kode)}</span>
     <a class="aksi ghost" href="#" data-ubah-kode="${a.id}"
        data-kode="${esc(a.kode)}" data-nama="${esc(a.nama)}">Ubah</a></span>`;
@@ -2733,7 +2746,7 @@ async function tabKapal(){
   (pes||[]).forEach(o => { (perTgl[o.tanggal_berangkat] ||= []).push(o); });
   const tanggal = Object.keys(perTgl).sort();
 
-  const kelolaKapal = S.peran !== 'super' ? '' : `
+  const kelolaKapal = !bisaKelola() ? '' : `
     <div class="card" id="kartu-kapal">
       <h3 style="margin:0 0 4px">Armada Kapal</h3>
       <div class="hint" style="margin-bottom:12px">Kapasitas di sini yang dipakai
@@ -2818,16 +2831,18 @@ async function tabKapal(){
         }).join('')}</tbody>
       </table></div>`;
   }).join('') + `
-    <div class="note"><b>Kenapa admin tidak bisa mengubah harga</b>
-      RLS menjaga per baris, bukan per kolom. Kalau peran admin diberi izin menulis
-      ke tabel pesanan, dia bisa mengubah kolom apa pun termasuk total. Jadi
-      pembagian kapal lewat satu fungsi khusus yang hanya menyentuh kolom kapal,
-      dan setiap perubahannya tercatat di audit.</div>`
+    <div class="note"><b>Kenapa total pesanan tidak bisa diubah dari sini</b>
+      RLS menjaga per baris, bukan per kolom. Kalau sebuah peran diberi izin menulis
+      ke tabel pesanan, dia bisa mengubah kolom apa pun di baris itu &mdash; termasuk
+      total yang dibayar. Jadi pembagian kapal lewat satu fungsi khusus yang hanya
+      menyentuh kolom kapal, dan setiap perubahannya tercatat di audit.
+      Harga <b>katalog</b> memang bisa diubah Super Admin, Owner, dan Admin &mdash;
+      tapi itu harga untuk pesanan berikutnya, bukan total pesanan yang sudah jadi.</div>`
   : `<div class="card"><div class="note w"><b>Belum ada keberangkatan</b>
       Belum ada pesanan sah yang punya tanggal keberangkatan. Tanggal baru
       dikumpulkan dari pesanan yang masuk lewat halaman pemesanan versi terbaru.</div></div>`);
 
-  if (S.peran === 'super'){
+  if (bisaKelola()){
     pasangKelolaKapal(kapalSemua || []);
     lengkapiTabel('#isi table[data-papan="armada"]', {
       id: 'armada', takUrut: [4], petunjuk: 'Cari nama kapal…',
@@ -2863,8 +2878,8 @@ async function tabVoucher(){
      23 Okt 2026) tapi TIDAK menerbitkan kode voucher — di database pun
      kode_voucher masih super-only, jadi kalau disamakan tombolnya akan muncul
      lalu gagal saat ditekan, dan itu lebih membingungkan daripada tidak ada. */
-  const bisa  = S.peran === 'super';                                   /* voucher */
-  const bisaT = S.peran === 'super' || S.peran === 'admin';            /* add-on  */
+  const bisa  = bisaKelola();   /* kode voucher: super & owner           */
+  const bisaT = bisaHarga();    /* harga add-on: super, owner, dan admin  */
 
   $('isi').innerHTML = `
     ${bisa ? `<div class="card">
@@ -3054,7 +3069,7 @@ const PERAN_LABEL = {
      karena daftar_pengguna() juga mengurutkannya paling atas. */
   menunggu:['Menunggu Akses','Sudah daftar, belum diberi peran'],
   super:   ['Super Admin','Semua akses, pemegang master'],
-  owner:   ['Owner','Lihat semua, tidak bisa mengubah'],
+  owner:   ['Owner','Semua kecuali kelola akses'],
   admin:   ['Admin','Konfirmasi bayar, bagi kapal, atur harga'],
   agen:    ['Agen','Hanya pelanggan & komisi sendiri'],
   boarding:['Petugas Boarding','Hanya daftar boarding']
@@ -3124,7 +3139,7 @@ async function tabAkses(){
   S.pengguna = orang || [];
   S.agenList = agen || [];
   S.agenListDari = S.latihan ? 'latihan' : 'db';
-  const bisa = S.peran === 'super';
+  const bisa = bisaAkses();   /* Kelola Akses tetap milik Super Admin saja */
 
   $('isi').innerHTML = `
     <div class="card">
@@ -3405,9 +3420,9 @@ async function tabAtur(){
     'Baris pengaturan tidak ditemukan. Tabel pengaturan harus berisi tepat satu '
     + 'baris dengan id = true. Hubungi tim Delta sebelum mengubah apa pun.' });
   S.atur = data;
-  /* 23 Okt 2026: Admin ikut boleh mengubah harga, diskon, dan komisi.
-     Owner tetap hanya melihat. */
-  const ro = !(S.peran === 'super' || S.peran === 'admin');
+  /* 23 Okt: Admin ikut boleh mengubah harga, diskon, komisi.
+     26 Okt: Owner juga — pemilik usaha memakai peran ini. */
+  const ro = !bisaHarga();
   const f = (k,l,hint='') => `<div class="fld"><label>${l}</label>
     <input id="set_${k}" type="number" value="${data[k] ?? ''}" ${ro?'disabled':''}>
     ${hint?`<div class="hint">${hint}</div>`:''}</div>`;
