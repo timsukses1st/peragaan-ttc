@@ -1009,6 +1009,35 @@ footer{border-top-color:rgba(255,255,255,.1);color:var(--band-redup)}
           memakai harga resmi hari ini — bukan angka dari halaman ini.</div>
       </div>
 
+      <!-- ============ UANG MUKA (DP) ============
+           Sengaja DI BAWAH kartu perkiraan biaya: pemesan perlu melihat
+           totalnya dulu sebelum menentukan DP, kalau tidak angka persennya
+           tidak ada artinya baginya.
+
+           Kartu ini disembunyikan kalau dp_aktif = false di pengaturan, jadi
+           owner bisa mematikan pembayaran DP tanpa perlu kode diubah. -->
+      <div class="card sembunyi" id="kartu-dp">
+        <h3 style="margin:0 0 4px;font-size:16.5px">Uang muka <span
+          style="font-weight:400;color:var(--muted);font-size:13.5px">(boleh dilewati)</span></h3>
+        <p class="sub" style="margin-bottom:12px" id="dp-sub">Kalau ingin membayar
+          sebagian dulu, isi di sini. Kosongkan kalau mau bayar penuh.</p>
+
+        <div class="grid g2" style="margin-bottom:0">
+          <div class="fld">
+            <label for="f-dp-persen">Uang muka (%)</label>
+            <input id="f-dp-persen" inputmode="decimal" autocomplete="off" placeholder="mis. 30">
+            <div class="hint" id="dp-ket-persen">Dihitung dari total keseluruhan.</div>
+          </div>
+          <div class="fld">
+            <label for="f-dp-rupiah">atau langsung rupiahnya</label>
+            <input id="f-dp-rupiah" inputmode="numeric" autocomplete="off" placeholder="mis. 150000">
+            <div class="hint" id="dp-ket-rupiah">Isi salah satu saja; satunya mengikuti.</div>
+          </div>
+        </div>
+
+        <div class="note" id="dp-catatan"></div>
+      </div>
+
       <div class="card">
         <div class="note w"><b>Belum ada pembayaran lewat halaman ini</b>
           Halaman ini tidak menerima uang dalam bentuk apa pun — tidak ada kartu,
@@ -1172,6 +1201,19 @@ async function muat(){
   $('f-tgl').max = setahun.toISOString().slice(0,10);
 
   gambarTambahan();
+
+  /* Aturan uang muka. Dibaca lewat dp_aturan(), BUKAN dengan select ke tabel
+     pengaturan: tabel itu memuat persentase komisi agen, yang tidak boleh
+     diketahui pelanggan. Fungsinya hanya membuka dua kolom DP.
+
+     Kalau panggilan ini gagal, kartu DP tetap tersembunyi dan pemesanan jalan
+     seperti biasa — DP itu tambahan, bukan syarat. */
+  try {
+    const { data: ad } = await sb.rpc('dp_aturan');
+    const a = Array.isArray(ad) ? ad[0] : ad;
+    S.dpAktif     = !!(a && a.r_aktif);
+    S.dpMinPersen = a ? Number(a.r_minimum_persen) || 0 : 0;
+  } catch { S.dpAktif = false; S.dpMinPersen = 0; }
 
   /* Tautan agen (?ref=KODE): isi kolomnya dan periksa otomatis, supaya pelanggan
      tidak perlu mengetik ulang kode yang sudah ada di tautannya. */
@@ -1485,6 +1527,88 @@ function hitungAnak(){
   return Number.isFinite(a) && a >= 0 ? a : 0;
 }
 
+/* ====================== UANG MUKA (DP) ======================
+   Yang disimpan database CUMA RUPIAHNYA (pesanan.dp_target). Kolom persen di
+   halaman ini alat bantu hitung.
+
+   Satu hal yang membedakan halaman ini dari dashboard: di sini totalnya masih
+   PERKIRAAN. Hitungan di browser bisa berbeda dari hitungan database — harga
+   bisa saja berubah di antara halaman dimuat dan tombol ditekan. Maka:
+
+     - kalau pemesan mengetik PERSEN, yang diingat persennya, dan rupiahnya baru
+       dihitung SETELAH pesanan jadi, memakai total resmi dari database;
+     - kalau pemesan mengetik RUPIAH, angka itu dikirim apa adanya — itu memang
+       jumlah yang ia niatkan untuk ditransfer.
+
+   Tanpa pemisahan itu, "DP 30%" yang dihitung dari perkiraan bisa meleset di
+   bawah ambang 30% milik database dan ditolak, padahal pemesan sudah benar. */
+function dpPersenDari(nominal, total){
+  if (!total || !nominal) return null;
+  return Math.round(nominal * 1000 / total) / 10;
+}
+/* Dibulatkan KE ATAS, sama dengan ajukan_dp() di database. Ke bawah membuat 30%
+   dari 490.000 jadi 146.999 dan justru gagal memenuhi ambang 30% itu sendiri. */
+function dpRupiahDari(persen, total){
+  if (!total || !(persen > 0)) return null;
+  return Math.ceil(total * persen / 100);
+}
+
+/* Menggambar ulang keterangan kartu DP. Dipanggil dari ringkasan(), jadi setiap
+   perubahan paket / jumlah orang / add-on ikut memperbarui angkanya. */
+function gambarDp(){
+  const kartu = $('kartu-dp');
+  if (!kartu) return;
+  if (!S.dpAktif){ kartu.classList.add('sembunyi'); return; }
+  kartu.classList.remove('sembunyi');
+
+  const total = S.totalPerkiraan || 0;
+  const minP   = S.dpMinPersen || 0;
+  const minRp  = dpRupiahDari(minP, total);
+
+  $('dp-ket-persen').innerHTML = minP
+    ? `Minimal <b>${minP}%</b> dari total.`
+    : 'Dihitung dari total keseluruhan.';
+  $('dp-ket-rupiah').innerHTML = minRp
+    ? `Minimal sekitar <b>${rp(minRp)}</b> dari perkiraan saat ini.`
+    : 'Isi salah satu saja; satunya mengikuti.';
+
+  /* Kalau sudah ada isian, perlihatkan apa akibatnya — termasuk sisanya. */
+  const niat = dpNiatSekarang();
+  if (!niat){
+    $('dp-catatan').innerHTML = '<b>Boleh dikosongkan</b>'
+      + 'Kalau dikosongkan, pesanan dianggap bayar penuh dan Anda membicarakan '
+      + 'pembayarannya langsung dengan agen lewat WhatsApp.';
+    return;
+  }
+  const nominal = niat.mode === 'persen' ? dpRupiahDari(niat.nilai, total) : niat.nilai;
+  const kurang  = minRp && nominal < minRp;
+  $('dp-catatan').className = 'note' + (kurang ? ' w' : '');
+  $('dp-catatan').innerHTML = kurang
+    ? `<b>Uang muka masih di bawah minimal</b>`
+      + `Minimal ${rp(minRp)} (${minP}% dari perkiraan total ${rp(total)}). `
+      + 'Pesanan tetap bisa disimpan, tapi uang mukanya tidak akan tercatat.'
+    : `<b>Uang muka ${rp(nominal)}</b>`
+      + `Sekitar ${dpPersenDari(nominal, total)}% dari perkiraan total ${rp(total)}. `
+      + `Sisanya sekitar ${rp(Math.max(total - nominal, 0))}, dibayar menyusul. `
+      + 'Angka pastinya dihitung ulang sistem kami saat pesanan disimpan.';
+}
+
+/* Kolom mana yang terakhir diisi pemesan — itu yang jadi niatnya. Dibaca dari
+   DOM, bukan disimpan di variabel terpisah, supaya tidak ada dua sumber yang
+   bisa berbeda isinya. */
+function dpNiatSekarang(){
+  if (!S.dpAktif) return null;
+  if (S.dpModeTerakhir === 'persen'){
+    const p = parseFloat(($('f-dp-persen').value || '').replace(',', '.'));
+    return Number.isFinite(p) && p > 0 ? { mode:'persen', nilai:p } : null;
+  }
+  if (S.dpModeTerakhir === 'rupiah'){
+    const n = parseInt(($('f-dp-rupiah').value || '').replace(/[^0-9]/g, ''), 10);
+    return Number.isFinite(n) && n > 0 ? { mode:'rupiah', nilai:n } : null;
+  }
+  return null;
+}
+
 function ringkasan(){
   const p = produkTerpilih(), n = pax();
   if (!p || !n){ $('ringkas').innerHTML = '<div class="hint">Lengkapi pilihan di atas.</div>'; return; }
@@ -1515,6 +1639,12 @@ function ringkasan(){
          t.jml > 1 ? ` × ${t.jml}` : ''}</span><span>+ ${rp(t.total)}</span></div>`).join('')
     + (anak ? `<div class="rk"><span>Anak di bawah 12 tahun</span><span>${anak} orang · life jacket anak</span></div>` : '')
     + `<div class="rk"><span>Perkiraan total</span><span>${rp(sub - pot + totalTamb)}</span></div>`;
+
+  /* Disimpan supaya kartu uang muka bisa mengubah persen jadi rupiah. Namanya
+     sengaja "perkiraan": ini hitungan di browser, bukan angka resmi. Total yang
+     mengikat baru dihitung database saat pesanan disimpan. */
+  S.totalPerkiraan = sub - pot + totalTamb;
+  gambarDp();
 }
 
 /* ====================== KIRIM ====================== */
@@ -1635,11 +1765,55 @@ async function kirim(){
 
   const r = Array.isArray(data) ? data[0] : data;
   if (!r?.r_kode) return pesan('Pesanan tidak mengembalikan kode. Hubungi kami lewat WhatsApp.', 12000);
-  tampilkanHasil(r.r_kode, r.r_token, nama);
+
+  /* Uang muka dicatat SETELAH pesanannya jadi, dan sengaja begitu. Dua alasan:
+
+     1. Pesanannya tidak boleh ikut gagal karena DP. Kalau DP disatukan ke dalam
+        buat_pesanan() dan ada yang salah di bagian DP, yang hilang adalah
+        pesanannya — padahal DP cuma kesepakatan yang masih bisa diperbaiki staf
+        lewat dashboard.
+     2. Persen baru bisa diubah jadi rupiah kalau total RESMI sudah diketahui.
+        Total di halaman ini masih perkiraan; database yang memutuskan angka
+        sebenarnya. Maka totalnya dibaca dulu dari status_pesanan(). */
+  const dp = await catatDp(r.r_token);
+  tampilkanHasil(r.r_kode, r.r_token, nama, dp);
+}
+
+/* Mengembalikan { nominal, persen } kalau DP tercatat, { gagal:pesan } kalau
+   tidak — supaya kartu hasil bisa jujur, bukan diam-diam menganggap tersimpan. */
+async function catatDp(token){
+  const niat = dpNiatSekarang();
+  if (!niat) return null;
+
+  try {
+    /* Total resmi. Tanpa ini, "30%" dihitung dari perkiraan browser dan bisa
+       meleset tepat di bawah ambang 30% milik database, lalu ditolak — padahal
+       yang diketik pemesan sudah benar. */
+    const { data: st } = await sb.rpc('status_pesanan', { p_token: token });
+    const s = Array.isArray(st) ? st[0] : st;
+    const total = s ? Number(s.total) : 0;
+    if (!total) return { gagal: 'total pesanan belum terbaca' };
+
+    const nominal = niat.mode === 'persen'
+      ? dpRupiahDari(niat.nilai, total)
+      : niat.nilai;
+    if (!nominal) return { gagal: 'nominal uang muka tidak terbaca' };
+
+    const { data: dd, error } = await sb.rpc('ajukan_dp',
+      { p_token: token, p_nominal: nominal });
+    if (error) return { gagal: error.message || 'ditolak sistem' };
+
+    const d = Array.isArray(dd) ? dd[0] : dd;
+    return { nominal: d ? d.r_dp : nominal,
+             persen:  d ? d.r_persen : dpPersenDari(nominal, total),
+             total };
+  } catch (e) {
+    return { gagal: (e && e.message) || 'gangguan jaringan' };
+  }
 }
 
 /* ====================== HASIL ====================== */
-function tampilkanHasil(kode, token, nama){
+function tampilkanHasil(kode, token, nama, dp){
   $('form-area').classList.add('sembunyi');
   document.querySelector('#pesan').scrollIntoView({behavior:'smooth'});
 
@@ -1649,8 +1823,14 @@ function tampilkanHasil(kode, token, nama){
   const keAgen  = !!S.agenWa;
   const tujuan  = keAgen ? wa62(S.agenWa) : WA_ADMIN;
   const sapaan  = keAgen ? `Halo ${S.agenNama}` : 'Halo The Tamperan Cruise';
+  /* Nominal DP ikut disebut di pesan WhatsApp-nya. Agen jadi tidak perlu
+     membuka dashboard dulu untuk tahu berapa yang ditunggu, dan pemesan punya
+     catatan tertulis soal angka yang ia sepakati. */
+  const dpOk    = dp && dp.nominal && !dp.gagal;
   const teksWa  = `${sapaan}, saya ${nama}. `
-    + `Saya baru membuat pesanan dengan kode ${kode}. Mohon dibantu konfirmasi dan pembayarannya.`;
+    + `Saya baru membuat pesanan dengan kode ${kode}. `
+    + (dpOk ? `Saya ingin membayar uang muka ${rp(dp.nominal)} dulu. ` : '')
+    + 'Mohon dibantu konfirmasi dan pembayarannya.';
   const waSiap  = keAgen || (WA_ADMIN && WA_ADMIN !== WA_PLACEHOLDER);
 
   $('hasil').classList.remove('sembunyi');
@@ -1660,6 +1840,16 @@ function tampilkanHasil(kode, token, nama){
       <div class="kode-besar mono" style="margin:12px 0 4px">${esc(kode)}</div>
       <p class="sub">Simpan kode ini. Pesanan berstatus <b>belum bayar</b> dan akan
          kami konfirmasi lewat WhatsApp.</p>
+
+      ${dpOk ? `<div class="note"><b>Uang muka ${rp(dp.nominal)} dicatat</b>
+          Sekitar ${dp.persen}% dari total ${rp(dp.total)}; sisanya
+          ${rp(Math.max(dp.total - dp.nominal, 0))} dibayar menyusul. Ini
+          <b>kesepakatan</b>, belum uang masuk &mdash; transfernya dibicarakan
+          lewat WhatsApp, dan baru tercatat setelah kami terima.</div>` : ''}
+      ${dp && dp.gagal ? `<div class="note w"><b>Uang muka belum tercatat</b>
+          Pesanan Anda <b>tersimpan dengan aman</b>, hanya catatan uang mukanya yang
+          gagal (${esc(dp.gagal)}). Sebutkan saja nominalnya waktu menghubungi agen
+          lewat WhatsApp &mdash; dia bisa mencatatnya dari sisi kami.</div>` : ''}
 
       ${waSiap
         ? `<a class="btn wa blok" href="https://wa.me/${tujuan}?text=${encodeURIComponent(teksWa)}"
@@ -1876,6 +2066,13 @@ const TUTOR = [
   { cari:'#kartu-tambahan', judul:'Tambahan',
     teks:'Centang kalau mau. Paddleboard bisa diisi jumlahnya sesuai kebutuhan. '
        + 'Boleh dilewati dan dibicarakan lagi dengan agen.' },
+  /* Langkah ini ikut hilang sendiri kalau owner mematikan DP: mulaiTutor()
+     menyaring langkah yang elemennya tidak ada, dan #kartu-dp tersembunyi
+     tidak punya ukuran. */
+  { cari:'#kartu-dp', judul:'Uang muka (boleh dilewati)',
+    teks:'Kalau mau membayar sebagian dulu, isi persennya atau langsung rupiahnya &mdash; '
+       + 'satu saja, kolom satunya mengikuti. Ini <b>kesepakatan</b>, belum pembayaran: '
+       + 'transfernya tetap dibicarakan lewat WhatsApp. Kosongkan kalau mau bayar penuh.' },
   { cari:'#ringkas', judul:'Perkiraan biaya',
     teks:'Rincian biaya yang menyesuaikan sendiri. Angkanya masih perkiraan: total yang '
        + 'mengikat dihitung ulang sistem kami saat pesanan disimpan.' },
@@ -2104,6 +2301,40 @@ $('bkode').onkeydown = e => { if (e.key === 'Enter'){ e.preventDefault(); cekKod
 $('f-produk').onchange = gambarUlang;
 $('f-pax').oninput     = gambarUlang;
 $('f-tgl').onchange    = ringkasan;
+
+/* ---- Dua kolom uang muka saling mengisi ----
+   S.dpModeTerakhir mencatat kolom mana yang TERAKHIR diketik pemesan. Itu yang
+   jadi niatnya, dan itu yang menentukan cara menghitungnya nanti: persen
+   dihitung ulang dari total resmi, rupiah dikirim apa adanya.
+
+   Penjaga "dpSedangIsi" mencegah pantulan tak berujung — mengisi kolom B
+   memicu event input milik B, yang kalau tidak dijaga balik menulis ke A dan
+   membulatkan ulang angkanya terus-menerus. */
+let dpSedangIsi = false;
+$('f-dp-persen').addEventListener('input', () => {
+  if (dpSedangIsi) return;
+  S.dpModeTerakhir = 'persen';
+  const p = parseFloat(($('f-dp-persen').value || '').replace(',', '.'));
+  dpSedangIsi = true;
+  $('f-dp-rupiah').value = Number.isFinite(p) && p > 0
+    ? (dpRupiahDari(p, S.totalPerkiraan || 0) || '') : '';
+  dpSedangIsi = false;
+  gambarDp();
+});
+$('f-dp-rupiah').addEventListener('input', () => {
+  if (dpSedangIsi) return;
+  S.dpModeTerakhir = 'rupiah';
+  /* Huruf ditolak saat diketik, bukan dibersihkan diam-diam waktu dikirim. */
+  const bersih = ($('f-dp-rupiah').value || '').replace(/[^0-9]/g, '');
+  if (bersih !== $('f-dp-rupiah').value) $('f-dp-rupiah').value = bersih;
+  const n = parseInt(bersih, 10);
+  dpSedangIsi = true;
+  $('f-dp-persen').value = Number.isFinite(n) && n > 0
+    ? (dpPersenDari(n, S.totalPerkiraan || 0) || '') : '';
+  dpSedangIsi = false;
+  gambarDp();
+});
+
 $('vcek').onclick      = cekVoucher;
 $('f-vou').onkeydown   = e => { if (e.key === 'Enter'){ e.preventDefault(); cekVoucher(); } };
 /* Mengetik ulang kode melepas status 'berlaku' — supaya tidak ada voucher sah
