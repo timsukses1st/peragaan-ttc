@@ -562,20 +562,8 @@ body{background:
 .prod .judul .lenc svg{width:18px;height:18px}
 .prod .judul h3{margin:0}
 
-/* ---------- pintu cepat (tanggal + jumlah + kirim) ---------- */
-.pintu{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);
-  border-radius:16px;padding:12px;display:grid;gap:10px;
-  grid-template-columns:1fr 1fr auto;align-items:center;margin:0 0 18px}
-.pintu .ruas{display:flex;align-items:center;gap:10px;background:#fff;
-  border:1.5px solid rgba(255,255,255,.2);border-radius:11px;padding:4px 12px}
-.pintu .ruas svg{width:19px;height:19px;flex:none;color:var(--sea)}
-.pintu .ruas input,.pintu .ruas select{border:0;padding:8px 0;background:none;
-  font-size:14.5px;color:var(--ink)}
-.pintu .ruas input:focus,.pintu .ruas select:focus{outline:none}
-.pintu .ruas:focus-within{border-color:var(--cyan);box-shadow:0 0 0 3px rgba(73,192,232,.22)}
-.pintu .btn{width:100%;white-space:nowrap;display:flex;align-items:center;
-  justify-content:center;gap:8px;border-radius:11px;padding:12px 24px}
-.pintu .btn svg{width:17px;height:17px}
+/* Aturan .pintu dan .ruas dihapus bersama pintu cepatnya (27 Okt 2026).
+   Keduanya tidak dipakai selektor lain mana pun di berkas ini. */
 
 /* ---------- seluruh halaman gelap, kolom isian tetap putih ---------- */
 body{background:var(--band);background-attachment:scroll}
@@ -732,9 +720,6 @@ footer{border-top-color:rgba(255,255,255,.1);color:var(--band-redup)}
   .judul-bag .lenc{width:32px;height:32px;border-radius:9px}
   .judul-bag .lenc svg{width:17px;height:17px}
   .judul-bag + .sub{margin-left:0}
-  /* Pintu cepat jadi bertumpuk: tiga kolom di 393px membuat kolom tanggal
-     terpotong sampai tanggalnya sendiri tidak terbaca. */
-  .pintu{grid-template-columns:1fr;padding:10px;border-radius:14px}
   .prod .judul{gap:9px}
   .prod .judul .lenc{width:28px;height:28px}
   .prod .judul .lenc svg{width:15px;height:15px}
@@ -879,33 +864,12 @@ footer{border-top-color:rgba(255,255,255,.1);color:var(--band-redup)}
   <p class="sub">Isi data di bawah. Pesanan tersimpan dengan status <b>belum bayar</b>,
      lalu dilanjutkan ke WhatsApp untuk konfirmasi.</p>
 
-  <!-- ============ PINTU CEPAT ============
-       Bentuknya meniru baris pemesanan di rancangan, tapi fungsinya BUKAN
-       menyimpan pesanan — hanya mengisi dua kolom pertama lalu meluncur ke
-       formulir lengkap. Pesanan tetap lahir dari formulir yang penuh, karena
-       kode agen, nama penumpang, NIK, dan alamat KTP semuanya wajib dan tidak
-       mungkin muat di satu baris. -->
-  <div class="pintu">
-    <label class="ruas" for="q-tgl">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/>
-        <path d="M3.5 10h17M8 3.5v3M16 3.5v3"/></svg>
-      <input type="date" id="q-tgl" aria-label="Tanggal berangkat">
-    </label>
-    <label class="ruas" for="q-pax">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.6 3.1-5.6 7-5.6s7 2 7 5.6"/></svg>
-      <input id="q-pax" inputmode="numeric" maxlength="3" placeholder="Jumlah orang"
-             aria-label="Jumlah orang">
-    </label>
-    <button type="button" class="btn" id="q-kirim">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M21 3 10.5 13.5M21 3l-6.8 18-3.7-7.5L3 10.1 21 3Z"/></svg>
-      Lanjut isi data</button>
-  </div>
+  <!-- Di sini dulu ada "pintu cepat": satu baris berisi tanggal, jumlah orang,
+       dan tombol Lanjut. Dihapus 27 Okt 2026 karena kedua isiannya hanya
+       disalin ke #f-tgl dan #f-pax di formulir bawah — pelanggan mengisi hal
+       yang sama dua kali, dan kolom jumlah orangnya berikon satu siluet
+       sehingga berulang kali salah diisi nama. Formulir di bawah tetap menjadi
+       satu-satunya tempat pesanan dibuat, persis seperti sebelumnya. -->
 
   <div id="form-area">
 
@@ -1204,11 +1168,6 @@ async function muat(){
   const setahun = new Date(hariIni); setahun.setFullYear(setahun.getFullYear() + 1);
   $('f-tgl').min = hariIni.toISOString().slice(0,10);
   $('f-tgl').max = setahun.toISOString().slice(0,10);
-  /* Pintu cepat diberi batas yang SAMA. Kalau tidak, orang bisa memilih
-     tanggal tahun lalu di pintu cepat, lalu salinannya ditolak diam-diam oleh
-     #f-tgl dan dia tidak pernah tahu kenapa tanggalnya tidak ikut pindah. */
-  $('q-tgl').min = $('f-tgl').min;
-  $('q-tgl').max = $('f-tgl').max;
 
   gambarTambahan();
 
@@ -1730,10 +1689,12 @@ async function cekStatus(token){
      bagian berjualan disembunyikan. Daftarnya diperbarui saat tata letak
      bersirip dipasang: dulu di sini tertulis 'h2' saja — sekarang judul
      dibungkus .judul-bag bersama lencana ikonnya, jadi menyembunyikan h2
-     saja meninggalkan ikon menggantung tanpa judul. .pintu dan .band juga
-     ikut, kalau tidak pintu cepat tetap tampil di halaman yang tidak punya
-     formulir untuk diisi. */
-  document.querySelectorAll('#produk, #form-area, .judul-bag, .pintu, .band, .sub, .hero')
+     saja meninggalkan ikon menggantung tanpa judul. .band ikut karena pita itu
+     bagian dari tampilan berjualan. (.pintu dulu juga di daftar ini; dihapus
+     bersama pintu cepatnya — querySelectorAll tidak error untuk kelas yang
+     tidak ada, tapi nama yang menunjuk ke sesuatu yang tak lagi ada hanya
+     menyesatkan pembaca berikutnya.) */
+  document.querySelectorAll('#produk, #form-area, .judul-bag, .band, .sub, .hero')
     .forEach(el => el.classList.add('sembunyi'));
   const tb = $('tombol-pesan');
   if (tb){ tb.href = location.pathname; tb.textContent = 'Pesan lagi'; }
@@ -2156,48 +2117,10 @@ $('f-anak').oninput    = ringkasan;
 $('kirim').onclick     = kirim;
 $('tombol-tutor').onclick = () => mulaiTutor(true);
 
-/* ====================== PINTU CEPAT ======================
-   Bentuknya meniru baris pemesanan di rancangan, tapi TIDAK menyimpan apa pun.
-   Tugasnya cuma memindahkan tanggal dan jumlah orang ke formulir lengkap lalu
-   mengantar orangnya ke sana. Pesanan tetap lahir dari formulir penuh, karena
-   kode agen, nama penumpang, NIK, dan alamat KTP semuanya wajib.
-
-   Dibuat begini, bukan sebagai formulir kedua, supaya tidak ada DUA tempat
-   yang bisa membuat pesanan. Dua jalur masuk ke satu tabel uang adalah cara
-   paling gampang melahirkan selisih data yang tidak ketahuan sampai akhir. */
-$('q-kirim').onclick = () => {
-  const tg  = ($('q-tgl').value || '').trim();
-  const pax = parseInt(($('q-pax').value || '').replace(/[^0-9]/g, ''), 10);
-
-  if (tg)  $('f-tgl').value = tg;
-  if (Number.isFinite(pax) && pax > 0) $('f-pax').value = Math.min(pax, 200);
-
-  /* Batas tanggal dijaga oleh atribut min/max pada #f-tgl yang disetel muat();
-     kalau yang diketik di pintu cepat di luar batas itu, salinannya ditolak
-     browser sendiri dan #f-tgl tetap kosong. Diberi tahu, bukan didiamkan. */
-  if (tg && !$('f-tgl').value){
-    $('f-tgl').value = '';
-    pesan('<b>Tanggal belum bisa dipakai.</b> Pilih tanggal mulai hari ini '
-        + 'sampai satu tahun ke depan.', 9000);
-  }
-
-  gambarUlang();
-
-  /* Formulirnya masih terkunci kalau kode agen belum diperiksa. Yang sudah
-     diketik tetap tersimpan; orangnya diantar ke gerbangnya, bukan ke kartu
-     yang isinya tersembunyi. */
-  if (!S.kodeOk){
-    $('gate').scrollIntoView({ behavior:'smooth', block:'center' });
-    $('bkode').focus({ preventScroll:true });
-    pesan('<b>Tersimpan.</b> Masukkan dulu kode agen Anda untuk membuka '
-        + 'formulir pemesanan.', 8000);
-    return;
-  }
-  $('utama').scrollIntoView({ behavior:'smooth', block:'start' });
-};
-['q-tgl','q-pax'].forEach(id => $(id).onkeydown = e => {
-  if (e.key === 'Enter'){ e.preventDefault(); $('q-kirim').onclick(); }
-});
+/* Penangan "pintu cepat" (#q-tgl, #q-pax, #q-kirim) ikut dihapus bersama
+   markup-nya. Ini bukan kode mati yang aman ditinggal: $('q-pax') akan bernilai
+   null dan .addEventListener di atasnya melempar TypeError sebelum sisa berkas
+   ini sempat jalan — artinya SELURUH halaman mati, bukan cuma baris itu. */
 
 /* ====================== SOROTAN SIRIP KIRI ======================
    Menandai bagian mana yang sedang dilihat. Memakai IntersectionObserver,
