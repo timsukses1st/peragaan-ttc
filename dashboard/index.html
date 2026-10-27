@@ -493,13 +493,21 @@ async function mulai(){
 function menuPeran(peran){
   return peran==='agen'     ? [['komisi','Komisi & Pelanggan Saya'],['fu','Follow-Up Saya']]
        : peran==='boarding' ? [['boarding','Daftar Boarding']]
-       : peran==='admin'    ? [['pesanan','Pesanan'],['kapal','Pembagian Kapal'],
+       /* 27 Okt 2026: tab Boarding ditambahkan ke admin, super, dan owner.
+          Sebelumnya tab ini HANYA ada di menu peran 'boarding', padahal
+          catat_naik() di database mengizinkan super/owner/admin juga — jadi
+          orang yang paling sering mencatat di lapangan (admin) tidak punya
+          layarnya sama sekali. Ketahuan waktu memasang pencatatan boarding,
+          bukan dari laporan. */
+       : peran==='admin'    ? [['pesanan','Pesanan'],['boarding','Boarding'],
+                               ['kapal','Pembagian Kapal'],
                                ['berangkat','Keberangkatan'],
                                /* 23 Okt 2026: Admin diberi izin mengubah harga.
                                   Dua tab ini ikut dibuka supaya dia punya tempat
                                   mengerjakannya. Kelola Akses tetap tertutup. */
                                ['voucher','Voucher & Tambahan'],['atur','Pengaturan']]
        : [['ringkas','Ringkasan'],['pesanan','Pesanan'],['berangkat','Keberangkatan'],
+          ['boarding','Boarding'],
           ['kapal','Pembagian Kapal'],['fu','Follow-Up'],['manifest','Manifest'],
           ['agen','Agen & Kode'],
           /* Biro & Deposit tidak diberikan ke Admin: di tab inilah harga nego
@@ -623,11 +631,10 @@ function dataLatihan(){
   const AG = { budi:'agen-budi', sari:'agen-sari', anto:'agen-anto' };
   const BR = { anugerah:'biro-anugerah', pandawa:'biro-pandawa', mundur:'biro-mundur' };
   const pr = n => ({ nama:n });
-  /* Nama penumpang dipakai pop-up "porsi tak naik" untuk menyebut siapa yang
-     tidak datang. Tanpa nama, pop-up itu cuma menampilkan tanda hubung dan
-     langkah panduannya jadi tidak ada artinya. */
-  const orang = (n, naikSampai) => Array.from({length:n}, (_,i) =>
-    ({ nama:`Peserta ${i+1}`, naik: i < naikSampai }));
+  /* 27 Okt 2026: pembantu orang() dihapus. Dulu dia membuat baris penumpang
+     palsu lengkap dengan namanya, karena pop-up "porsi tak naik" menyebut
+     siapa saja yang tidak datang. Sekarang yang disimpan cuma satu angka
+     (jml_naik), jadi tidak ada lagi yang perlu dibuatkan barisnya. */
   return {
     pesanan: [
       { id:'o1', kode:'TTC-LAT01', tipe:'perorangan', pax:2, anak:0, total:285000,
@@ -638,7 +645,7 @@ function dataLatihan(){
         pemesan_hp2:'085700000011',
         pemesan_alamat:'Jl. Ahmad Yani No. 12, RT 03/RW 01, Kel. Ploso, Kec. Pacitan, Kab. Pacitan, Jawa Timur 63515',
         agen_id:AG.budi, produk:pr('Cruise PROMO'), agen:{nama:'Budi Santoso'}, kapal:null,
-        penumpang:[{naik:false},{naik:false}] },
+        jml_naik:0 },
       { id:'o2', kode:'TTC-LAT02', tipe:'perorangan', pax:4, anak:1, total:380000,
         subtotal:400000, diskon_nominal:20000, tambahan_nominal:0,
         status:'waiting', fu_status:'dihubungi', fu_terakhir:JAM(5),
@@ -647,7 +654,7 @@ function dataLatihan(){
         pemesan_hp2:'081355556666',
         pemesan_alamat:'Perum Griya Asri Blok C-7, RT 05/RW 08, Kel. Sidoharjo, Kec. Pacitan, Jawa Timur 63513',
         agen_id:AG.sari, produk:pr('Cruise Daily'), agen:{nama:'Sari Wulandari'},
-        kapal:{nama:'Kapal 1'}, penumpang:[{naik:false},{naik:false},{naik:false},{naik:false}] },
+        kapal:{nama:'Kapal 1'}, jml_naik:0 },
       /* Rombongan biro 40 orang, LUNAS, dan baru 37 yang naik. Inilah sasaran
          langkah panduan "porsi tak naik -> deposit": 3 x Rp780.000 = Rp2.340.000.
          deposit_jam sengaja null supaya tombolnya masih ada. */
@@ -663,7 +670,7 @@ function dataLatihan(){
         pemesan_hp2:'02177889900',
         pemesan_alamat:'Jl. Raya Solo-Yogya KM 15, Ruko Pandawa No. 4, Klaten, Jawa Tengah 57438',
         agen_id:AG.budi, produk:pr('2 Day Journey'), agen:{nama:'Budi Santoso'},
-        kapal:{nama:'Kapal 2'}, penumpang:orang(40, 37) },
+        kapal:{nama:'Kapal 2'}, jml_naik:37 },
 
       /* Pesanan biro HARGA NEGO yang baru DP separuh. Sasaran langkah panduan
          "DP Rp X, sisa Rp Y" dan tombol Catat pelunasan. Harga nego Rp400.000
@@ -678,7 +685,7 @@ function dataLatihan(){
         dibuat:JAM(18), diubah:JAM(17), tanggal_berangkat:HARI(4), kapal_id:null,
         kode_voucher_beku:null, pemesan_nama:'Bu Ratih', pemesan_hp:'081277776666',
         agen_id:null, produk:pr('1 Day Journey'), agen:null,
-        kapal:null, penumpang:orang(25, 0) },
+        kapal:null, jml_naik:0 },
 
       /* Pesanan biro yang DIBATALKAN PEMBELI dengan DP Rp3.000.000 sudah masuk.
          Sasaran langkah panduan "DP -> deposit". */
@@ -692,7 +699,7 @@ function dataLatihan(){
         dibuat:JAM(60), diubah:JAM(20), tanggal_berangkat:HARI(8), kapal_id:null,
         kode_voucher_beku:null, pemesan_nama:'Pak Slamet', pemesan_hp:'081255554444',
         agen_id:null, produk:pr('1 Day Journey'), agen:null,
-        kapal:null, penumpang:orang(20, 0) },
+        kapal:null, jml_naik:0 },
       { id:'o4', kode:'TTC-LAT04', tipe:'perorangan', pax:3, anak:0, total:427500,
         subtotal:450000, diskon_nominal:22500, tambahan_nominal:0,
         harga_satuan_beku:150000, deposit_jam:null, deposit_sebab:null,
@@ -701,7 +708,7 @@ function dataLatihan(){
         kode_voucher_beku:null, pemesan_nama:'Fajar Ramadhan', pemesan_hp:'081200000004',
         pemesan_alamat:'Jl. Diponegoro No. 88, RT 01/RW 04, Kel. Baleharjo, Kec. Pacitan, Jawa Timur 63511',
         agen_id:AG.sari, produk:pr('Cruise PROMO'), agen:{nama:'Sari Wulandari'},
-        kapal:{nama:'Kapal 1'}, penumpang:[{naik:true},{naik:true},{naik:false}] },
+        kapal:{nama:'Kapal 1'}, jml_naik:2 },
       { id:'o5', kode:'TTC-LAT05', tipe:'perorangan', pax:2, anak:0, total:665000,
         subtotal:300000, diskon_nominal:15000, tambahan_nominal:380000,
         harga_satuan_beku:150000, deposit_jam:null, deposit_sebab:null,
@@ -709,14 +716,14 @@ function dataLatihan(){
         dibuat:JAM(50), diubah:JAM(20), tanggal_berangkat:HARI(0), kapal_id:K1,
         kode_voucher_beku:'PACITAN', pemesan_nama:'Lestari Dewi', pemesan_hp:'081200000005',
         agen_id:AG.anto, produk:pr('Cruise Daily'), agen:{nama:'Anto Prasetyo'},
-        kapal:{nama:'Kapal 1'}, penumpang:[{naik:true},{naik:true}] },
+        kapal:{nama:'Kapal 1'}, jml_naik:2 },
       { id:'o6', kode:'TTC-LAT06', tipe:'perorangan', pax:2, anak:0, total:285000,
         subtotal:300000, diskon_nominal:15000, tambahan_nominal:0,
         status:'cancel_pembeli', fu_status:'tidak', fu_terakhir:JAM(9),
         dibuat:JAM(12), diubah:JAM(9), tanggal_berangkat:HARI(5), kapal_id:null,
         kode_voucher_beku:null, pemesan_nama:'Gilang Saputra', pemesan_hp:'081200000006',
         agen_id:AG.anto, produk:pr('Cruise PROMO'), agen:{nama:'Anto Prasetyo'}, kapal:null,
-        penumpang:[{naik:false},{naik:false}] },
+        jml_naik:0 },
 
       /* --- Baris khusus Follow-Up ---
          Tiga kelompok (Belum bayar / Kedaluwarsa / Batal oleh pembeli) harus
@@ -731,49 +738,49 @@ function dataLatihan(){
         dibuat:JAM(40), diubah:JAM(38), tanggal_berangkat:HARI(1), kapal_id:null,
         kode_voucher_beku:null, pemesan_nama:'Yuni Astuti', pemesan_hp:'081200000007',
         agen_id:AG.budi, produk:pr('Cruise Daily'), agen:{nama:'Budi Santoso'}, kapal:null,
-        penumpang:[{naik:false},{naik:false}] },
+        jml_naik:0 },
       { id:'o8', kode:'TTC-LAT08', tipe:'perorangan', pax:5, anak:2, total:475000,
         subtotal:500000, diskon_nominal:25000, tambahan_nominal:0,
         status:'expired', fu_status:'dihubungi', fu_terakhir:JAM(11),
         dibuat:JAM(44), diubah:JAM(11), tanggal_berangkat:HARI(1), kapal_id:null,
         kode_voucher_beku:'WARGAPCT', pemesan_nama:'Teguh Prakoso', pemesan_hp:'081200000008',
         agen_id:AG.sari, produk:pr('Cruise PROMO'), agen:{nama:'Sari Wulandari'}, kapal:null,
-        penumpang:Array.from({length:5},()=>({naik:false})) },
+        jml_naik:0 },
       { id:'o9', kode:'TTC-LAT09', tipe:'perorangan', pax:2, anak:0, total:285000,
         subtotal:300000, diskon_nominal:15000, tambahan_nominal:0,
         status:'expired', fu_status:'belum', fu_terakhir:null,
         dibuat:JAM(52), diubah:JAM(50), tanggal_berangkat:HARI(1), kapal_id:null,
         kode_voucher_beku:null, pemesan_nama:'Dwi Lestari', pemesan_hp:'081200000009',
         agen_id:AG.anto, produk:pr('Cruise Daily'), agen:{nama:'Anto Prasetyo'}, kapal:null,
-        penumpang:[{naik:false},{naik:false}] },
+        jml_naik:0 },
       { id:'o10', kode:'TTC-LAT10', tipe:'perorangan', pax:3, anak:1, total:427500,
         subtotal:450000, diskon_nominal:22500, tambahan_nominal:0,
         status:'pending', fu_status:'belum', fu_terakhir:null,
         dibuat:JAM(4), diubah:JAM(4), tanggal_berangkat:HARI(3), kapal_id:null,
         kode_voucher_beku:null, pemesan_nama:'Nur Aisyah', pemesan_hp:'081200000010',
         agen_id:AG.sari, produk:pr('Cruise PROMO'), agen:{nama:'Sari Wulandari'}, kapal:null,
-        penumpang:[{naik:false},{naik:false},{naik:false}] },
+        jml_naik:0 },
       { id:'o11', kode:'TTC-LAT11', tipe:'perorangan', pax:2, anak:0, total:665000,
         subtotal:300000, diskon_nominal:15000, tambahan_nominal:380000,
         status:'pending', fu_status:'dihubungi', fu_terakhir:JAM(2),
         dibuat:JAM(8), diubah:JAM(2), tanggal_berangkat:HARI(4), kapal_id:null,
         kode_voucher_beku:'PACITAN', pemesan_nama:'Bagas Pratama', pemesan_hp:'081200000011',
         agen_id:AG.anto, produk:pr('Cruise Daily'), agen:{nama:'Anto Prasetyo'}, kapal:null,
-        penumpang:[{naik:false},{naik:false}] },
+        jml_naik:0 },
       { id:'o12', kode:'TTC-LAT12', tipe:'perorangan', pax:4, anak:0, total:570000,
         subtotal:600000, diskon_nominal:30000, tambahan_nominal:0,
         status:'cancel_pembeli', fu_status:'tidak', fu_terakhir:JAM(15),
         dibuat:JAM(22), diubah:JAM(15), tanggal_berangkat:HARI(6), kapal_id:null,
         kode_voucher_beku:null, pemesan_nama:'Rizal Mahendra', pemesan_hp:'081200000012',
         agen_id:AG.budi, produk:pr('Cruise PROMO'), agen:{nama:'Budi Santoso'}, kapal:null,
-        penumpang:Array.from({length:4},()=>({naik:false})) },
+        jml_naik:0 },
       { id:'o13', kode:'TTC-LAT13', tipe:'perorangan', pax:2, anak:0, total:285000,
         subtotal:300000, diskon_nominal:15000, tambahan_nominal:0,
         status:'cancel_pembeli', fu_status:'belum', fu_terakhir:null,
         dibuat:JAM(18), diubah:JAM(16), tanggal_berangkat:HARI(7), kapal_id:null,
         kode_voucher_beku:null, pemesan_nama:'Intan Permata', pemesan_hp:'081200000013',
         agen_id:AG.sari, produk:pr('Cruise Daily'), agen:{nama:'Sari Wulandari'}, kapal:null,
-        penumpang:[{naik:false},{naik:false}] },
+        jml_naik:0 },
       /* PESANAN WARISAN: statusnya LUNAS tapi tidak ada satu pun baris
          pembayaran. Ini bentuk data yang ditinggalkan tombol "Lunas" satu-klik
          yang lama — ia hanya mengubah status, tanpa mencatat uang. Wajib ada di
@@ -791,7 +798,7 @@ function dataLatihan(){
         dibuat:JAM(500), diubah:JAM(480), tanggal_berangkat:HARI(-5), kapal_id:K1,
         kode_voucher_beku:null, pemesan_nama:'Bu Ratih', pemesan_hp:'081277776666',
         agen_id:null, produk:pr('1 Day Journey'), agen:null,
-        kapal:{nama:'Kapal 1'}, penumpang:orang(12, 9) },
+        kapal:{nama:'Kapal 1'}, jml_naik:9 },
 
       /* Batal karena CUACA tapi DP-nya sudah masuk. Perlu ada supaya penolakan
          "jalur ini hanya untuk pembatalan oleh pembeli" benar-benar teruji —
@@ -807,7 +814,7 @@ function dataLatihan(){
         dibuat:JAM(300), diubah:JAM(100), tanggal_berangkat:HARI(-3), kapal_id:null,
         kode_voucher_beku:null, pemesan_nama:'Pak Hendra', pemesan_hp:'081288887777',
         agen_id:null, produk:pr('1 Day Journey'), agen:null,
-        kapal:null, penumpang:orang(15, 0) },
+        kapal:null, jml_naik:0 },
 
       /* Batal karena cuaca: bukan kelompok follow-up (bukan salah pembeli),
          tapi perlu ada supaya lencana BATAL - CUACA pernah terlihat di Pesanan. */
@@ -817,7 +824,7 @@ function dataLatihan(){
         dibuat:JAM(70), diubah:JAM(60), tanggal_berangkat:HARI(-2), kapal_id:null,
         kode_voucher_beku:null, pemesan_nama:'Rombongan SMPN 2', pemesan_hp:'081200000014',
         agen_id:AG.budi, produk:pr('2 Day Journey'), agen:{nama:'Budi Santoso'}, kapal:null,
-        penumpang:Array.from({length:6},()=>({naik:false})) },
+        jml_naik:0 },
     ],
     kapal: [
       { id:K1, nama:'Kapal 1', kapasitas:40, aktif:true, urutan:1 },
@@ -1210,7 +1217,7 @@ function rpcLatihan(nama, arg = {}){
         pemesan_nama:(arg.p_pemesan && arg.p_pemesan.nama) || b.pic,
         pemesan_hp:b.pic_wa, agen_id:null,
         produk:{ nama:pk.nama }, agen:null, kapal:null,
-        penumpang:Array.from({length:pax}, (_,i) => ({ nama:`Penumpang ${i+1}`, naik:false })),
+        jml_naik:0,
       });
       if (dp > 0) rpcLatihan('catat_bayar', { p_kode:kode, p_nominal:dp,
         p_metode:arg.p_metode || 'transfer', p_referensi:null,
@@ -1236,13 +1243,12 @@ function rpcLatihan(nama, arg = {}){
       if (r.r_dibayar < o.total)
         throw { code:'22023', message:`Pesanan ${o.kode} belum lunas (baru Rp${r.r_dibayar} `
                  + `dari Rp${o.total}). Lunasi dulu, baru porsi tak terpakai dipindahkan.` };
-      const pnp  = o.penumpang || [];
-      const naik = pnp.filter(p => p.naik).length;
+      const naik = o.jml_naik || 0;
       const jml  = o.pax - naik;
       if (naik === 0)
         throw { code:'22023', message:`Belum ada satu pun penumpang pesanan ${o.kode} yang `
-                 + 'tercatat naik. Selesaikan boarding dulu; kalau memang tidak jalan, '
-                 + 'pakai pembatalan.' };
+                 + 'tercatat naik. Isi dulu jumlah yang naik di tab Boarding; kalau '
+                 + 'memang tidak jalan, pakai pembatalan.' };
       if (jml <= 0)
         throw { code:'22023', message:`Semua ${o.pax} penumpang pesanan ${o.kode} sudah naik. `
                                     + 'Tidak ada porsi yang tersisa.' };
@@ -1250,18 +1256,48 @@ function rpcLatihan(nama, arg = {}){
       if (nominal <= 0)
         throw { code:'22023', message:`Harga satuan pesanan ${o.kode} nol, jadi porsi tak `
                                     + 'terpakai bernilai Rp0.' };
-      const nama = pnp.filter(p => !p.naik).map(p => p.nama).join(', ');
-      const hp   = o.biro_id ? null : hpPolos(o.pemesan_hp);
+      const hp = o.biro_id ? null : hpPolos(o.pemesan_hp);
       (LATIH.deposit_mutasi ||= []).unshift({
         id:'d-'+Math.random().toString(36).slice(2,8), biro_id:o.biro_id || null,
         pemesan_hp:hp, pesanan_id:o.id, arah:'masuk', nominal,
         waktu:new Date().toISOString(), aktor_nama:'Anda (mode panduan)',
         catatan:(arg.p_catatan ? arg.p_catatan + ' — ' : '')
-          + `${jml} dari ${o.pax} penumpang tidak naik di pesanan ${o.kode} (${nama}). `
+          + `${jml} dari ${o.pax} penumpang tidak naik di pesanan ${o.kode}. `
           + 'Tidak dikembalikan, jadi saldo deposit.' });
       o.deposit_jam = new Date().toISOString(); o.deposit_sebab = 'tak_naik';
+      /* r_nama_tak_naik tetap dikembalikan supaya bentuknya sama dengan fungsi
+         database, tapi isinya null — nama penumpang memang tidak ada lagi. */
       return [{ r_jumlah:jml, r_nominal:nominal,
-                r_saldo:saldoLat(o.biro_id, hp), r_nama_tak_naik:nama }];
+                r_saldo:saldoLat(o.biro_id, hp), r_nama_tak_naik:null }];
+    },
+
+    /* ---- catat_naik: petugas mengisi berapa yang naik ----
+       Penjagaannya ditiru persis dari fungsi database, termasuk penguncian
+       setelah porsinya dipindahkan ke deposit. Kalau versi latihan lebih
+       longgar, panduan mengajarkan hal yang nanti ditolak saat dipakai. */
+    catat_naik: () => {
+      if (!['super','owner','admin','boarding'].includes(S.peran))
+        throw { code:'42501', message:'Peran Anda tidak berhak mencatat boarding.' };
+      const o = P.find(x => x.kode === String(arg.p_kode || '').trim());
+      if (!o) throw { code:'22023', message:`Pesanan ${arg.p_kode} tidak ditemukan.` };
+      if (['cancel_pembeli','cancel_cuaca','expired'].includes(o.status))
+        throw { code:'22023', message:`Pesanan ${o.kode} sudah dibatalkan, tidak bisa `
+                                    + 'dicatat boarding.' };
+      if (arg.p_jumlah == null || arg.p_jumlah < 0)
+        throw { code:'22023', message:'Jumlah yang naik tidak boleh minus.' };
+      if (arg.p_jumlah > o.pax)
+        throw { code:'22023', message:`Yang naik (${arg.p_jumlah}) tidak boleh lebih banyak `
+                                    + `dari yang dipesan (${o.pax}).` };
+      if (o.deposit_jam)
+        throw { code:'22023', message:`Pesanan ${o.kode} sudah dipindahkan porsinya ke `
+                 + 'deposit. Jumlah yang naik tidak bisa diubah lagi.' };
+      const baru = arg.p_jumlah > 0 && o.status === 'paid'    ? 'boarded'
+                 : arg.p_jumlah === 0 && o.status === 'boarded' ? 'paid'
+                 : o.status;
+      o.jml_naik = arg.p_jumlah; o.status = baru;
+      o.diubah = new Date().toISOString();
+      return [{ r_pax:o.pax, r_naik:arg.p_jumlah,
+                r_tak_naik:o.pax - arg.p_jumlah, r_status:baru }];
     },
 
     dp_batal_ke_deposit: () => {
@@ -1598,6 +1634,17 @@ const TUTOR = {
       teks:'Di sinilah kapal ditambah dan <b>kapasitas izin</b>-nya diisi. Angka kapasitas '
          + 'inilah yang dipakai kartu muatan di bawah &mdash; isi sesuai izin kapalnya, '
          + 'jangan diperkirakan. Boleh dikosongkan kalau izinnya belum keluar.' },
+    { tab:'manifest', cari:'#isi table[data-papan="manifest"]', judul:'Manifest keberangkatan',
+      teks:'Satu baris per <b>rombongan</b>, bukan per orang. Sejak 27 Okt 2026 nama penumpang '
+         + 'satu per satu memang tidak dikumpulkan lagi &mdash; yang bernama di sini adalah '
+         + '<b>pemesannya</b>, yang bertanggung jawab atas rombongan. Kalau syahbandar meminta '
+         + 'daftar nama per penumpang, datanya tidak ada; jangan disanggupi sebelum cara '
+         + 'pengumpulannya dibicarakan ulang.' },
+    { tab:'boarding', cari:['#isi [data-semua-naik]','#isi table[data-papan="boarding"]'],
+      judul:'Mencatat yang naik',
+      teks:'Di tab Boarding, tiap rombongan diisi <b>berapa orang yang benar-benar naik</b>. '
+         + 'Angka itulah dasar tombol <b>Porsi &rarr; deposit</b> di tab Pesanan, jadi dia uang, '
+         + 'bukan sekadar catatan. Begitu porsinya dipindahkan ke deposit, angkanya terkunci.' },
     { tab:'agen', cari:'#isi #kartu-agen-baru', judul:'Tambah agen',
       teks:'Agen baru didaftarkan dari sini: nama, kode referral, dan nomor WhatsApp-nya. '
          + 'Kode itu yang diketik pelanggan di halaman pemesanan, dan langsung berlaku '
@@ -1717,16 +1764,23 @@ const TUTOR = {
   ],
   boarding: [
     { cari:'#judul', judul:'Selamat datang',
-      teks:'Panduan singkat untuk petugas boarding. Di sini hanya ada daftar penumpang '
+      teks:'Panduan singkat untuk petugas boarding. Di sini hanya ada daftar rombongan '
          + 'yang berhak naik — tanpa data harga maupun komisi.' },
+    { tab:'boarding', cari:['#isi .kpi:nth-child(3)','#isi .kpi'], judul:'Hari ini saja dulu',
+      teks:'Tiga kartu pertama memperlihatkan keadaan hari ini: berapa rombongan berangkat, '
+         + 'berapa orangnya, dan berapa yang sudah tercatat naik.' },
     { tab:'boarding', cari:'#isi .papan-atas select', judul:'Saring per kapal',
-      teks:'Pilih kapal yang sedang dinaiki, supaya yang tampil hanya rombongan kapal itu.' },
-    { tab:'boarding', cari:'#isi .papan-atas .cari', judul:'Cari penumpang',
-      teks:'Kalau pemesan lupa kodenya, ketik namanya di sini.' },
-    { tab:'boarding', cari:'#isi table[data-papan="boarding"] tbody tr',
-      judul:'Pil HARI INI',
-      teks:'Baris bertanda HARI INI adalah yang berangkat hari ini. Kolom Naik menunjukkan '
-         + 'berapa orang dari rombongan itu yang sudah tercatat naik.' },
+      teks:'Pilih kapal yang sedang dinaiki, supaya yang tampil hanya rombongan kapal itu. '
+         + 'Ini langkah pertama sebelum mencatat apa pun.' },
+    { tab:'boarding', cari:'#isi .papan-atas .cari', judul:'Cari rombongan',
+      teks:'Kalau pemesan lupa kodenya, ketik nama pemesan atau nama bironya di sini.' },
+    { tab:'boarding', cari:['#isi [data-semua-naik]','#isi [data-ubah-naik]',
+                            '#isi table[data-papan="boarding"] tbody tr'],
+      judul:'Mencatat yang naik',
+      teks:'Tidak ada QR dan tidak ada centang per nama &mdash; yang dicatat <b>jumlahnya</b>. '
+         + 'Tekan <b>Semua naik</b> kalau rombongannya lengkap, atau <b>Ubah</b> untuk mengisi '
+         + 'angkanya sendiri kalau ada yang tidak datang. Angka ini dipakai menghitung uang, '
+         + 'jadi isi apa adanya; setiap perubahan tercatat atas nama Anda.' },
     /* cari:null -> kartu di tengah layar. Tombol Panduan ada di bar yang menempel,
        dan sorotan elemen menempel gampang meleset saat halaman tergulir. */
     { cari:null, judul:'Selesai',
@@ -2391,16 +2445,17 @@ async function popBayar(kode, muatUlang){
 /* ---- Pop-up: porsi tak naik -> deposit ---- */
 async function popPorsi(kode, muatUlang){
   /* Jumlah yang naik dibaca ulang dari database, bukan dari atribut di tombol:
-     boarding bisa berubah di sela-sela layar ini dibuka. */
+     petugas bisa mengubahnya di sela-sela layar ini dibuka.
+     27 Okt 2026: sumbernya pindah dari baris tabel penumpang ke kolom
+     pesanan.jml_naik. Daftar nama yang tidak naik otomatis ikut hilang —
+     memang tidak ada namanya lagi untuk disebut. */
   const { data: o, error } = await DB.from('pesanan')
-    .select('kode,pax,harga_satuan_beku,biro_nama,penumpang(nama,naik)')
+    .select('kode,pax,jml_naik,harga_satuan_beku,biro_nama')
     .eq('kode', kode).maybeSingle();
   if (error) return gagalPesan(error);
   if (!o) return pesan('Pesanan tidak ditemukan.', 7000);
 
-  const pnp     = o.penumpang || [];
-  const naik    = pnp.filter(p => p.naik).length;
-  const takNaik = pnp.filter(p => !p.naik);
+  const naik    = o.jml_naik || 0;
   const jml     = o.pax - naik;
   const nominal = jml * (o.harga_satuan_beku || 0);
   const pemilik = o.biro_nama
@@ -2419,8 +2474,10 @@ async function popPorsi(kode, muatUlang){
       <div class="uang"><span>Masuk deposit</span><b style="color:var(--sea);font-size:16px">${rp(nominal)}</b></div>
     </div>
 
-    ${takNaik.length ? `<div class="note"><b>Yang tidak naik</b>${
-      esc(takNaik.map(p => p.nama).join(', '))}</div>` : ''}
+    <div class="note"><b>Dari mana angka ini</b>
+      Jumlah yang naik diisi petugas di tab <b>Boarding</b>. Kalau angkanya
+      keliru, perbaiki dulu di sana &mdash; setelah dipindahkan ke deposit,
+      angkanya terkunci dan tidak bisa diubah lagi.</div>
 
     <div class="note w"><b>Hanya bisa sekali</b>Setelah dipindahkan, pesanan ini
       ditandai dan tombolnya hilang. Saldonya tidak bisa ditarik kembali lewat
@@ -3145,95 +3202,130 @@ async function tabFollowUp(){
 }
 
 /* ============ MANIFEST ============ */
+/* ====================================================================
+   MANIFEST — satu baris per ROMBONGAN, bukan per orang
+   --------------------------------------------------------------------
+   27 Okt 2026: daftar nama per penumpang dihentikan atas permintaan
+   pemilik usaha. Yang dikumpulkan sekarang hanya data PEMESAN (lengkap:
+   nama, HP, alamat KTP, NIK) plus jumlah orang. Jadi manifest ini
+   rombongan, bukan daftar nama.
+
+   JUJUR SOAL APA YANG BISA DIPERTANGGUNGJAWABKAN
+   Kartu catatan di bawah tabel sengaja dipertahankan dan ditulis ulang.
+   Manifest yang isinya hitungan kepala TIDAK boleh dipakai seolah daftar
+   nama — kalau syahbandar meminta nama per penumpang, datanya memang
+   tidak ada, dan itu harus terbaca di layarnya sendiri, bukan baru
+   ketahuan di dermaga.
+
+   Kolom NIK & alamat di sini milik PEMESAN, bukan penumpang. Penyamaran
+   NIK tetap memakai pengaturan nik_siapa_boleh_lihat yang sudah ada.
+   ==================================================================== */
 async function tabManifest(){
   const [{data:ord, error:e1}, {data:atur}] = await Promise.all([
-    DB.from('pesanan').select(`kode,tipe,pax,anak,status,pemesan_nama,biro_pic,produk(nama),
-       penumpang(urut,nama,gender,usia,nik,alamat,provinsi,naik,naik_jam,cara)`)
-      .in('status',['paid','boarded']).order('dibuat'),
+    DB.from('pesanan').select('kode,tipe,pax,anak,jml_naik,status,tanggal_berangkat,'
+      + 'pemesan_nama,pemesan_hp,pemesan_nik,pemesan_alamat,biro_nama,biro_pic,'
+      + 'produk(nama),kapal(nama)')
+      .in('status',['paid','boarded']).order('tanggal_berangkat'),
     DB.from('pengaturan').select('kolom_manifest,nik_siapa_boleh_lihat').single()
   ]);
   if (e1) return gagal(e1);
   const kol = atur?.kolom_manifest || {};
   const bolehNik = atur?.nik_siapa_boleh_lihat === 'super_owner'
     ? ['super','owner'].includes(S.peran) : S.peran==='super';
-  const samarNik = n => !n ? '<span style="color:var(--muted)">— dari biro</span>'
+  const samarNik = n => !n ? '<span style="color:var(--muted)">—</span>'
     : bolehNik ? `<span class="mono" style="font-size:11.5px">${esc(n)}</span>`
     : `<span class="mono" style="font-size:11.5px">${esc(n.slice(0,4))} •••• •••• ${esc(n.slice(-4))}</span>`;
 
-  let no=0, tot=0, naik=0, anak=0, perNama=0, dihitung=0;
-  const baris = (ord||[]).map(o=>{
-    const px = (o.penumpang||[]).sort((a,b)=>a.urut-b.urut);
-    const sdh = px.filter(p=>p.naik).length;
-    const adaUsia = px.some(p=>p.usia!=null);
-    tot += px.length; naik += sdh;
-    anak += adaUsia ? px.filter(p=>p.usia!=null && p.usia<12).length : (o.anak||0);
-    perNama  += px.filter(p=>p.cara==='nama').length;
-    dihitung += px.filter(p=>p.cara==='hitung'||p.cara==='massal').length;
-
-    return `<tr style="background:#dce9f5"><td class="num">—</td>
-      <td class="mono" style="font-size:11.5px">${esc(o.kode)}</td>
-      <td colspan="${3+(kol.nik?1:0)+(kol.alamat?2:0)}"><b>${esc(o.pemesan_nama)}</b>
-        <div style="font-size:11px;font-weight:600;color:${adaUsia?'var(--ok)':'var(--sea)'}">
-          ${adaUsia?'✓ usia diminta per orang':'○ usia tidak diminta (jalur biro)'}
-          ${(o.anak||0)>0?` · <span style="color:var(--warn)">${o.anak} anak di bawah 12 — siapkan life jacket anak</span>`:''}
-          ${o.biro_pic?` · PIC: ${esc(o.biro_pic)}`:''}</div></td>
-      <td class="mono">${px.length} orang</td>
-      <td><span class="pill ${sdh>=px.length?'p-ok':'p-warn'}">${sdh}/${px.length} NAIK</span></td></tr>`
-    + px.map(p=>{ no++;
-      return `<tr><td class="num" style="color:var(--muted)">${no}</td>
-        <td class="mono" style="font-size:11px;color:var(--muted)">${esc(o.kode)}-${p.urut}</td>
-        <td style="padding-left:16px">${esc(p.nama)}</td>
-        <td>${p.gender||'<span style="color:var(--muted)">—</span>'}</td>
-        <td class="num">${p.usia!=null
-          ? `${p.usia}${p.usia<12?' <span class="pill p-warn">ANAK</span>':''}`
-          : '<span style="color:var(--muted)">—</span>'}</td>
-        ${kol.nik?`<td>${samarNik(p.nik)}</td>`:''}
-        ${kol.alamat?`<td style="font-size:11.5px;color:var(--muted);max-width:260px">${
-            p.alamat?esc(p.alamat.slice(0,52)):'<span style="color:var(--muted)">—</span>'}</td>
-          <td style="font-size:12px">${p.provinsi?esc(p.provinsi):'<span style="color:var(--muted)">—</span>'}</td>`:''}
-        <td class="mono" style="font-size:11px">${esc(o.kode)}</td>
-        <td>${p.naik
-          ? `<span class="pill ${p.cara==='nama'?'p-sea':'p-mute'}">${
-               p.cara==='nama'?'NAIK '+jam(p.naik_jam).split(' ').pop():'DIHITUNG'}</span>`
-          : '<span class="pill p-mute">BELUM</span>'}</td></tr>`;
-    }).join('');
-  }).join('');
+  const baris = ord || [];
+  const tot  = baris.reduce((a,o) => a + (o.pax || 0), 0);
+  const naik = baris.reduce((a,o) => a + (o.jml_naik || 0), 0);
+  const anak = baris.reduce((a,o) => a + (o.anak || 0), 0);
+  const belumKapal = baris.filter(o => !o.kapal?.nama).length;
+  const hariIni = new Date().toISOString().slice(0,10);
 
   $('isi').innerHTML = `
-    <div class="grid g3">
-      <div class="kpi"><div class="k">Penumpang</div><div class="v">${tot}</div>
-        <div class="d">${(ord||[]).length} pesanan sah</div></div>
-      <div class="kpi"><div class="k">Sudah Naik</div><div class="v">${naik}</div>
-        <div class="d">dari ${tot} penumpang</div></div>
-      <div class="kpi"><div class="k">Anak di Bawah 12</div>
-        <div class="v" style="color:var(--warn)">${anak}</div>
+    <div class="grid g4">
+      <div class="kpi"><div class="k">Rombongan</div><div class="v">${baris.length}</div>
+        <div class="d">pesanan sah</div></div>
+      <div class="kpi"><div class="k">Total penumpang</div><div class="v">${tot}</div>
+        <div class="d">dihitung per kepala</div></div>
+      <div class="kpi"><div class="k">Sudah naik</div>
+        <div class="v" style="color:${naik >= tot && tot ? 'var(--ok)' : 'inherit'}">${naik}</div>
+        <div class="d">dari ${tot} orang</div></div>
+      <div class="kpi"><div class="k">Anak di bawah 12</div>
+        <div class="v" style="color:${anak ? 'var(--warn)' : 'inherit'}">${anak}</div>
         <div class="d">life jacket ukuran anak</div></div>
     </div>
     <div class="card scrollx">
-      <h3>Manifest Penumpang</h3>
+      <h3>Manifest Keberangkatan <span class="pill p-mute">${baris.length}</span></h3>
       <table data-papan="manifest">
-        <thead><tr><th class="num">No</th><th>Kode</th><th>Nama</th><th>L/P</th><th class="num">Usia</th>
-          ${kol.nik?'<th>NIK</th>':''}${kol.alamat?'<th>Alamat sesuai KTP</th><th>Provinsi</th>':''}
-          <th>Pesanan</th><th>Boarding</th></tr></thead>
-        <tbody>${baris || '<tr class="kosong"><td colspan="9">Belum ada pesanan sah.</td></tr>'}</tbody>
+        <thead><tr><th class="nw">Berangkat</th><th class="nw">Kapal</th><th class="nw">Kode</th>
+          <th>Pemesan</th><th class="nw">WhatsApp</th><th class="nw">Produk</th>
+          <th class="num">Pax</th><th class="num">Anak</th><th class="num">Naik</th>
+          ${kol.nik ? '<th class="nw">NIK pemesan</th>' : ''}
+          ${kol.alamat ? '<th>Alamat sesuai KTP</th>' : ''}
+          <th class="nw">Status</th></tr></thead>
+        <tbody>${baris.length ? baris.map(o => {
+          const st = STATUS[o.status] || [o.status,'p-mute'];
+          const kurang = (o.pax || 0) - (o.jml_naik || 0);
+          return `<tr>
+            <td class="nw" data-urut="${o.tanggal_berangkat ? Date.parse(o.tanggal_berangkat) : 0}">${
+              o.tanggal_berangkat
+                ? `${tgl(o.tanggal_berangkat)}${o.tanggal_berangkat === hariIni
+                     ? ' <span class="pill p-ok">HARI INI</span>' : ''}`
+                : '<span style="color:var(--muted)">—</span>'}</td>
+            <td class="nw">${o.kapal?.nama
+              ? esc(o.kapal.nama) : '<span class="pill p-warn">belum</span>'}</td>
+            <td class="mono nw">${esc(o.kode)}</td>
+            <td class="nw"><b class="nama" title="${esc(o.pemesan_nama)}">${esc(o.pemesan_nama)}</b>${
+              o.tipe === 'biro' ? ' <span class="pill p-sea">BIRO</span>' : ''}${
+              o.biro_nama ? `<div class="hint nama" style="max-width:200px"
+                title="${esc(o.biro_nama)}${o.biro_pic ? ' · PIC ' + esc(o.biro_pic) : ''}">${
+                esc(o.biro_nama)}${o.biro_pic ? ' · PIC ' + esc(o.biro_pic) : ''}</div>` : ''}</td>
+            <td class="nw">${selWa(o.pemesan_hp,
+              `Halo ${o.pemesan_nama}, ini dari The Tamperan Cruise soal pesanan ${o.kode}.`)}</td>
+            <td class="nw">${esc(o.produk?.nama)}</td>
+            <td class="num">${o.pax}</td>
+            <td class="num">${o.anak
+              ? `<span class="pill p-warn">${o.anak}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
+            <td class="num nw" data-urut="${o.jml_naik || 0}"><span class="pill ${
+              (o.jml_naik || 0) >= o.pax ? 'p-ok' : (o.jml_naik ? 'p-warn' : 'p-mute')
+              }">${o.jml_naik || 0}/${o.pax}</span>${
+              kurang > 0 && o.jml_naik ? `<div class="hint">${kurang} tidak naik</div>` : ''}</td>
+            ${kol.nik ? `<td class="nw">${samarNik(o.pemesan_nik)}</td>` : ''}
+            ${kol.alamat ? `<td><span class="nama" style="max-width:280px"
+              title="${esc(o.pemesan_alamat || '')}">${
+              o.pemesan_alamat ? esc(o.pemesan_alamat) : '<span style="color:var(--muted)">—</span>'
+              }</span></td>` : ''}
+            <td class="nw"><span class="pill ${st[1]}">${st[0]}</span></td></tr>`;
+        }).join('') : `<tr class="kosong"><td colspan="12"><div class="hint">
+          Belum ada pesanan berstatus LUNAS atau SUDAH NAIK.</div></td></tr>`}</tbody>
       </table>
-      <div class="note w"><b>Manifest ini jujur soal kedalaman pemeriksaannya</b>
-        Diperiksa per nama: <b>${perNama} orang</b> · dihitung per kepala: <b>${dihitung} orang</b> ·
-        belum naik: <b>${tot-naik} orang</b>.
-        Jangan diubah jadi seolah semua dicek satu-satu.</div>
+
+      <div class="note w"><b>Manifest ini hitungan kepala, bukan daftar nama</b>
+        Yang tercatat per orang hanya <b>jumlahnya</b> — nama penumpang satu per satu
+        memang tidak dikumpulkan sejak 27 Okt 2026. Yang bernama di sini adalah
+        <b>pemesannya</b>, yaitu orang yang bertanggung jawab atas rombongan.
+        Kalau syahbandar meminta daftar nama per penumpang, datanya tidak ada —
+        jangan disanggupi sebelum cara pengumpulannya dibicarakan ulang.</div>
+
+      ${belumKapal ? `<div class="note"><b>${belumKapal} rombongan belum dapat kapal</b>
+        Tempatkan dulu di tab Pembagian Kapal sebelum hari keberangkatan.</div>` : ''}
+
       ${!bolehNik && kol.nik ? `<div class="note"><b>NIK disamarkan untuk peran ini</b>
-        Hanya ${atur.nik_siapa_boleh_lihat==='super_owner'?'Super Admin & Owner':'Super Admin'} yang melihat NIK penuh.
-        Pengaturannya ada di tab Pengaturan.</div>`:''}
+        Hanya ${atur.nik_siapa_boleh_lihat === 'super_owner' ? 'Super Admin & Owner' : 'Super Admin'}
+        yang melihat NIK penuh. Pengaturannya ada di tab Pengaturan.</div>` : ''}
     </div>`;
 
-  /* Manifest paling panjang (ratusan baris) — pencarian di sini yang paling
-     sering dipakai petugas: ketik nama, langsung ketemu. */
   lengkapiTabel('#isi table[data-papan="manifest"]', {
     id: 'manifest',
-    petunjuk: 'Cari nama penumpang atau kode…',
-    saring: [{ kolom: kol.nik ? (kol.alamat ? 8 : 6) : (kol.alamat ? 7 : 5),
-               semua: 'Semua pesanan',
-               pilihan: [...new Set((ord||[]).map(o => o.kode))] }]
+    petunjuk: 'Cari kode, pemesan, biro, atau produk…',
+    saring: [
+      { kolom: 1, semua: 'Semua kapal',
+        pilihan: [...new Set(baris.map(o => o.kapal?.nama).filter(Boolean))] },
+      { kolom: 5, semua: 'Semua produk',
+        pilihan: [...new Set(baris.map(o => o.produk?.nama).filter(Boolean))] }
+    ]
   });
 }
 
@@ -4958,22 +5050,54 @@ async function tabKomisi(){
 }
 
 /* ============ BOARDING ============ */
+/* ====================================================================
+   BOARDING — mengisi ANGKA, bukan mencentang nama
+   --------------------------------------------------------------------
+   27 Okt 2026: QR dan pencentangan per nama dibatalkan atas permintaan
+   pemilik usaha. Petugas dermaga sekarang mengisi satu angka per
+   rombongan: berapa orang yang benar-benar naik.
+
+   KENAPA INI BUKAN SEKADAR TAMPILAN
+   Angka inilah yang jadi dasar "porsi tak naik -> deposit". Jadi dia uang,
+   bukan catatan. Karena itu: disimpan lewat catat_naik() di database
+   (bukan UPDATE langsung), tiap perubahan tercatat di audit, dan begitu
+   porsinya sudah dipindahkan ke deposit angkanya dikunci — kalau boleh
+   diubah sesudahnya, saldo deposit yang sudah terbentuk tidak lagi cocok
+   dengan angka yang jadi dasarnya.
+   ==================================================================== */
 async function tabBoarding(){
   const { data, error } = await DB.from('pesanan')
-    .select('kode,pax,anak,tipe,status,tanggal_berangkat,pemesan_nama,'
-          + 'produk(nama),kapal(nama),penumpang(naik)')
-    .in('status',['paid','boarded']).order('tanggal_berangkat');
+    .select('kode,pax,anak,tipe,status,tanggal_berangkat,pemesan_nama,biro_nama,'
+          + 'jml_naik,deposit_jam,produk(nama),kapal(nama)')
+    .in('status',['paid','boarded','waiting']).order('tanggal_berangkat');
   if (error) return gagal(error);
+
+  const baris = data || [];
+  const hariIni = new Date().toISOString().slice(0,10);
+  const hariIniBaris = baris.filter(o => o.tanggal_berangkat === hariIni);
+  const bisaCatat = ['super','owner','admin','boarding'].includes(S.peran);
+
   $('isi').innerHTML = `
-    <div class="card scrollx"><h3>Daftar Boarding</h3>
+    <div class="grid g4">
+      <div class="kpi"><div class="k">Berangkat hari ini</div>
+        <div class="v">${hariIniBaris.length}</div><div class="d">rombongan</div></div>
+      <div class="kpi"><div class="k">Penumpang hari ini</div>
+        <div class="v">${hariIniBaris.reduce((a,o)=>a+(o.pax||0),0)}</div>
+        <div class="d">${hariIniBaris.reduce((a,o)=>a+(o.anak||0),0)} anak</div></div>
+      <div class="kpi"><div class="k">Sudah naik hari ini</div>
+        <div class="v">${hariIniBaris.reduce((a,o)=>a+(o.jml_naik||0),0)}</div>
+        <div class="d">dari ${hariIniBaris.reduce((a,o)=>a+(o.pax||0),0)} orang</div></div>
+      <div class="kpi"><div class="k">Belum dapat kapal</div>
+        <div class="v" style="color:${baris.some(o=>!o.kapal?.nama)?'var(--warn)':'var(--ok)'}">${
+          baris.filter(o=>!o.kapal?.nama).length}</div>
+        <div class="d">semua tanggal</div></div>
+    </div>
+    <div class="card scrollx"><h3>Daftar Boarding <span class="pill p-mute">${baris.length}</span></h3>
       <table data-papan="boarding">
         <thead><tr><th class="nw">Berangkat</th><th class="nw">Kapal</th><th class="nw">Kode</th>
             <th>Pemesan</th><th class="nw">Produk</th><th class="num">Pax</th>
-            <th class="num">Naik</th><th class="nw">Status</th></tr></thead>
-        <tbody>${(data||[]).map(o=>{
-          const sdh=(o.penumpang||[]).filter(p=>p.naik).length;
-          const hariIni = new Date().toISOString().slice(0,10);
-          return `<tr>
+            <th class="nw">Naik</th><th class="nw">Status</th></tr></thead>
+        <tbody>${baris.length ? baris.map(o => `<tr>
             <td class="nw" data-urut="${o.tanggal_berangkat?Date.parse(o.tanggal_berangkat):0}">${o.tanggal_berangkat
               ? `${tgl(o.tanggal_berangkat)}${o.tanggal_berangkat===hariIni
                    ? ' <span class="pill p-ok">HARI INI</span>' : ''}`
@@ -4982,25 +5106,124 @@ async function tabBoarding(){
               ? esc(o.kapal.nama) : '<span class="pill p-warn">belum</span>'}</td>
             <td class="mono nw">${esc(o.kode)}</td>
             <td class="nw"><span class="nama" title="${esc(o.pemesan_nama)}">${esc(o.pemesan_nama)}</span>${
-              o.tipe==='biro'?' <span class="pill p-sea">BIRO</span>':''}</td>
+              o.tipe==='biro'?' <span class="pill p-sea">BIRO</span>':''}${
+              o.biro_nama ? `<div class="hint nama" style="max-width:190px"
+                title="${esc(o.biro_nama)}">${esc(o.biro_nama)}</div>` : ''}</td>
             <td class="nw">${esc(o.produk?.nama)}</td>
-            <td class="num">${o.pax}${o.anak?`<div style="font-size:10.5px;color:var(--warn)">${o.anak} anak</div>`:''}</td>
-            <td class="num"><span class="pill ${sdh>=o.pax?'p-ok':'p-warn'}">${sdh}/${o.pax}</span></td>
-            <td><span class="pill ${(STATUS[o.status]||['','p-mute'])[1]}">${(STATUS[o.status]||[o.status])[0]}</span></td>
-          </tr>`;
-        }).join('')}</tbody>
+            <td class="num">${o.pax}${o.anak?`<div class="hint" style="color:var(--warn)">${o.anak} anak</div>`:''}</td>
+            <td class="nw" data-sel-naik="${esc(o.kode)}"
+                data-urut="${o.jml_naik||0}">${selNaik(o, bisaCatat)}</td>
+            <td class="nw"><span class="pill ${(STATUS[o.status]||['','p-mute'])[1]}">${
+              (STATUS[o.status]||[o.status])[0]}</span></td>
+          </tr>`).join('') : `<tr class="kosong"><td colspan="8"><div class="hint">
+            Belum ada pesanan yang siap berangkat.</div></td></tr>`}</tbody>
       </table>
-      <div class="note w"><b>Halaman scan belum dibangun</b>
-        Ini baru daftar bacanya. Pemindaian QR dan pencentangan per nama menyusul setelah
-        dashboard dan landing page selesai.</div>
+
+      <div class="note"><b>Cara memakainya di dermaga</b>
+        Saring per kapal dulu lewat kotak di atas tabel, supaya yang tampil hanya
+        rombongan kapal yang sedang dinaiki. Lalu untuk tiap baris, tekan
+        <b>Semua naik</b> kalau rombongannya lengkap, atau <b>Ubah</b> untuk mengisi
+        angkanya sendiri kalau ada yang tidak datang.</div>
+
+      <div class="note w"><b>Angka ini dipakai untuk menghitung uang</b>
+        Selisih antara yang dipesan dan yang naik dipindahkan jadi saldo deposit
+        lewat tombol <b>Porsi &rarr; deposit</b> di tab Pesanan. Jadi isi apa adanya.
+        Setiap perubahan tercatat di audit atas nama Anda, dan setelah porsinya
+        terlanjur dipindahkan ke deposit, angkanya terkunci.</div>
     </div>`;
 
-  /* Dipakai di dermaga: petugas mengetik nama atau kode, dan menyaring per kapal
-     supaya yang tampil hanya rombongan kapal yang sedang dinaiki. */
+  if (bisaCatat) pasangCatatNaik();
   lengkapiTabel('#isi table[data-papan="boarding"]', {
-    id: 'boarding', petunjuk: 'Cari kode atau nama pemesan…',
-    saring: [{ kolom: 1, semua: 'Semua kapal',
-               pilihan: [...new Set((data||[]).map(o => o.kapal?.nama).filter(Boolean))] }]
+    id: 'boarding', petunjuk: 'Cari kode, pemesan, atau biro…',
+    takUrut: [6],
+    saring: [
+      { kolom: 1, semua: 'Semua kapal',
+        pilihan: [...new Set(baris.map(o => o.kapal?.nama).filter(Boolean))] },
+      { kolom: 7, semua: 'Semua status',
+        pilihan: [...new Set(baris.map(o => (STATUS[o.status]||[o.status])[0]))] }
+    ]
+  });
+}
+
+/* Sel kolom "Naik": pil angka + tombolnya. Terkunci kalau porsinya sudah
+   dipindahkan ke deposit — database juga menolaknya, ini supaya tombol yang
+   pasti gagal tidak digambar sama sekali. */
+function selNaik(o, bisaCatat){
+  const n = o.jml_naik || 0;
+  const pil = `<span class="pill ${n >= o.pax ? 'p-ok' : (n ? 'p-warn' : 'p-mute')}">${n}/${o.pax}</span>`;
+  if (o.deposit_jam)
+    return `<span class="sel2">${pil}<span class="pill p-sea">TERKUNCI</span></span>`;
+  if (!bisaCatat) return pil;
+  return `<span class="sel2" style="flex-wrap:wrap">${pil}
+    ${n < o.pax ? `<a class="aksi ghost" href="#" data-semua-naik="${esc(o.kode)}"
+       data-pax="${o.pax}">Semua naik</a>` : ''}
+    <a class="aksi ghost" href="#" data-ubah-naik="${esc(o.kode)}"
+       data-pax="${o.pax}" data-naik="${n}">Ubah</a></span>`;
+}
+
+function pasangCatatNaik(){
+  /* --- Semua naik: satu klik, tanpa pop-up --- */
+  $('isi').querySelectorAll('[data-semua-naik]').forEach(b => b.onclick = async e => {
+    e.preventDefault();
+    const kode = b.dataset.semuaNaik, pax = Number(b.dataset.pax);
+    b.style.pointerEvents = 'none'; b.textContent = '…';
+    const { data, error } = await DB.rpc('catat_naik', { p_kode: kode, p_jumlah: pax });
+    if (error){ b.style.pointerEvents = ''; b.textContent = 'Semua naik';
+      return gagalPesan(error); }
+    const h = Array.isArray(data) ? data[0] : data;
+    pesan(`<b>${esc(kode)}</b>: ${pax} orang tercatat naik.`
+      + `${h && h.r_status === 'boarded' ? ' Status jadi SUDAH NAIK.' : ''}`, 7000);
+    tabBoarding();
+  });
+
+  /* --- Ubah: isian angka di dalam sel --- */
+  $('isi').querySelectorAll('[data-ubah-naik]').forEach(t => t.onclick = e => {
+    e.preventDefault();
+    const kode = t.dataset.ubahNaik;
+    const pax  = Number(t.dataset.pax);
+    const naik = Number(t.dataset.naik);
+    const sel  = $('isi').querySelector(`[data-sel-naik="${CSS.escape(kode)}"]`);
+    if (!sel) return;
+
+    sel.innerHTML = `<span class="sel2" style="flex-wrap:wrap">
+      <input class="kode-in nk-in" style="width:58px;text-align:right" inputmode="numeric"
+             maxlength="3" value="${naik}">
+      <span style="font-size:12px;color:var(--muted)">/ ${pax}</span>
+      <a class="aksi ghost" href="#" data-simpan-naik>Simpan</a>
+      <a class="aksi" href="#" data-batal-naik style="color:var(--muted)">Batal</a></span>`;
+    const inp = sel.querySelector('.nk-in');
+    inp.focus(); inp.select();
+
+    /* Menutup tanpa menggambar ulang seluruh tab: tabel boarding bisa panjang
+       dan menggambar ulang membuat posisi gulir petugas lompat ke atas. */
+    const tutup = () => {
+      sel.innerHTML = selNaik({ kode, pax, jml_naik: naik, deposit_jam: null }, true);
+      pasangCatatNaik();
+    };
+    sel.querySelector('[data-batal-naik]').onclick = ev => { ev.preventDefault(); tutup(); };
+
+    sel.querySelector('[data-simpan-naik]').onclick = async ev => {
+      ev.preventDefault();
+      const teks = (inp.value || '').trim();
+      if (!/^[0-9]{1,3}$/.test(teks)){ inp.focus();
+        return pesan('Isi dengan angka saja, 0 sampai ' + pax + '.', 7000); }
+      const n = parseInt(teks, 10);
+      if (n > pax){ inp.focus();
+        return pesan(`Yang naik tidak boleh lebih dari ${pax} orang yang dipesan.`, 8000); }
+
+      const { data, error } = await DB.rpc('catat_naik', { p_kode: kode, p_jumlah: n });
+      if (error) return gagalPesan(error);
+      const h = Array.isArray(data) ? data[0] : data;
+      pesan(`<b>${esc(kode)}</b>: ${n} dari ${pax} orang tercatat naik.`
+        + `${h && h.r_tak_naik > 0
+            ? ` ${h.r_tak_naik} tidak naik — porsinya bisa dipindahkan ke deposit `
+              + 'dari tab Pesanan setelah pesanan lunas.' : ''}`, 11000);
+      tabBoarding();
+    };
+    inp.onkeydown = ev => {
+      if (ev.key === 'Enter')  sel.querySelector('[data-simpan-naik]').onclick(ev);
+      if (ev.key === 'Escape') tutup();
+    };
   });
 }
 
