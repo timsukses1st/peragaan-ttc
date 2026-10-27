@@ -92,7 +92,14 @@ input:disabled,select:disabled{background:#eef2f7;color:var(--muted)}
 /* ---------- catatan ---------- */
 .note{background:var(--sky);border-left:4px solid var(--sea);border-radius:0 8px 8px 0;
   padding:12px 14px;font-size:14px;margin:14px 0;color:#12405a}
-.note b{display:block;margin-bottom:3px;color:#0d2e42}
+/* Hanya <b> PERTAMA yang jadi judul blok. Yang berikutnya penekanan di tengah
+   kalimat dan harus tetap sebaris — tanpa :first-child, setiap penekanan
+   terlempar ke barisnya sendiri dan memotong kalimat. Persis seperti kartu
+   "Jumlah penumpang" dulu, yang membuat "nama pemesan" berdiri sendiri di
+   tengah kalimat. Disamakan dengan aturan di dashboard. */
+.note b:first-child{display:block;margin-bottom:3px;color:#0d2e42}
+.note b{display:inline;color:#0d2e42}
+.note strong{font-weight:700}
 .note.w{background:var(--warnbg);border-left-color:#c08a1e;color:#5d3c05}
 .note.w b{color:#452c03}
 .note.d{background:var(--dangerbg);border-left-color:var(--danger);color:#6d1711}

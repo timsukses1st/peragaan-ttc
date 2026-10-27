@@ -215,7 +215,21 @@ input:focus,select:focus{outline:2px solid var(--sea);outline-offset:1px;border-
 .hint.nama{display:block;margin-top:2px;line-height:1.35}
 .note{background:var(--sky);border-left:3px solid var(--sea);padding:11px 13px;border-radius:0 8px 8px 0;
       font-size:12.5px;margin:12px 0}
-.note b{display:block;margin-bottom:3px}
+/* <b> PERTAMA di dalam .note adalah judulnya, jadi dijadikan blok. Yang
+   berikutnya penekanan di tengah kalimat dan WAJIB tetap sebaris.
+
+   Dulu aturannya ".note b{display:block}" tanpa :first-child, sehingga setiap
+   penekanan di tengah kalimat terlempar ke barisnya sendiri dan memotong
+   kalimatnya — 16 tempat di berkas ini. Tidak error, tidak terdeteksi
+   pemeriksa mana pun, cuma kelihatan aneh saat dibaca.
+
+   Catatan: :first-child mengabaikan teks, jadi <b> yang didahului teks biasa
+   pun tetap terhitung anak pertama. Satu-satunya note tanpa judul (lihat
+   "Kalau cuma mau mencabut aksesnya") memakai <strong>, bukan <b>, supaya
+   tidak ikut terkena aturan ini. */
+.note b:first-child{display:block;margin-bottom:3px}
+.note b{display:inline}
+.note strong{font-weight:700}
 .note.w{background:var(--warnbg);border-left-color:var(--warn)}
 .note.d{background:var(--dangerbg);border-left-color:var(--danger)}
 .rank{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--garis-h)}
@@ -1300,6 +1314,31 @@ function rpcLatihan(nama, arg = {}){
         r_sisa: r.r_sisa, r_keadaan: r.r_keadaan }; });
     },
 
+    /* Kolomnya persis sama dengan RETURNS TABLE atur_dp() di database:
+       r_dp, r_total, r_persen, r_dibayar, r_sisa_dp. Stub yang nama kolomnya
+       meleset membuat mode panduan memperlihatkan angka kosong padahal data
+       sungguhannya benar — susah dilacak karena tidak ada error sama sekali. */
+    atur_dp: () => {
+      if (!['super','owner','admin'].includes(S.peran))
+        throw { code:'42501', message:'Tidak berwenang mengatur uang muka.' };
+      const o = P.find(x => x.kode === arg.p_kode);
+      if (!o) throw { code:'22023', message:`Pesanan ${arg.p_kode} tidak ditemukan.` };
+      const n = arg.p_nominal;
+      if (n !== null && n !== undefined){
+        if (!(n > 0))
+          throw { code:'22023', message:'Nominal uang muka tidak masuk akal.' };
+        if (n > o.total)
+          throw { code:'22023', message:'Uang muka tidak boleh melebihi total tagihan '
+                                      + `(Rp${o.total}).` };
+      }
+      o.dp_target = (n === null || n === undefined) ? null : n;
+      const r = ringkasLat(o);
+      return [{ r_dp: o.dp_target, r_total: o.total,
+                r_persen: o.dp_target ? Math.round(o.dp_target * 1000 / o.total) / 10 : null,
+                r_dibayar: r.r_dibayar,
+                r_sisa_dp: Math.max((o.dp_target || 0) - r.r_dibayar, 0) }];
+    },
+
     riwayat_bayar: () => {
       const o = P.find(x => x.kode === arg.p_kode);
       if (!o || !['super','owner','admin'].includes(S.peran)) return [];
@@ -2278,7 +2317,8 @@ async function tabPesanan(){
   const { data, error } = await DB.from('pesanan')
     .select('kode,tipe,pax,anak,total,status,dibuat,tanggal_berangkat,kode_voucher_beku,'
            + 'pemesan_nama,pemesan_hp,pemesan_hp2,pemesan_alamat,biro_id,biro_nama,'
-           + 'deposit_jam,deposit_sebab,harga_satuan_beku,produk(nama),agen(nama),kapal(nama)')
+           + 'deposit_jam,deposit_sebab,harga_satuan_beku,dp_target,'
+           + 'produk(nama),agen(nama),kapal(nama)')
     .order('dibuat',{ascending:false}).limit(300);
   if (error) return gagal(error);
 
@@ -2405,6 +2445,19 @@ function aksiStatus(o){
          style="color:var(--muted)">Riwayat</a>`);
   }
 
+  /* ---- Kesepakatan uang muka ----
+     Terpisah dari "Catat bayar", dan itu disengaja: yang satu mencatat uang yang
+     SUDAH masuk, yang ini menetapkan berapa yang DISEPAKATI akan masuk di muka.
+     Mencampur keduanya jadi satu tombol adalah cara tercepat membuat pembukuan
+     mencatat uang yang belum ada di rekening.
+
+     Hanya selama pesanan masih hidup dan belum lunas — setelah lunas, besar DP
+     tidak lagi ada artinya. */
+  if (bisaBayar() && hidup && ['pending','waiting'].includes(o.status))
+    t.push(`<a class="aksi ghost" href="#" data-dp="${esc(o.kode)}"
+       data-total="${o.total}" data-dpnow="${o.dp_target ?? ''}">${
+       o.dp_target ? 'Ubah DP' : 'Atur DP'}</a>`);
+
   /* ---- Porsi tak naik -> deposit ----
      Hanya setelah lunas dan boarding berjalan, dan hanya sekali per pesanan.
      Tombolnya disembunyikan kalau sudah pernah dipindahkan, supaya tidak ada
@@ -2512,6 +2565,13 @@ function pasangAksiUang(muatUlang){
     await popBayar(t.dataset.bayar, muatUlang);
   });
 
+  /* ---- Kesepakatan uang muka ---- */
+  $('isi').querySelectorAll('[data-dp]').forEach(t => t.onclick = async e => {
+    e.preventDefault();
+    await popDp(t.dataset.dp, Number(t.dataset.total || 0),
+                t.dataset.dpnow ? Number(t.dataset.dpnow) : null, muatUlang);
+  });
+
   /* ---- Porsi tak naik -> deposit ---- */
   $('isi').querySelectorAll('[data-porsi]').forEach(t => t.onclick = async e => {
     e.preventDefault();
@@ -2526,11 +2586,144 @@ function pasangAksiUang(muatUlang){
   });
 }
 
+/* ====================== KESEPAKATAN UANG MUKA (DP) ======================
+   Yang disimpan database CUMA RUPIAHNYA (pesanan.dp_target). Kolom persen di
+   layar ini hanya alat bantu hitung — mengetik di satu kolom mengisi kolom
+   satunya, lalu yang dikirim selalu rupiah.
+
+   Rupiah yang jadi patokan, bukan persen, karena kalau persen yang disimpan dan
+   total pesanan berubah (pax ditambah, add-on dicentang), target DP ikut
+   bergerak sendiri — pelanggan yang sudah transfer sesuai kesepakatan tiba-tiba
+   dianggap kurang bayar. Rupiah tidak ikut bergerak; persennya yang bergeser,
+   dan itu memang kenyataannya.
+
+   DP dihitung dari TOTAL pesanan keseluruhan, bukan per pax. */
+function dpPersen(nominal, total){
+  if (!total || !nominal) return null;
+  return Math.round(nominal * 1000 / total) / 10;     /* satu angka di belakang koma */
+}
+/* Dibulatkan KE ATAS, sama dengan ajukan_dp() di database. Ke bawah membuat 30%
+   dari 490.000 jadi 146.999 dan justru gagal memenuhi ambang 30% itu sendiri. */
+function dpRupiah(persen, total){
+  if (!total || !(persen > 0)) return null;
+  return Math.ceil(total * persen / 100);
+}
+
+async function popDp(kode, total, dpSekarang, muatUlang){
+  /* Uang yang SUDAH masuk ikut diambil, supaya terlihat apakah DP-nya sudah
+     terpenuhi. Dua angka ini sengaja ditampilkan berdampingan dan diberi label
+     berbeda — "disepakati" versus "sudah masuk". */
+  const { data: rs } = await DB.rpc('ringkas_bayar', { p_kode: kode });
+  const r = Array.isArray(rs) ? rs[0] : rs;
+  const dibayar = r ? r.r_dibayar : 0;
+
+  const { q, tutup } = bukaLapis(`
+    <h3>Uang muka ${esc(kode)}</h3>
+    <div class="hint" style="margin-bottom:12px">Ini <b>kesepakatan</b>, bukan
+      pencatatan uang masuk. Uang yang benar-benar diterima dicatat lewat
+      <b>Catat bayar</b>, dan angkanya terpisah dari yang di sini.</div>
+
+    <div style="margin-bottom:14px">
+      <div class="uang"><span>Total tagihan</span><b>${rp(total)}</b></div>
+      <div class="uang"><span>Sudah masuk</span>
+        <b style="color:${dibayar > 0 ? 'var(--ok)' : 'var(--muted)'}">${rp(dibayar)}</b></div>
+      ${dpSekarang ? `<div class="uang"><span>DP disepakati sekarang</span>
+        <b>${rp(dpSekarang)} <span style="font-weight:400;color:var(--muted)">(${
+        dpPersen(dpSekarang, total)}% dari total)</span></b></div>` : ''}
+    </div>
+
+    <div class="grid g2" style="margin-bottom:0">
+      <div class="fld"><label for="dp-persen">Uang muka (%)</label>
+        <input id="dp-persen" inputmode="decimal" autocomplete="off"
+               placeholder="mis. 30" value="${dpSekarang ? dpPersen(dpSekarang, total) : ''}">
+        <div class="hint">Dihitung dari total tagihan keseluruhan.</div></div>
+      <div class="fld"><label for="dp-rupiah">atau langsung rupiahnya</label>
+        <input id="dp-rupiah" inputmode="numeric" autocomplete="off"
+               placeholder="mis. 150000" value="${dpSekarang || ''}">
+        <div class="hint">Yang disimpan selalu kolom ini.</div></div>
+    </div>
+
+    <div class="note"><b>Mengisi salah satu saja sudah cukup</b>
+      Kolom satunya ikut terisi sendiri. Yang masuk ke database hanya rupiahnya;
+      persen dihitung ulang dari total setiap kali ditampilkan. Jadi kalau nanti
+      jumlah orang atau tambahan diubah, nominal DP ini <b>tidak ikut berubah</b> —
+      persennya yang bergeser. Kosongkan dua-duanya untuk membatalkan kesepakatan
+      DP (pesanan kembali dianggap bayar penuh).</div>
+
+    <div class="aksi-bar">
+      <button type="button" class="btn ghost dp-tutup">Batal</button>
+      ${dpSekarang ? '<button type="button" class="btn dp-hapus">Hapus DP</button>' : ''}
+      <button type="button" class="btn dp-simpan">Simpan DP</button>
+    </div>`, true);
+
+  const pr = q('#dp-persen'), rpi = q('#dp-rupiah');
+
+  /* Dua kolom saling mengisi. Penjaga "sedangIsi" mencegah pantulan tak
+     berujung: mengisi kolom B memicu event input milik B, yang kalau tidak
+     dijaga akan balik menulis ke A dan membulatkan ulang angkanya terus. */
+  let sedangIsi = false;
+  pr.addEventListener('input', () => {
+    if (sedangIsi) return;
+    const p = parseFloat((pr.value || '').replace(',', '.'));
+    sedangIsi = true;
+    rpi.value = Number.isFinite(p) && p > 0 ? dpRupiah(p, total) : '';
+    sedangIsi = false;
+  });
+  rpi.addEventListener('input', () => {
+    if (sedangIsi) return;
+    const n = angkaRp(rpi.value);
+    sedangIsi = true;
+    pr.value = n && n > 0 ? dpPersen(n, total) : '';
+    sedangIsi = false;
+  });
+
+  q('.dp-tutup').onclick = tutup;
+  pr.focus(); pr.select();
+
+  const kirim = async (nominal, tombol, sukses) => {
+    tombol.disabled = true;
+    tombol.innerHTML = '<span class="spin"></span> Menyimpan…';
+    const { error } = await DB.rpc('atur_dp', { p_kode: kode, p_nominal: nominal });
+    if (error){
+      tombol.disabled = false;
+      tombol.textContent = nominal === null ? 'Hapus DP' : 'Simpan DP';
+      return gagalPesan(error);
+    }
+    tutup();
+    pesan(sukses, 9000);
+    muatUlang();
+  };
+
+  const simpan = q('.dp-simpan');
+  simpan.onclick = () => {
+    const n = angkaRp(rpi.value);
+    if (n === null || n === 0){
+      return kirim(null, simpan,
+        `Kesepakatan DP <b>${esc(kode)}</b> dihapus. Pesanan kembali dianggap bayar penuh.`);
+    }
+    if (n < 0){ rpi.focus(); return pesan('Nominal tidak masuk akal.', 7000); }
+    if (n > total){ rpi.focus();
+      return pesan(`DP ${rp(n)} melebihi total tagihan ${rp(total)}. `
+        + 'Database juga menolaknya.', 10000); }
+    kirim(n, simpan, `DP <b>${esc(kode)}</b> disepakati ${rp(n)} `
+      + `(${dpPersen(n, total)}% dari total). Uang masuk dicatat terpisah lewat Catat bayar.`);
+  };
+
+  const hapus = q('.dp-hapus');
+  if (hapus) hapus.onclick = () => kirim(null, hapus,
+    `Kesepakatan DP <b>${esc(kode)}</b> dihapus. Pesanan kembali dianggap bayar penuh.`);
+}
+
 /* ---- Pop-up: ringkasan + riwayat + formulir pencatatan ---- */
 async function popBayar(kode, muatUlang){
-  const [{ data: rs, error: e1 }, { data: rw }] = await Promise.all([
+  /* dp_target diambil terpisah, BUKAN dengan menambah kolom ke ringkas_bayar():
+     mengubah RETURNS TABLE sebuah fungsi uang berarti DROP lalu CREATE, dan
+     setiap pemanggil yang meleset langsung mematikan pencatatan pembayaran.
+     Satu select kecil jauh lebih murah risikonya daripada itu. */
+  const [{ data: rs, error: e1 }, { data: rw }, { data: pd }] = await Promise.all([
     DB.rpc('ringkas_bayar',  { p_kode: kode }),
     DB.rpc('riwayat_bayar',  { p_kode: kode }),
+    DB.from('pesanan').select('dp_target').eq('kode', kode).maybeSingle(),
   ]);
   if (e1) return gagalPesan(e1);
   const r = Array.isArray(rs) ? rs[0] : rs;
@@ -2538,6 +2731,10 @@ async function popBayar(kode, muatUlang){
 
   const riwayat = rw || [];
   const bolehCatat = r.r_sisa > 0;
+  const dpTarget = pd && pd.dp_target ? pd.dp_target : null;
+  /* Tidak pernah negatif: kalau uang masuk sudah melebihi DP, yang kurang
+     adalah nol — bukan minus, yang akan terbaca seperti kelebihan bayar. */
+  const kurangDp = dpTarget ? Math.max(dpTarget - r.r_dibayar, 0) : 0;
 
   const { q, tutup } = bukaLapis(`
     <h3>Pembayaran ${esc(kode)}</h3>
@@ -2549,6 +2746,12 @@ async function popBayar(kode, muatUlang){
       <div class="uang"><span>Sudah masuk</span><b style="color:var(--ok)">${rp(r.r_dibayar)}</b></div>
       <div class="uang"><span>Sisa</span><b style="color:${
         r.r_sisa > 0 ? 'var(--warn)' : 'var(--muted)'}">${rp(r.r_sisa)}</b></div>
+      ${dpTarget ? `<div class="uang" style="border-top:1px solid var(--line);margin-top:6px;padding-top:8px">
+        <span>DP disepakati</span><b>${rp(dpTarget)} <span
+          style="font-weight:400;color:var(--muted)">(${dpPersen(dpTarget, r.r_total)}%)</span></b></div>
+      <div class="uang"><span>${kurangDp > 0 ? 'Kurang untuk memenuhi DP' : 'Kesepakatan DP'}</span>
+        <b style="color:${kurangDp > 0 ? 'var(--warn)' : 'var(--ok)'}">${
+          kurangDp > 0 ? rp(kurangDp) : 'sudah terpenuhi'}</b></div>` : ''}
     </div>
 
     ${riwayat.length ? `<div class="card scrollx" style="margin:0 0 14px;padding:0;border:0">
@@ -2568,8 +2771,11 @@ async function popBayar(kode, muatUlang){
       <div class="grid g2" style="margin-bottom:0">
         <div class="fld"><label for="by-nominal">Nominal diterima</label>
           <input id="by-nominal" inputmode="numeric" autocomplete="off"
-                 value="${r.r_sisa}" placeholder="mis. 10000000">
-          <div class="hint">Terisi otomatis sebesar sisa tagihan. Ubah kalau ini DP.
+                 value="${kurangDp > 0 ? kurangDp : r.r_sisa}" placeholder="mis. 10000000">
+          <div class="hint">${kurangDp > 0
+            ? 'Terisi sebesar <b>kekurangan DP</b>, karena itu yang sedang ditagih. '
+              + 'Ubah kalau yang masuk lebih banyak.'
+            : 'Terisi otomatis sebesar sisa tagihan. Ubah kalau ini pembayaran sebagian.'}
             Tidak boleh melebihi sisa.</div></div>
         <div class="fld"><label for="by-metode">Metode</label>
           <select id="by-metode">${METODE.map(([v,l]) =>
@@ -3641,7 +3847,10 @@ function pasangHapusAkun(gambarUlang){
           Pesanan, boarding, dan pembayaran yang pernah dia kerjakan tidak ikut
           terhapus &mdash; tapi catatan &ldquo;dikerjakan oleh siapa&rdquo; pada
           baris-baris itu jadi kosong. Riwayat audit tetap menyimpan namanya.</div>
-        <div class="note">Kalau cuma mau mencabut aksesnya, <b>Nonaktifkan</b> lebih
+        <!-- <strong>, bukan <b>: note ini tidak punya judul, dan .note b:first-child
+             akan menjadikan <b> mana pun di sini sebagai judul blok — memotong
+             kalimatnya. Lihat komentar di aturan .note pada <style>. -->
+        <div class="note">Kalau cuma mau mencabut aksesnya, <strong>Nonaktifkan</strong> lebih
           tepat &mdash; itu bisa dibatalkan kapan saja.</div>
         <div class="fld" style="margin-bottom:0">
           <label for="konfirm-hapus">Ketik <span class="mono">${esc(email)}</span> untuk memastikan</label>
