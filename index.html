@@ -1054,8 +1054,51 @@ footer{border-top-color:rgba(255,255,255,.1);color:var(--band-redup)}
   <!-- ============ HASIL ============ -->
   <div id="hasil" class="sembunyi"></div>
 
-  <!-- ============ CEK STATUS ============ -->
-  <div id="cek" style="scroll-margin-top:70px"></div>
+  <!-- ============ CEK STATUS ============
+       Dulu #cek cuma div kosong: menu "Cek status" di sidebar menggulung ke
+       jangkar yang tidak berisi apa-apa, jadi diklik seolah tidak berfungsi.
+       Status hanya bisa dibuka lewat tautan ?t=... yang dikirim saat memesan —
+       dan tautan itu paling sering hilang.
+
+       Diminta DUA hal, bukan kode saja. Kode pesanan = 'TTC-' + 5 karakter dari
+       32 abjad; pada 10.000 pesanan, tebakan acak kena 1 dari 3.355 percobaan,
+       dan yang terbuka adalah nama, nomor HP, serta alamat KTP orang lain.
+       Nomor WhatsApp sebagai syarat kedua menutup jalan itu. -->
+  <div class="judul-bag" id="cek">
+    <span class="lenc" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+        stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4 4"/></svg></span>
+    <h2>Cek status pesanan</h2>
+  </div>
+  <p class="sub">Sudah pernah memesan? Lihat sampai mana prosesnya di sini.</p>
+
+  <div id="cek-form">
+    <div class="card">
+      <div class="grid g2" style="margin-bottom:0">
+        <div class="fld">
+          <label for="c-kode">Kode pesanan</label>
+          <input id="c-kode" class="mono" placeholder="mis. TTC-4ME3A"
+                 autocomplete="off" spellcheck="false" maxlength="20">
+          <div class="hint">Ada di pesan WhatsApp waktu Anda memesan.</div>
+        </div>
+        <div class="fld">
+          <label for="c-hp">Nomor WhatsApp</label>
+          <input id="c-hp" inputmode="tel" placeholder="08xxxxxxxxxx"
+                 autocomplete="tel" maxlength="20">
+          <div class="hint">Nomor yang Anda pakai waktu memesan.</div>
+        </div>
+      </div>
+      <button type="button" class="btn blok" id="c-lihat">Lihat status</button>
+      <div class="hint" id="c-ket" style="text-align:center;margin-top:9px">
+        Keduanya harus cocok dengan data pesanan Anda.</div>
+      <div class="note"><b>Lupa kodenya?</b>
+        Tanyakan ke agen tempat Anda memesan &mdash; dia punya catatannya.
+        Kami sengaja tidak menampilkan status hanya dari kode, supaya data Anda
+        tidak bisa dibuka orang lain yang asal menebak kode.</div>
+    </div>
+  </div>
+
   <div id="cek-status" class="sembunyi"></div>
 
   <footer>
@@ -1883,7 +1926,10 @@ async function cekStatus(token){
      bersama pintu cepatnya — querySelectorAll tidak error untuk kelas yang
      tidak ada, tapi nama yang menunjuk ke sesuatu yang tak lagi ada hanya
      menyesatkan pembaca berikutnya.) */
-  document.querySelectorAll('#produk, #form-area, .judul-bag, .band, .sub, .hero')
+  /* #cek-form ikut disembunyikan: di halaman status, formulir "cari pesanan
+     saya" tidak ada gunanya — pesanannya sudah terbuka. Tombol "Pesan lagi"
+     di pojok kanan atas yang jadi jalan keluarnya. */
+  document.querySelectorAll('#produk, #form-area, #cek-form, .judul-bag, .band, .sub, .hero')
     .forEach(el => el.classList.add('sembunyi'));
   const tb = $('tombol-pesan');
   if (tb){ tb.href = location.pathname; tb.textContent = 'Pesan lagi'; }
@@ -2364,6 +2410,49 @@ $('f-vou').oninput     = () => { if (S.vouOk) { S.vouOk=false; S.vouKode=null;
 $('f-anak').oninput    = ringkasan;
 $('kirim').onclick     = kirim;
 $('tombol-tutor').onclick = () => mulaiTutor(true);
+
+/* ---- Cek status dari kode + nomor WhatsApp ----
+   Yang dikembalikan database hanya TOKEN, lalu halaman pindah ke ?t=token.
+   Sengaja begitu, bukan menggambar status langsung di sini: dengan begitu cuma
+   ada SATU jalur tampilan status, jadi tidak mungkin versi "lewat kode" suatu
+   saat menampilkan hal yang berbeda dari versi "lewat tautan". Pemesan juga
+   dapat tautan yang bisa ia simpan sendiri. */
+async function cariStatus(){
+  const tombol = $('c-lihat'), ket = $('c-ket');
+  const kode = ($('c-kode').value || '').trim();
+  const hp   = ($('c-hp').value   || '').trim();
+
+  if (!kode || !hp){
+    ket.innerHTML = '<span style="color:var(--warn)">Isi kode pesanan dan nomor '
+                  + 'WhatsApp-nya dulu.</span>';
+    (kode ? $('c-hp') : $('c-kode')).focus();
+    return;
+  }
+
+  tombol.disabled = true;
+  tombol.innerHTML = '<span class="spin"></span> Mencari…';
+  ket.textContent = '';
+
+  const { data, error } = await sb.rpc('cek_status_kode', { p_kode: kode, p_hp: hp });
+
+  tombol.disabled = false;
+  tombol.textContent = 'Lihat status';
+
+  const t = Array.isArray(data) ? (data[0] || {}).r_token : (data || {}).r_token;
+  if (error || !t){
+    /* Pesan penolakannya sengaja TIDAK membedakan "kode salah" dari "nomor
+       salah" — sama seperti di database. Pesan yang berbeda akan memberi tahu
+       penebak bahwa kodenya sudah benar, dan itu memotong separuh kerjanya. */
+    ket.innerHTML = '<span style="color:var(--warn)">Kode pesanan atau nomor '
+                  + 'WhatsApp tidak cocok. Periksa lagi, atau tanyakan ke agen Anda.</span>';
+    return;
+  }
+  location.search = `?t=${encodeURIComponent(t)}`;
+}
+
+$('c-lihat').onclick = cariStatus;
+for (const id of ['c-kode','c-hp'])
+  $(id).onkeydown = e => { if (e.key === 'Enter'){ e.preventDefault(); cariStatus(); } };
 
 /* Penangan "pintu cepat" (#q-tgl, #q-pax, #q-kirim) ikut dihapus bersama
    markup-nya. Ini bukan kode mati yang aman ditinggal: $('q-pax') akan bernilai
