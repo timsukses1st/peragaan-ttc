@@ -163,6 +163,27 @@ a.aksi{display:inline-block;padding:3px 9px;border-radius:999px;text-decoration:
 a.aksi:hover{filter:brightness(.94);text-decoration:none}
 a.wa{background:#d6f0e1;color:#0f5c37;border-color:#7cc49c}
 a.ghost{background:#fff;color:var(--sea);border-color:#8fb3c9}
+/* Pasangan saklar hidup/mati. Dibedakan warnanya karena akibatnya berlawanan:
+   "Stop jual" menarik produk dari halaman pemesanan, "Jual lagi" menaruhnya
+   kembali — dan selama keduanya biru polos seperti "Ubah", satu-satunya pembeda
+   cuma tulisannya. Di tabel lima baris, mata membaca warna dan bentuk dulu.
+
+   Amber, bukan merah: aksinya bisa dibatalkan kapan saja dengan menekan
+   pasangannya. Merah disimpan untuk yang benar-benar tak bisa dibatalkan
+   (--danger, dipakai tombol Hapus akun).
+
+   Warnanya pinjam --warnbg/--warn dan --okbg/--ok yang sudah dipakai pil status
+   di kolom sebelahnya, jadi "amber = tidak dijual" dan "hijau = dijual" terbaca
+   konsisten dalam satu baris, bukan dua bahasa warna yang berbeda.
+
+   Garis tepinya diukur, bukan dikira-kira. Latar amber dan hijau mudanya cuma
+   1,17:1 dan 1,20:1 terhadap kartu putih — jadi yang sebenarnya membatasi tombol
+   dari kartu adalah garis tepinya, dan garis itu wajib ≥3:1 (WCAG 1.4.11).
+   #a8761b = 3,98:1 dan #3f8a63 = 4,18:1 terhadap putih. Nilai yang lebih muda
+   (#d9ab4f / #7cc49c) terlihat enak di layar kantor tapi cuma 2,1:1 — di bawah
+   matahari dermaga tombolnya melebur jadi tulisan mengambang. */
+a.matikan{background:var(--warnbg);color:var(--warn);border-color:#a8761b}
+a.hidupkan{background:var(--okbg);color:var(--ok);border-color:#3f8a63}
 .sel2{display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
 .mono{font-family:ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
 .pill{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.3px;
@@ -2410,7 +2431,7 @@ function aksiStatus(o){
   /* Menghidupkan ulang pesanan batal sengaja hanya untuk super admin — database
      juga menolaknya untuk admin, ini cuma menyembunyikan tombol yang pasti gagal. */
   if (['cancel_pembeli','cancel_cuaca','expired'].includes(o.status) && bisaKelola())
-    t.push(`<a class="aksi ghost" href="#" data-status="${esc(o.kode)}" data-ke="pending">Aktifkan lagi</a>`);
+    t.push(`<a class="aksi hidupkan" href="#" data-status="${esc(o.kode)}" data-ke="pending">Aktifkan lagi</a>`);
   return t.join(' ');
 }
 
@@ -2893,8 +2914,9 @@ async function tabBiro(){
             ${b.aktif && b.pic && b.pic_wa
               ? `<a class="aksi ghost" href="#" data-pesan-biro="${b.id}">Pesanan baru</a>` : ''}
             <a class="aksi ghost" href="#" data-ubah-biro="${b.id}">Ubah</a>
-            <a class="aksi" href="#" data-biro-aktif="${b.id}"
-               data-nilai="${b.aktif ? 0 : 1}" style="color:var(--muted)">${
+            <a class="aksi ${b.aktif ? 'matikan' : 'hidupkan'}" href="#"
+               data-biro-aktif="${b.id}"
+               data-nilai="${b.aktif ? 0 : 1}">${
                b.aktif ? 'Nonaktifkan' : 'Aktifkan'}</a></span>`
             : '<span style="color:var(--muted);font-size:11.5px">tidak bisa edit</span>'}</td>
         </tr>`).join('') : `<tr class="kosong"><td colspan="8"><div class="hint">
@@ -3549,7 +3571,8 @@ async function tabAgen(){
           <td class="nw">${a.boleh_biro?'<span class="pill p-sea">BOLEH</span>':'<span class="pill p-mute">TIDAK</span>'}</td>
           <td class="nw">${a.aktif?'<span class="pill p-ok">AKTIF</span>':'<span class="pill p-mute">NONAKTIF</span>'}</td>
           <td class="nw">${bisaKelola()
-            ? `<a class="aksi ghost" href="#" data-biro="${a.id}" data-nilai="${a.boleh_biro?0:1}">${
+            ? `<a class="aksi ${a.boleh_biro?'matikan':'hidupkan'}" href="#"
+                 data-biro="${a.id}" data-nilai="${a.boleh_biro?0:1}">${
                  a.boleh_biro?'Cabut':'Beri akses'}</a>`
             : '<span style="color:var(--muted);font-size:11.5px">tidak bisa edit</span>'}</td>
         </tr>`).join('')}</tbody>
@@ -4372,7 +4395,8 @@ async function tabKapal(){
             : '<span class="pill p-mute">NONAKTIF</span>'}</td>
           <td class="nw"><span class="sel2">
             <a class="aksi ghost" href="#" data-ubah-kapal="${k.id}">Ubah</a>
-            <a class="aksi ghost" href="#" data-kapal-aktif="${k.id}"
+            <a class="aksi ${k.aktif?'matikan':'hidupkan'}" href="#"
+               data-kapal-aktif="${k.id}"
                data-nilai="${k.aktif?0:1}">${k.aktif?'Nonaktifkan':'Aktifkan'}</a></span></td>
         </tr>`).join('')}</tbody>
       </table>
@@ -4513,7 +4537,8 @@ async function tabVoucher(){
             ? '<span class="pill p-ok">AKTIF</span>' : '<span class="pill p-mute">NONAKTIF</span>'}</td>
           <td class="nw" style="color:var(--muted)">${tgl(v.dibuat)}</td>
           <td class="nw">${bisa
-            ? `<a class="aksi ghost" href="#" data-vaktif="${v.id}" data-nilai="${v.aktif?0:1}">${
+            ? `<a class="aksi ${v.aktif?'matikan':'hidupkan'}" href="#"
+                 data-vaktif="${v.id}" data-nilai="${v.aktif?0:1}">${
                  v.aktif?'Nonaktifkan':'Aktifkan'}</a>`
             : '<span style="color:var(--muted);font-size:11.5px">tidak bisa edit</span>'}</td>
         </tr>`).join('') : `<tr><td colspan="5"><div class="hint">Belum ada kode voucher.</div></td></tr>`}</tbody>
@@ -4542,7 +4567,8 @@ async function tabVoucher(){
           <td class="nw">${t.aktif
             ? '<span class="pill p-ok">AKTIF</span>' : '<span class="pill p-mute">NONAKTIF</span>'}</td>
           <td class="nw">${bisaT
-            ? `<a class="aksi ghost" href="#" data-taktif="${t.id}" data-nilai="${t.aktif?0:1}">${
+            ? `<a class="aksi ${t.aktif?'matikan':'hidupkan'}" href="#"
+                 data-taktif="${t.id}" data-nilai="${t.aktif?0:1}">${
                  t.aktif?'Nonaktifkan':'Aktifkan'}</a>`
             : '<span style="color:var(--muted);font-size:11.5px">tidak bisa edit</span>'}</td>
         </tr>`).join('')}</tbody>
@@ -4868,11 +4894,13 @@ async function tabAkses(){
         <td class="nw">${bisa ? `
           <span class="sel2">
             <a class="aksi ghost" href="#" data-reset="${esc(u.email)}">Reset password</a>
-            ${sendiri ? '' : `<a class="aksi" href="#" data-aktif="${u.id}" data-ke="${u.aktif?0:1}"
-               style="${u.aktif
-                 ? 'background:var(--dangerbg);color:var(--danger);border-color:#e3a8a2'
-                 : 'background:var(--okbg);color:var(--ok);border-color:#a7d8bd'}">${
-                 u.aktif ? 'Nonaktifkan' : 'Aktifkan'}</a>`}
+            ${/* Dulu merah. Diturunkan ke amber bukan karena kurang penting, tapi
+                  karena di baris ini ada tombol Hapus yang juga merah — dan Hapus
+                  tidak bisa dibatalkan sedangkan Nonaktifkan bisa. Dua aksi dengan
+                  berat berbeda tidak boleh sewarna. */''}
+            ${sendiri ? '' : `<a class="aksi ${u.aktif?'matikan':'hidupkan'}" href="#"
+               data-aktif="${u.id}" data-ke="${u.aktif?0:1}">${
+               u.aktif ? 'Nonaktifkan' : 'Aktifkan'}</a>`}
             ${sendiri ? '' : `<a class="aksi ghost" href="#" data-hapus="${u.id}"
                data-email="${esc(u.email)}" data-nama="${esc(u.nama)}"
                style="color:var(--danger)">Hapus</a>`}
@@ -5095,7 +5123,8 @@ async function tabAtur(){
             ? '<span style="color:var(--muted);font-size:11.5px">tidak bisa edit</span>'
             : `<span class="sel2">
                 <a class="aksi ghost" href="#" data-ubah-produk="${p.id}">Ubah</a>
-                <a class="aksi ghost" href="#" data-produk-aktif="${p.id}"
+                <a class="aksi ${p.aktif?'matikan':'hidupkan'}" href="#"
+                   data-produk-aktif="${p.id}"
                    data-nilai="${p.aktif?0:1}">${p.aktif?'Stop jual':'Jual lagi'}</a></span>`}</td>
         </tr>`).join('')}</tbody>
       </table>
