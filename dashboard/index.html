@@ -2400,8 +2400,26 @@ const BOLEH_UBAH_STATUS = ['super','owner','admin'];
    sepuluh kolom dan menambah satu lagi memaksa digeser menyamping di layar HP.
    Yang lunas tidak diberi apa-apa — kebanyakan baris lunas, dan menuliskan
    "lunas" di tiap baris cuma bikin ramai tanpa menambah keterangan. */
+/* Baris kecil di bawah angka Total.
+
+   Catatan istilah — ini pernah tabrakan dan sengaja dibereskan: dulu baris
+   "sebagian" berbunyi "DP Rp147.000", padahal yang dimaksud UANG YANG SUDAH
+   MASUK. Sejak ada kesepakatan DP (pesanan.dp_target), kata "DP" jadi punya dua
+   arti di kolom yang sama — target dan setoran. Maka yang sudah masuk disebut
+   "masuk", dan "DP" hanya dipakai untuk kesepakatannya. */
 function selBayar(o, rb){
-  if (!rb) return '';
+  /* Kesepakatan DP ditampilkan walau ringkasan uangnya belum terbaca: dp_target
+     datang dari tabel pesanan, bukan dari ringkas_bayar(). */
+  const barisDp = () => {
+    if (!o.dp_target) return '';
+    const masuk  = rb ? rb.r_dibayar : 0;
+    const kurang = Math.max(o.dp_target - masuk, 0);
+    return `<div class="hint" style="text-align:right;color:${
+      kurang > 0 ? 'var(--muted)' : 'var(--ok)'}">DP disepakati ${rp(o.dp_target)}${
+      kurang > 0 ? ` &middot; kurang ${rp(kurang)}` : ' &middot; terpenuhi'}</div>`;
+  };
+
+  if (!rb) return barisDp();
   if (['cancel_pembeli','cancel_cuaca','expired'].includes(o.status)){
     if (!rb.r_dibayar) return '';
     return `<div class="hint" style="text-align:right">uang masuk ${rp(rb.r_dibayar)}${
@@ -2409,9 +2427,9 @@ function selBayar(o, rb){
   }
   if (rb.r_keadaan === 'sebagian')
     return `<div class="hint" style="text-align:right;color:var(--warn)">
-      DP ${rp(rb.r_dibayar)} &middot; sisa <b>${rp(rb.r_sisa)}</b></div>`;
+      masuk ${rp(rb.r_dibayar)} &middot; sisa <b>${rp(rb.r_sisa)}</b></div>` + barisDp();
   if (rb.r_keadaan === 'belum')
-    return `<div class="hint" style="text-align:right">belum ada uang masuk</div>`;
+    return `<div class="hint" style="text-align:right">belum ada uang masuk</div>` + barisDp();
   if (rb.r_keadaan === 'lebih')
     return `<div class="hint" style="text-align:right;color:var(--danger)">
       terbayar ${rp(rb.r_dibayar)} &mdash; <b>lebih</b></div>`;
