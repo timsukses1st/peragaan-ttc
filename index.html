@@ -986,17 +986,12 @@ footer{border-top-color:rgba(255,255,255,.1);color:var(--band-redup)}
         </div>
       </div>
 
-      <!-- ============ CATATAN JUMLAH PENUMPANG ============
-           27 Okt 2026: tabel nama penumpang satu per satu DIBUANG atas
-           permintaan pemilik usaha. Yang dikumpulkan sekarang cuma jumlahnya.
-           #t-pnp dan #pnp-ket dipertahankan sebagai wadah kosong supaya
-           fungsi gambarUlang() dan langkah panduan lama tidak menunjuk
-           elemen yang tidak ada. -->
-      <div class="card">
-        <h3 style="margin:0 0 4px;font-size:16.5px">Jumlah penumpang</h3>
-        <p class="sub" style="margin-bottom:12px" id="pnp-ket"></p>
-        <div id="t-pnp"></div>
-      </div>
+      <!-- Di sini dulu ada kartu "Jumlah penumpang": tabel nama penumpang satu
+           per satu, dibuang 27 Okt 2026, lalu sempat disisakan sebagai kartu
+           berisi keterangan saja. Kartu itu dihapus seluruhnya 27 Okt 2026 —
+           isinya cuma mengulang apa yang sudah jelas dari kolom "Jumlah
+           penumpang" di kartu atas, dan tidak ada satu pun isian di dalamnya.
+           Jumlah orang tetap diisi di #f-pax, jumlah anak di #f-anak. -->
 
       <!-- ringkasan -->
       <div class="card">
@@ -1440,7 +1435,9 @@ function gambarTambahan(){
 
 function gambarUlang(){
   const p = produkTerpilih();
-  const n = pax();
+  /* Dulu di sini ada "const n = pax()" untuk mengisi kartu Jumlah penumpang.
+     Kartunya dihapus, jadi n tidak dipakai lagi dan ikut dibuang — jumlah orang
+     tetap dibaca pax() di dalam ringkasan() dan kirim(), bukan dari sini. */
 
   /* Kartu paket di atas ikut ditandai. Ditaruh di sini supaya berlaku dari
      arah mana pun paketnya diganti — lewat kartu, lewat dropdown, atau lewat
@@ -1462,16 +1459,11 @@ function gambarUlang(){
      dibiarkan tersembunyi, jumlah anak selalu nol dan life jacket anak tidak
      pernah disiapkan. */
   $('fld-anak').style.display = '';
-  $('pnp-ket').textContent = S.tipe === 'biro'
-    ? 'Jalur biro: cukup jumlah orangnya. Nama per penumpang tidak diminta.'
-    : 'Cukup jumlah orangnya. Nama per penumpang tidak diminta — yang dicatat '
-      + 'data pemesan di atas.';
-  $('t-pnp').innerHTML = n
-    ? `<div class="note"><b>${n} penumpang dicatat sebagai jumlah</b>
-        Manifest keberangkatan memakai <b>nama pemesan</b> sebagai penanggung jawab
-        rombongan, lalu menghitung orangnya per kepala. Nama penumpang satu per satu
-        tidak dikumpulkan.</div>`
-    : `<div class="hint">Isi jumlah penumpang dulu di kolom atas.</div>`;
+  /* Penulis #pnp-ket dan #t-pnp dihapus bersama kartunya. Keduanya WAJIB ikut
+     dihapus, bukan dibiarkan: $('pnp-ket') bernilai null dan .textContent di
+     atasnya melempar TypeError di tengah gambarUlang() — ringkasan() di bawah
+     tidak pernah terpanggil, sehingga perkiraan biaya berhenti diperbarui
+     setiap kali paket atau jumlah orang diubah. */
   ringkasan();
 }
 
@@ -1867,18 +1859,16 @@ const TUTOR = [
   { cari:'#f-tgl', judul:'Tanggal berangkat',
     teks:'Pilih tanggal rencana berlayar. Tidak bisa tanggal yang sudah lewat.' },
   { cari:'#f-pax', judul:'Jumlah penumpang',
-    teks:'Isi jumlah orang. Baris nama penumpang di bawah akan menyesuaikan sendiri '
-       + 'sebanyak angka yang Anda isi.' },
+    teks:'Isi jumlah orang yang ikut. Nama penumpang satu per satu <b>tidak diminta</b> '
+       + '&mdash; data pemesan di atas yang jadi penanggung jawab rombongan. Jangan lupa '
+       + 'isi berapa yang di bawah 12 tahun di sebelahnya; itu dipakai menyiapkan '
+       + 'life jacket ukuran anak.' },
   { cari:'#fld-voucher', judul:'Kode voucher (kalau ada)',
     teks:'Kalau agen Anda memberi kode voucher, masukkan di sini lalu tekan Periksa. '
        + 'Kode voucher berbeda dengan kode agen, dan tidak semua paket bisa memakainya.' },
   { cari:'#kartu-tambahan', judul:'Tambahan',
     teks:'Centang kalau mau. Paddleboard bisa diisi jumlahnya sesuai kebutuhan. '
        + 'Boleh dilewati dan dibicarakan lagi dengan agen.' },
-  { cari:'#t-pnp', judul:'Jumlah penumpang',
-    teks:'Nama penumpang satu per satu <b>tidak diminta</b>. Yang dicatat cuma jumlahnya, '
-       + 'dan data pemesan di atas yang jadi penanggung jawab rombongan. Jangan lupa isi '
-       + 'berapa yang di bawah 12 tahun &mdash; itu dipakai menyiapkan life jacket anak.' },
   { cari:'#ringkas', judul:'Perkiraan biaya',
     teks:'Rincian biaya yang menyesuaikan sendiri. Angkanya masih perkiraan: total yang '
        + 'mengikat dihitung ulang sistem kami saat pesanan disimpan.' },
