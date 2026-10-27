@@ -39,6 +39,15 @@ h1{font-size:25px;letter-spacing:-.5px;margin:0 0 3px}
 .dbtab{background:none;border:0;border-bottom:2px solid transparent;padding:9px 13px;font:inherit;
        font-size:13.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
 .dbtab.on{color:var(--sea);border-bottom-color:var(--sea);font-weight:600}
+/* Baris sub-tab. Sengaja beda bentuk dari .dbtab (pil, bukan garis bawah)
+   supaya sekali lihat jelas mana tab utama dan mana tampilan di dalamnya —
+   dua baris dengan gaya sama akan terlihat seperti dua baris menu sejajar. */
+#bar-sub{display:flex;gap:6px;flex-wrap:wrap;margin:-8px 0 18px}
+.subtab{background:var(--bg);border:1px solid var(--line);border-radius:999px;
+        padding:6px 13px;font:inherit;font-size:13px;color:var(--muted);
+        cursor:pointer;white-space:nowrap}
+.subtab:hover{color:var(--ink)}
+.subtab.on{background:var(--sea);border-color:var(--sea);color:#fff;font-weight:600}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px;
   box-shadow:0 1px 2px rgba(15,39,68,.06)}
 .card.tight{padding:13px}
@@ -293,6 +302,11 @@ input:focus,select:focus{outline:2px solid var(--sea);outline-offset:1px;border-
     <h1 id="judul">—</h1>
     <p class="sub" id="subjudul"></p>
     <div class="dbtabs" id="navTab"></div>
+    <!-- Baris sub-tab. Sengaja SIBLING dari #isi, bukan di dalamnya: dengan
+         begitu ketiga belas fungsi tab tetap menulis ke #isi apa adanya dan
+         tidak satu pun perlu diubah isinya. Kosong (dan tersembunyi) untuk
+         tab yang tidak punya tampilan ganda. -->
+    <div id="bar-sub" class="hide"></div>
     <div id="isi"></div>
   </div>
 </div>
@@ -362,7 +376,7 @@ const bisaBayar  = () => bisaKelola() || S.peran === 'admin';
 const bisaDeposit = () => bisaKelola();
 
 const S = { peran:null, agenId:null, email:null, uid:null, atur:null,
-             kapal:[], pengguna:[], agenList:[], tabAktif:null,
+             kapal:[], pengguna:[], agenList:[], tabAktif:null, subAktif:null,
              peranAsli:null, agenIdAsli:null, agenListDari:null,  /* nilai sebenarnya; yang tanpa
                  akhiran 'Asli' boleh diubah pratinjau */
              latihan:false };    /* true = seluruh data datang dari data latihan */
@@ -490,32 +504,116 @@ async function mulai(){
 
 /* Daftar tab per peran. Dipisah dari mulai() supaya bisa digambar ulang saat
    super admin mempratinjau peran lain. */
+/* ====================================================================
+   STRUKTUR TAB — 12 jadi 7
+   --------------------------------------------------------------------
+   28 Okt 2026. Permintaan tim Tamperan: dashboard lebih simpel.
+
+   MASALAHNYA BUKAN JUMLAH TABNYA, TAPI EMPAT TAB YANG MENJAWAB SATU
+   PERTANYAAN YANG SAMA. Keberangkatan, Boarding, Pembagian Kapal, dan
+   Manifest semuanya menjawab "siapa berlayar kapan, kapalnya mana, berapa
+   yang hadir" — operator harus pindah-pindah tab untuk melihat SATU
+   rombongan secara utuh. Begitu juga Voucher & Tambahan yang sebenarnya
+   bagian dari Pengaturan, dan Follow-Up yang sebenarnya satu saringan di
+   atas daftar Pesanan.
+
+   Jadi yang digabung digabung sebagai SUB-TAMPILAN di dalam satu tab,
+   bukan dihapus. Tidak ada satu layar pun yang hilang:
+
+     Keberangkatan  <- Keberangkatan + Boarding + Pembagian Kapal + Manifest
+     Pesanan        <- Pesanan + Follow-Up
+     Pengaturan     <- Pengaturan + Voucher & Tambahan
+
+   YANG SENGAJA TIDAK DIUBAH
+   Isi ketiga belas fungsi tab tidak disentuh sama sekali. Sub-tampilan
+   memanggil fungsi yang sama persis seperti dulu, dan fungsinya tetap
+   menulis ke #isi. Yang berubah hanya apa yang digambar di deretan tab
+   dan apa yang dipanggil saat tab dibuka — jadi kalau ada yang rusak,
+   rusaknya di navigasi, bukan di layar yang sudah terbukti jalan.
+
+   Peran 'agen' TIDAK ikut berubah: dia tidak punya tab Pesanan, jadi
+   Follow-Up Saya tidak ada tempat untuk diserap. */
+const SUB_TAB = {
+  berangkat: [
+    ['daftar',   'Daftar',          'boarding'],
+    ['kapal',    'Pembagian kapal', 'kapal'],
+    ['ringkas',  'Per tanggal',     'berangkat'],
+    ['manifest', 'Manifest',        'manifest'],
+  ],
+  pesanan: [
+    ['semua', 'Semua pesanan', 'pesanan'],
+    ['fu',    'Follow-Up',     'fu'],
+  ],
+  atur: [
+    ['harga',   'Harga & paket',      'atur'],
+    ['voucher', 'Voucher & tambahan', 'voucher'],
+  ],
+};
+
 function menuPeran(peran){
   return peran==='agen'     ? [['komisi','Komisi & Pelanggan Saya'],['fu','Follow-Up Saya']]
-       : peran==='boarding' ? [['boarding','Daftar Boarding']]
-       /* 27 Okt 2026: tab Boarding ditambahkan ke admin, super, dan owner.
-          Sebelumnya tab ini HANYA ada di menu peran 'boarding', padahal
-          catat_naik() di database mengizinkan super/owner/admin juga — jadi
-          orang yang paling sering mencatat di lapangan (admin) tidak punya
-          layarnya sama sekali. Ketahuan waktu memasang pencatatan boarding,
-          bukan dari laporan. */
-       : peran==='admin'    ? [['pesanan','Pesanan'],['boarding','Boarding'],
-                               ['kapal','Pembagian Kapal'],
-                               ['berangkat','Keberangkatan'],
-                               /* 23 Okt 2026: Admin diberi izin mengubah harga.
-                                  Dua tab ini ikut dibuka supaya dia punya tempat
-                                  mengerjakannya. Kelola Akses tetap tertutup. */
-                               ['voucher','Voucher & Tambahan'],['atur','Pengaturan']]
+       /* Petugas dermaga cuma butuh satu layar: daftar yang berangkat.
+          Dia masuk langsung ke sub-tampilan "Daftar". */
+       : peran==='boarding' ? [['berangkat','Keberangkatan']]
+       : peran==='admin'    ? [['pesanan','Pesanan'],['berangkat','Keberangkatan'],
+                               ['atur','Pengaturan']]
        : [['ringkas','Ringkasan'],['pesanan','Pesanan'],['berangkat','Keberangkatan'],
-          ['boarding','Boarding'],
-          ['kapal','Pembagian Kapal'],['fu','Follow-Up'],['manifest','Manifest'],
-          ['agen','Agen & Kode'],
           /* Biro & Deposit tidak diberikan ke Admin: di tab inilah harga nego
              ditetapkan dan uang dipindahkan ke deposit. Admin boleh MENCATAT
              uang masuk (dari tab Pesanan), bukan menetapkan nilainya. */
           ['biro','Biro & Deposit'],
-          ['voucher','Voucher & Tambahan'],
-          ['akses','Kelola Akses'],['atur','Pengaturan']];
+          ['agen','Agen & Kode'],
+          ['atur','Pengaturan'],
+          ['akses','Kelola Akses']];
+}
+
+/* Sub-tampilan mana yang boleh dilihat peran ini.
+   Petugas boarding hanya "Daftar" — Pembagian Kapal, Per tanggal, dan
+   Manifest memuat data harga dan nilai pesanan yang bukan urusannya, dan
+   RLS di database juga sudah menolaknya. Menyembunyikan tombolnya supaya
+   dia tidak menekan sesuatu yang pasti kosong. */
+function subUntuk(tab, peran){
+  const daftar = SUB_TAB[tab];
+  if (!daftar) return null;
+  if (peran === 'boarding') return daftar.filter(s => s[0] === 'daftar');
+  return daftar;
+}
+
+/* Peta balik: nama layar lama ('boarding', 'kapal', 'voucher', …) → tab induk
+   dan sub-tampilannya sekarang. Dibangun DARI SUB_TAB, bukan ditulis ulang,
+   supaya tidak mungkin ada dua daftar yang isinya berbeda. Dipakai tutorial —
+   langkah-langkahnya masih menyebut nama layar lama, dan dibiarkan begitu:
+   satu peta di sini lebih aman daripada menyunting sebelas baris langkah. */
+const ALAMAT_LAYAR = (() => {
+  const peta = {};
+  for (const [tab, daftar] of Object.entries(SUB_TAB))
+    for (const [sub, , layar] of daftar) peta[layar] = { tab, sub };
+  return peta;
+})();
+
+/* Tab mana yang harus dibuka, untuk peran tertentu, agar sampai ke sebuah
+   layar. Nama yang masih jadi tab utuh dikembalikan apa adanya.
+
+   Peta sub-tab dipakai LEBIH DULU, lalu dijatuhkan ke "nama = tab" kalau peran
+   ini tidak punya tab induknya. Urutan itu penting dua arah:
+
+   - Kalau menu diperiksa dulu, "berangkat" cocok dengan tab Keberangkatan dan
+     ikut kehilangan sub-nya, sehingga mendarat di Daftar boarding padahal yang
+     dimaksud Per tanggal. Nama tab induk kebetulan sama dengan nama salah satu
+     layar di dalamnya, jadi kecocokan itu menipu.
+   - Kalau peta dipakai mentah tanpa jatuhan, layar "fu" selalu diarahkan ke
+     dalam tab Pesanan — padahal untuk agen ia tab tersendiri dan tab Pesanan
+     tidak ada di menunya. */
+function alamatLayar(nama, peran){
+  const menu = menuPeran(peran).map(([t]) => t);
+  const alamat = ALAMAT_LAYAR[nama];
+  if (alamat && menu.includes(alamat.tab)){
+    /* Sub-nya pun harus boleh dilihat peran ini: petugas boarding hanya
+       memegang satu sub-tampilan, sisanya disaring subUntuk(). */
+    const boleh = (subUntuk(alamat.tab, peran) || []).some(s => s[0] === alamat.sub);
+    if (boleh) return alamat;
+  }
+  return { tab: nama, sub: undefined };
 }
 
 function gambarMenu(peran){
@@ -524,10 +622,8 @@ function gambarMenu(peran){
   const menu = menuPeran(peran);
   $('navTab').innerHTML = menu.map(([k,l],i)=>
     `<button class="dbtab${i?'':' on'}" data-tab="${k}">${l}</button>`).join('');
-  $('navTab').querySelectorAll('.dbtab').forEach(b => b.onclick = () => {
-    $('navTab').querySelectorAll('.dbtab').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on'); buka(b.dataset.tab);
-  });
+  $('navTab').querySelectorAll('.dbtab').forEach(b => b.onclick = () =>
+    buka(b.dataset.tab));
   buka(menu[0][0]);
 }
 
@@ -591,14 +687,58 @@ async function siapkanAgenPratinjau(){
   sel.onchange = () => { S.agenId = sel.value; gambarMenu('agen'); };
 }
 
-function buka(tab){
+/* Satu-satunya daftar yang memetakan nama layar ke fungsinya. Dipakai baik
+   oleh tab biasa maupun sub-tampilan, supaya tidak ada dua daftar yang bisa
+   berbeda isinya. */
+const LAYAR = {
+  ringkas:tabRingkas, pesanan:tabPesanan, fu:tabFollowUp, manifest:tabManifest,
+  agen:tabAgen, atur:tabAtur, komisi:tabKomisi, boarding:tabBoarding,
+  kapal:tabKapal, berangkat:tabBerangkat, voucher:tabVoucher,
+  biro:tabBiro, akses:tabAkses,
+};
+
+function buka(tab, sub){
   S.tabAktif = tab;
+
+  /* Sorotan tab utama diurus di sini, bukan di penangan klik, supaya pemanggil
+     mana pun (klik menu, tutorial, buka pertama) menghasilkan keadaan yang
+     sama — dulu tutorial berpindah layar tanpa menu ikut berpindah. */
+  $('navTab').querySelectorAll('.dbtab').forEach(x =>
+    x.classList.toggle('on', x.dataset.tab === tab));
+
+  const daftarSub = subUntuk(tab, S.peran);
+
+  if (!daftarSub){
+    S.subAktif = null;
+    $('bar-sub').classList.add('hide');
+    $('bar-sub').innerHTML = '';
+    gambarLayar(LAYAR[tab]);
+    return;
+  }
+
+  /* Sub-tampilan yang diminta harus benar-benar ada untuk peran ini —
+     kalau tidak, jatuh ke yang pertama. Tanpa penjaga ini, petugas boarding
+     yang tabnya dibuka ulang dengan sub 'manifest' akan melihat layar kosong
+     tanpa tahu kenapa. */
+  const pilih = daftarSub.find(s => s[0] === sub) || daftarSub[0];
+  S.subAktif = pilih[0];
+
+  $('bar-sub').innerHTML = daftarSub.map(([kunci, label]) =>
+    `<button class="subtab${kunci === pilih[0] ? ' on' : ''}"
+      data-sub="${kunci}">${esc(label)}</button>`).join('');
+  $('bar-sub').classList.toggle('hide', daftarSub.length < 2);
+  $('bar-sub').querySelectorAll('.subtab').forEach(b => b.onclick = () => {
+    if (b.dataset.sub === S.subAktif) return;
+    buka(tab, b.dataset.sub);
+  });
+
+  gambarLayar(LAYAR[pilih[2]]);
+}
+
+function gambarLayar(fn){
   $('isi').innerHTML = `<div class="card"><span class="spin"
     style="border-color:#ccc;border-top-color:var(--sea)"></span> Memuat…</div>`;
-  ({ringkas:tabRingkas, pesanan:tabPesanan, fu:tabFollowUp, manifest:tabManifest,
-    agen:tabAgen, atur:tabAtur, komisi:tabKomisi, boarding:tabBoarding,
-    kapal:tabKapal, berangkat:tabBerangkat, voucher:tabVoucher,
-    biro:tabBiro, akses:tabAkses}[tab] || (()=>{}))();
+  (fn || (()=>{}))();
 }
 
 /* ====================================================================
@@ -1023,12 +1163,26 @@ function rpcLatihan(nama, arg = {}){
                komisi: Math.round(omzet * tarif / 100) };
     }).sort((x,y) => y.omzet - x.omzet),
 
+    /* 27 Okt 2026 — DIPERBAIKI. Nama kolomnya dulu salah: stub ini
+       mengembalikan omzet/tiket/komisi, sedangkan fungsi aslinya di database
+       mengembalikan omzet_total/tiket_total/komisi_total/perlu_follow_up/
+       menunggu_verif. Akibatnya di mode panduan keempat KPI Ringkasan selalu
+       Rp0 dan 0, PADAHAL leaderboard tepat di bawahnya memperlihatkan
+       Rp29 juta — janggal dan membuat panduannya tidak bisa dipercaya.
+       Ketahuan waktu meninjau tampilan, bukan dari laporan.
+       Nama kolom di sini WAJIB sama persis dengan pg_get_function_result
+       milik ringkasan_dashboard(text). */
     ringkasan_dashboard: () => {
       const lunas = P.filter(o => ['paid','boarded'].includes(o.status));
-      return [{ omzet: jumlah(lunas,'total'), tiket: jumlah(lunas,'pax'),
-                pesanan: lunas.length, komisi: Math.round(jumlah(lunas,'total') * 0.08),
-                pending: P.filter(o => o.status === 'pending').length,
-                batal: P.filter(o => o.status.startsWith('cancel')).length }];
+      const fuKena = P.filter(o => ['pending','expired','cancel_pembeli'].includes(o.status)
+                                && o.fu_status !== 'jadi' && o.fu_status !== 'tidak');
+      return [{
+        omzet_total:     jumlah(lunas,'total'),
+        tiket_total:     jumlah(lunas,'pax'),
+        komisi_total:    Math.round(jumlah(lunas,'total') * 0.08),
+        perlu_follow_up: fuKena.length,
+        menunggu_verif:  P.filter(o => ['pending','waiting'].includes(o.status)).length,
+      }];
     },
 
     keberangkatan: () => {
@@ -1116,7 +1270,13 @@ function rpcLatihan(nama, arg = {}){
       if (!['super','owner','admin'].includes(S.peran)) return [];
       const pilih = arg.p_kode && arg.p_kode.length
         ? P.filter(o => arg.p_kode.includes(o.kode)) : P;
-      return pilih.map(o => ({ r_kode:o.kode, ...ringkasLat(o) }));
+      /* Kolomnya disebut satu per satu, BUKAN disebar dari ringkasLat().
+         ringkasLat() juga mengandung r_jml_bayar, sedangkan fungsi aslinya di
+         database tidak punya kolom itu — menyebarkannya begitu saja membuat
+         mode panduan menyediakan kolom yang tidak akan ada di data sungguhan. */
+      return pilih.map(o => { const r = ringkasLat(o); return {
+        r_kode: o.kode, r_total: r.r_total, r_dibayar: r.r_dibayar,
+        r_sisa: r.r_sisa, r_keadaan: r.r_keadaan }; });
     },
 
     riwayat_bayar: () => {
@@ -1864,10 +2024,17 @@ async function tutorKe(i){
   TUT.i = i;
   const L = TUT.langkah[i];
 
-  /* Pindah tab dulu kalau langkahnya ada di tab lain, lalu tunggu isinya tergambar. */
-  if (L.tab && S.tabAktif !== L.tab){
-    const tb = $('navTab').querySelector(`[data-tab="${L.tab}"]`);
-    if (tb){ tb.click(); await new Promise(r => setTimeout(r, 420)); }
+  /* Pindah layar dulu kalau langkahnya ada di layar lain, lalu tunggu isinya
+     tergambar. L.tab menyebut NAMA LAYAR (sebagian sekarang jadi sub-tampilan),
+     jadi diterjemahkan lewat alamatLayar() ke tab induk + sub-nya. */
+  if (L.tab){
+    const { tab, sub } = alamatLayar(L.tab, S.peran);
+    const pindahTab = S.tabAktif !== tab;
+    const pindahSub = sub !== undefined && S.subAktif !== sub;
+    if ((pindahTab || pindahSub) && $('navTab').querySelector(`[data-tab="${tab}"]`)){
+      buka(tab, sub);
+      await new Promise(r => setTimeout(r, 420));
+    }
   }
   tutorGambarUlang();
 }
