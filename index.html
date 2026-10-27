@@ -318,9 +318,20 @@ footer{margin-top:40px;padding:22px 0 40px;border-top:1px solid var(--line);
    yang tertinggal di belakang judul adalah bagian polosnya. Waktu masih
    'center', judulnya menabrak penumpang dan tulisan di lambung kapal —
    dua tulisan bertumpuk, dan ketahuan waktu dilihat, bukan waktu ditulis. */
+/* TITIK FOKUS TEGAK — 38%, dan angkanya hasil ukur, bukan selera
+   Hero itu kotak yang sangat lebar-pendek (terukur 1627x414, rasio 3,93)
+   sedangkan fotonya 1600x893 (rasio 1,79). Jadi background-size:cover
+   memenuhi LEBARnya dan memotong TINGGInya — bukan sebaliknya. Yang hilang
+   di 52%: 253 baris teratas, dan di situlah atap kanopi serta kepala
+   pemandu yang berdiri di haluan.
+   Di 38% pita yang terlihat jadi baris 185..592, dan seluruh badan kapal
+   masuk — kanopi, bendera, lambung, sampai buihnya — plus matahari
+   terbenam dan karang di kiri ikut kebagian.
+   Dipakai persen (bukan piksel) supaya ikut menyesuaikan: di 1440 pita jadi
+   123..692, di layar pendek 169..617, dan kapalnya tetap utuh di ketiganya. */
 .hero .latar{position:absolute;inset:0;
   background-image:url('/img/hero.jpg'),url('/img/ph-hero.svg');
-  background-size:cover;background-position:72% 52%;background-repeat:no-repeat}
+  background-size:cover;background-position:72% 38%;background-repeat:no-repeat}
 /* Tiga lapisan peneduh:
      1. dari kiri   — menjamin judul terbaca di atas bagian foto seterang apa pun
      2. dari atas   — supaya pita atas yang tembus pandang tidak melayang
