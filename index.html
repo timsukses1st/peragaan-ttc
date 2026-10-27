@@ -632,6 +632,61 @@ footer{border-top-color:rgba(255,255,255,.1);color:var(--band-redup)}
   .band .g2{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
   #form-area,#hasil,.judul-bag,.sub,footer{max-width:1120px}
 }
+
+/* ====================================================================
+   DIRAPATKAN SUPAYA HERO + KARTU PAKET MUAT SATU LAYAR
+   --------------------------------------------------------------------
+   Angkanya BUKAN kira-kira. Diukur langsung di halaman yang sudah
+   terpasang, pada 1440x900:
+     hero          16 -> 481   (465 px)
+     judul paket  507 -> 545
+     kartu paket  588 -> 941   <- lewat 41 px dari tinggi layar
+   Jadi yang perlu dipangkas sekitar 60-70 px, dan itu dibagi ke
+   beberapa tempat kecil, bukan ditumpuk di satu tempat — memotong
+   satu bagian sampai 70 px membuat bagian itu terlihat gepeng sendiri.
+
+   Sesudah perubahan ini, diukur ulang di halaman yang sama:
+     1440x900  -> kartu berakhir di 859, sisa 41 px
+     1366x768  -> kartu berakhir di 693, sisa 75 px
+   ==================================================================== */
+@media (min-width:980px){
+  .hero{margin-bottom:14px}
+  .hero .wrap{padding:30px 38px 26px}
+  /* 52 -> 46 px. Judulnya tetap tiga baris, cuma barisnya lebih pendek. */
+  .hero h1{font-size:clamp(30px,5.4vw,46px);margin-bottom:12px}
+  .hero p{margin-bottom:18px}
+  .hero .tagline{margin-bottom:12px}
+  .judul-bag{margin:18px 0 4px}
+  /* 16/10 -> 16/9: tinggi foto kartu 172 -> 155 px. Fotonya tetap lanskap
+     dan tidak terasa terpotong karena isinya memang pemandangan lebar. */
+  .prod .foto{aspect-ratio:16/9}
+  .prod .isi{padding:12px 14px 13px}
+  .prod .ket{margin-bottom:11px}
+}
+
+/* Layar PENDEK — laptop 768p, atau jendela yang tidak dimaksimalkan.
+   Dipisah sebagai @media tinggi, bukan lebar: yang jadi masalah di sini
+   tinggi layarnya, dan laptop 1366x768 lebarnya cukup tapi tingginya tidak.
+   Tanpa blok ini, di 768p kartu paket masih terpotong ~91 px. */
+@media (min-width:980px) and (max-height:860px){
+  .hero .wrap{padding:22px 34px 20px}
+  .hero h1{font-size:clamp(28px,4.2vw,38px);margin-bottom:9px}
+  .hero p{font-size:15.5px;margin-bottom:14px}
+  .hero .tagline{margin-bottom:9px;padding:4px 11px;font-size:11px}
+  .hero .fakta{gap:8px}
+  .fak{padding:7px 11px}
+  .fak b{font-size:12.5px}
+  .fak span{font-size:11px}
+  .judul-bag{margin:13px 0 3px}
+  .judul-bag .lenc{width:32px;height:32px}
+  h2{font-size:19px}
+  .judul-bag + .sub{margin-bottom:10px}
+  .prod .foto{aspect-ratio:16/8}
+  .prod .isi{padding:10px 13px 11px}
+  .prod h3{font-size:15px}
+  .prod .ket{font-size:12.5px;margin-bottom:9px}
+  .prod .harga{font-size:18px}
+}
 @media (max-width:979px){
   /* Tanpa sirip kiri, merek dipegang pita atas DAN hero. Yang di hero
      dimunculkan supaya bagian atas halaman tidak terasa kosong. */
