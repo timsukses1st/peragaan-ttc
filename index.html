@@ -1887,6 +1887,26 @@ async function cekStatus(token){
     .forEach(el => el.classList.add('sembunyi'));
   const tb = $('tombol-pesan');
   if (tb){ tb.href = location.pathname; tb.textContent = 'Pesan lagi'; }
+
+  /* ---- Sidebar disesuaikan untuk halaman status ----
+     Dua hal yang dulu salah di sini:
+
+     1. Sorotannya tetap di "Paket". Kelas .on dipasang di markup pada tautan
+        pertama, dan yang memindahkannya adalah IntersectionObserver yang
+        mengamati bagian-bagian halaman — padahal di halaman ini bagian itu
+        semua disembunyikan, jadi tidak ada yang pernah terlihat dan sorotannya
+        tidak pernah berpindah. Maka dipindahkan di sini, bukan diserahkan ke
+        pengamat yang tidak akan kebagian apa pun.
+
+     2. "Paket" dan "Pesan tempat" menunjuk #paket dan #pesan, yang di halaman
+        ini tersembunyi — diklik tidak terjadi apa-apa. Sekarang keduanya
+        menunjuk balik ke halaman utama (tanpa ?t=...), sama seperti tombol
+        "Pesan lagi" di pojok kanan atas. */
+  document.querySelectorAll('.rusuk nav a[data-sirip]').forEach(a => {
+    const ini = a.dataset.sirip;
+    a.classList.toggle('on', ini === 'cek');
+    if (ini !== 'cek') a.href = `${location.pathname}#${ini}`;
+  });
   const kotak = $('cek-status');
   kotak.classList.remove('sembunyi');
   kotak.innerHTML = `<h2 style="display:block">Status pesanan</h2>
