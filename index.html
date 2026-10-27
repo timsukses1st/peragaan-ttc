@@ -651,7 +651,15 @@ footer{border-top-color:rgba(255,255,255,.1);color:var(--band-redup)}
   .hero{margin-top:0}
   .hero .wrap{padding:40px 38px 36px;max-width:1120px}
   .band .g2{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
-  #form-area,#hasil,.judul-bag,.sub,footer{max-width:1120px}
+  /* Batas 1120 px dipasang supaya baris teks formulir tidak terlalu panjang
+     untuk dibaca. Semuanya rata KIRI, sejajar dengan tepi kiri kartu paket
+     yang selebar kolom.
+     footer SENGAJA TIDAK ikut dibatasi. Teksnya rata tengah, dan kalau
+     kotaknya cuma 1120 px sementara kolomnya 1629 px, yang terjadi teksnya
+     rata tengah DI DALAM KOTAK ITU — bukan di tengah halaman. Hasilnya
+     meleset 509 px ke kiri. Ini pernah lolos sekali; pemeriksanya sekarang
+     ada di bawah supaya tidak terulang. */
+  #form-area,#hasil,.judul-bag,.sub{max-width:1120px}
 }
 
 /* ====================================================================
