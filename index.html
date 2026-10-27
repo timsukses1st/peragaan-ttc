@@ -613,11 +613,21 @@ footer{border-top-color:rgba(255,255,255,.1);color:var(--band-redup)}
 
 /* ---------- layar lebar: sirip kiri muncul ---------- */
 @media (min-width:980px){
-  .rusuk{display:flex;flex-direction:column;width:236px;flex:none;
-    position:sticky;top:0;align-self:stretch;min-height:100vh;
+  /* SIRIP KIRI DIPAKU, BUKAN "STICKY"
+     Versi pertama memakai position:sticky + min-height:100vh. Sticky hanya
+     menahan elemen SELAMA kotaknya masih di layar — begitu bagian bawah
+     sirip tercapai (dan tingginya 100vh, jadi langsung tercapai), dia ikut
+     tergulir ke atas bersama isi halaman. Itu yang terlihat sebagai
+     "sidebar-nya ikut naik".
+     position:fixed menahannya betulan: dia keluar dari aliran halaman, jadi
+     .kolom diberi margin-left selebar siripnya supaya isinya tidak tertimpa.
+     overflow-y:auto dipasang untuk layar yang sangat pendek — isi siripnya
+     bergulir di dalam dirinya sendiri, bukan terpotong hilang. */
+  .rusuk{display:flex;flex-direction:column;width:236px;
+    position:fixed;top:0;left:0;height:100vh;overflow-y:auto;z-index:22;
     background:linear-gradient(180deg,#0a2742 0%,#071d33 100%);
     border-right:1px solid rgba(255,255,255,.09)}
-  .kolom{padding:16px 20px 0}
+  .kolom{padding:16px 20px 0;margin-left:236px}
   .wrap{max-width:none;padding:0}
   /* Pita atas jadi tombol melayang di pojok kanan atas hero: merek sudah
      dipegang sirip kiri, jadi yang tersisa cuma dua tombolnya. */
@@ -729,12 +739,10 @@ footer{border-top-color:rgba(255,255,255,.1);color:var(--band-redup)}
     <span>Pelayaran · Pacitan</span>
   </div>
   <nav aria-label="Bagian halaman">
-    <a href="#atas" class="on" data-sirip="atas">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V20h13V9.5"/><path d="M9.5 20v-6h5v6"/></svg>
-      Beranda</a>
-    <a href="#paket" data-sirip="paket">
+    <!-- 27 Okt 2026: tautan "Beranda" dihapus. Halaman beranda memang tidak
+         ada — yang dituju cuma puncak halaman ini sendiri, dan tautan yang
+         tidak membawa ke mana-mana lebih membingungkan daripada berguna. -->
+    <a href="#paket" class="on" data-sirip="paket">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <rect x="3" y="4.5" width="18" height="15" rx="2.5"/><path d="M3 9.5h18M8 4.5v15"/></svg>
