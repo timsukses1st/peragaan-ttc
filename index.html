@@ -144,10 +144,22 @@ html{scroll-padding-top:60px}
      lokasinya disembunyikan karena hero di bawahnya sudah menyebut hal yang
      sama, dan merek dipaksa satu baris. Hasilnya ~44px. */
   .bar .in{padding:7px 12px;gap:8px;flex-wrap:nowrap}
-  /* Nama merek TIDAK dipotong: label tombol yang dipendekkan (lihat .sempit).
-     Merek terpotong jadi "THE TAMPERAN CRU..." lebih buruk daripada tombol
-     berbunyi "Pesan" saja. */
+  /* Nama merek TIDAK dipotong — tapi di bawah 640px ia DISEMBUNYIKAN seluruhnya,
+     logonya saja yang tinggal. Bukan karena kehabisan tempat lalu menyerah:
+     hero di bawah bar sudah menampilkan merek lengkap sendiri (.merek-hero jadi
+     display:flex di bawah 980px), jadi di layar sempit namanya memang tertulis
+     DUA KALI, berdempetan. Yang dihapus di sini salinan keduanya.
+
+     Angkanya: dengan tiga tombol, merek berteks + Cara + Konsultasi + Pesan
+     butuh ~384px, sementara layarnya 375px — dan karena .bar .in disetel
+     flex-wrap:nowrap, akibatnya "Pesan" terpotong, bukan turun baris.
+     Tanpa teks merek: ~228px, lega. */
   .brand{font-size:11.5px;letter-spacing:.2px;line-height:1.2;white-space:nowrap;flex:0 0 auto}
+  /* :not(.logo) WAJIB ada — logonya di markup juga sebuah <span>, jadi
+     ".brand > span" saja akan menyembunyikan logonya sekalian dan bar-nya
+     kehilangan seluruh identitas. */
+  .brand > span:not(.logo){display:none}
+  .brand{gap:0}
   /* Kekhususan sengaja dinaikkan dengan .bar: aturan global .sempit{display:none}
      letaknya SESUDAH blok @media ini di dalam berkas, jadi kalau selektornya
      sama-sama satu kelas, yang global menang dan tombolnya jadi kosong
@@ -155,8 +167,19 @@ html{scroll-padding-top:60px}
   .bar .lebar{display:none}
   .bar .sempit{display:inline}
   .brand small{display:none}
-  .bar a,#tombol-tutor{font-size:12px;padding:6px 9px;flex:0 0 auto}
+  .bar a,#tombol-tutor,#tombol-konsul{font-size:12px;padding:6px 9px;flex:0 0 auto}
   #tombol-tutor{margin-left:auto}
+
+  /* Konsultasi jadi IKON SAJA di bawah 640px. Dengan dua tombol, label pendek
+     (.sempit) masih muat; begitu tombol ketiga masuk, tidak. Diukur di 375px:
+     merek ~160 + Cara ~60 + Tanya berlabel ~95 + Pesan ~62 + jarak ~24 +
+     tepi ~24 = ~425px — lebih lebar dari layarnya, dan karena .bar .in disetel
+     flex-wrap:nowrap, akibatnya bukan turun baris melainkan "Pesan" terpotong
+     dan muncul gulir mendatar. Ikon saja menghemat ~50px dan cukup.
+     Nama tombolnya tetap terbaca pembaca layar lewat aria-label. */
+  #tombol-konsul .lebar,#tombol-konsul .sempit{display:none}
+  #tombol-konsul{padding:6px 8px}
+  #tombol-konsul svg{margin-right:0}
 
   /* --- hero: judul jangan sampai memakan satu layar penuh --- */
   .hero{padding:26px 0 24px}
@@ -186,7 +209,7 @@ html{scroll-padding-top:60px}
    mereknya tidak ikut terpotong elipsis. */
 @media (max-width: 360px){
   .brand{font-size:11px}
-  .bar a,#tombol-tutor{font-size:11px;padding:5px 7px}
+  .bar a,#tombol-tutor,#tombol-konsul{font-size:11px;padding:5px 7px}
   .bar .in{gap:6px;padding:7px 10px}
 }
 
@@ -232,6 +255,18 @@ footer{margin-top:40px;padding:22px 0 40px;border-top:1px solid var(--line);
   padding:6px 12px;border-radius:8px;white-space:nowrap;cursor:pointer;background:none;
   font-family:inherit}
 #tombol-tutor:hover{background:#1b3a5c;color:#fff}
+
+/* Tombol Konsultasi. Dibuat SETARA dengan "Cara pesan", bukan setara dengan
+   "Pesan sekarang": yang terakhir itu ajakan utama halaman ini dan harus tetap
+   paling menonjol. Hijau WhatsApp hanya pada ikon dan garis tepinya, tidak
+   sebagai latar penuh — latar hijau penuh akan menarik mata lebih kuat daripada
+   tombol pesannya sendiri. */
+#tombol-konsul{color:#9fe3c0;font-size:13.5px;text-decoration:none;
+  border:1px solid #2f7a56;padding:6px 12px;border-radius:8px;white-space:nowrap;
+  cursor:pointer;background:none;font-family:inherit;display:inline-flex;
+  align-items:center}
+#tombol-konsul:hover{background:#17543a;color:#d8f7e6;border-color:#3f9e70}
+#tombol-konsul.sembunyi{display:none}
 .kode-besar{font-size:30px;font-weight:800;letter-spacing:1px}
 
 /* ---------- Timeline status pesanan ----------
@@ -641,7 +676,13 @@ footer{border-top-color:rgba(255,255,255,.1);color:var(--band-redup)}
     background:none;border:0;-webkit-backdrop-filter:none;backdrop-filter:none}
   .bar .in{padding:0;max-width:none}
   .bar .brand{display:none}
-  .bar a,#tombol-tutor{background:rgba(8,29,51,.6);
+  /* #tombol-konsul disebut TERPISAH walaupun ia juga sebuah <a>. ".bar a"
+     kekhususannya (0,1,1) kalah dari "#tombol-konsul" (1,0,0) yang menyetel
+     background:none — jadi tanpa baris ini, dua tombol lain dapat latar
+     tembus-pandang di atas foto hero sementara Konsultasi tidak, dan
+     tulisannya melebur dengan fotonya. Tidak terlihat di pratinjau yang tidak
+     menyertakan hero. */
+  .bar a,#tombol-tutor,#tombol-konsul{background:rgba(8,29,51,.6);
     -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
   .hero{margin-top:0}
   .hero .wrap{padding:40px 38px 36px;max-width:1120px}
@@ -786,6 +827,18 @@ footer{border-top-color:rgba(255,255,255,.1);color:var(--band-redup)}
   <div class="brand"><span class="logo" aria-hidden="true"></span>
     <span>THE TAMPERAN CRUISE<small>Pelabuhan Tamperan · Pacitan</small></span></div>
   <button type="button" id="tombol-tutor" style="margin-left:auto"><span class="lebar">Cara pesan</span><span class="sempit">Cara</span></button>
+  <!-- Konsultasi: tanya-tanya SEBELUM memesan, langsung ke admin. Sengaja
+       dipisah dari alur konfirmasi pesanan — pesanan tetap dikonfirmasi lewat
+       agen masing-masing, supaya komisinya jelas pemiliknya. Dipasang href-nya
+       oleh JavaScript, bukan ditulis di sini, supaya nomornya cuma ada di satu
+       tempat (WA_KONSULTASI) dan tidak bisa berbeda antara markup dan kode. -->
+  <a id="tombol-konsul" target="_blank" rel="noopener" style="margin-left:9px"
+     aria-label="Konsultasi lewat WhatsApp" title="Konsultasi lewat WhatsApp">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+      stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+      style="width:15px;height:15px;vertical-align:-2px;margin-right:5px">
+      <path d="M21 11.5a8.4 8.4 0 0 1-11.9 7.6L3 21l1.9-5.6A8.4 8.4 0 1 1 21 11.5Z"/></svg
+    ><span class="lebar">Konsultasi</span><span class="sempit">Tanya</span></a>
   <a href="#pesan" id="tombol-pesan" style="margin-left:9px"><span class="lebar">Pesan sekarang</span><span class="sempit">Pesan</span></a>
 </div></div>
 
@@ -1116,21 +1169,25 @@ footer{border-top-color:rgba(255,255,255,.1);color:var(--band-redup)}
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
 /* ====================================================================
-   Nomor WhatsApp layanan pusat. Format internasional tanpa '+'.
-   Contoh: 081234567890 ditulis 6281234567890
+   DUA NOMOR, DUA GUNA YANG BERBEDA. Jangan disatukan.
 
-   Dipakai sebagai CADANGAN saja: pelanggan yang datang lewat kode agen
-   diarahkan ke nomor agennya sendiri (lihat tampilkanHasil). Nomor ini
-   dipakai kalau agen itu belum punya nomor terdaftar, dan di halaman
-   "Belum punya kode?".
+   WA_KONSULTASI — nomor admin untuk TANYA-TANYA sebelum memesan. Dipakai
+     tombol "Konsultasi" di header. Tidak pernah dipakai sebagai tujuan
+     konfirmasi pesanan.
 
-   Diisi 28 Okt 2026: 085113136509 -> 6285113136509.
-   WA_PLACEHOLDER sengaja DIBIARKAN berisi nomor contoh lama — ia cuma
-   pembanding untuk memeriksa "apakah nomornya sudah diganti", jadi kalau
-   ikut diubah, pemeriksaan itu kehilangan gunanya dan tombol WhatsApp
-   bisa aktif memakai nomor contoh tanpa ada yang sadar.
+   WA_ADMIN — tujuan konfirmasi PESANAN kalau agennya belum punya nomor
+     terdaftar. Masih nomor contoh, jadi tombol konfirmasinya sengaja
+     dinonaktifkan untuk kasus itu (lihat waSiap). Mengisinya dengan nomor
+     admin akan membuat admin menerima pesanan seolah-olah dia agennya,
+     dan komisi pesanan itu jadi tidak punya pemilik.
+
+   Keduanya format internasional tanpa '+': 081234567890 -> 6281234567890.
+   WA_PLACEHOLDER cuma pembanding untuk memeriksa "apakah WA_ADMIN sudah
+   diganti" — jangan ikut diubah, kalau sama nilainya pemeriksaan itu
+   kehilangan gunanya dan nomor contoh bisa lolos ke pelanggan.
    ==================================================================== */
-const WA_ADMIN = '6285113136509';
+const WA_KONSULTASI = '6285113136509';     // admin, untuk konsultasi
+const WA_ADMIN = '6281234567890';          // <-- GANTI NOMOR INI (tujuan pesanan)
 const WA_PLACEHOLDER = '6281234567890';    // pembanding; jangan diubah
 
 /* Kunci publishable memang untuk dipakai di browser. Yang menjaga data bukan
@@ -2420,6 +2477,30 @@ $('f-vou').oninput     = () => { if (S.vouOk) { S.vouOk=false; S.vouKode=null;
 $('f-anak').oninput    = ringkasan;
 $('kirim').onclick     = kirim;
 $('tombol-tutor').onclick = () => mulaiTutor(true);
+
+/* ---- Tombol Konsultasi ----
+   href dipasang di sini, bukan ditulis di markup, supaya nomornya cuma ada di
+   SATU tempat. Kalau ditulis dua kali, suatu saat yang satu diganti dan yang
+   lain tertinggal — dan tidak ada error apa pun yang memberi tahu.
+
+   Pesan pembukanya sengaja menyebut "konsultasi", bukan "pesan": admin langsung
+   tahu ini pertanyaan sebelum memesan, bukan konfirmasi pesanan yang mestinya
+   lewat agen. */
+{
+  const tk = $('tombol-konsul');
+  if (tk){
+    if (/^62[0-9]{9,13}$/.test(WA_KONSULTASI)){
+      tk.href = `https://wa.me/${WA_KONSULTASI}?text=`
+        + encodeURIComponent('Halo The Tamperan Cruise, saya mau konsultasi dulu '
+          + 'soal pelayarannya sebelum memesan.');
+    } else {
+      /* Nomor tidak masuk akal -> tombolnya disembunyikan, bukan dibiarkan
+         menautkan ke wa.me yang pasti gagal. wa.me tidak pernah memberi tahu
+         kalau nomornya salah; chat-nya saja yang tidak pernah terbuka. */
+      tk.classList.add('sembunyi');
+    }
+  }
+}
 
 /* ---- Cek status dari kode + nomor WhatsApp ----
    Yang dikembalikan database hanya TOKEN, lalu halaman pindah ke ?t=token.
