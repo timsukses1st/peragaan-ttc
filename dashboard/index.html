@@ -232,6 +232,27 @@ input:focus,select:focus{outline:2px solid var(--sea);outline-offset:1px;border-
 .note strong{font-weight:700}
 .note.w{background:var(--warnbg);border-left-color:var(--warn)}
 .note.d{background:var(--dangerbg);border-left-color:var(--danger)}
+
+/* ---- Penjelasan yang bisa dilipat ----
+   Tim Tamperan minta dashboard lebih simpel, dan penyumbang terbesarnya tulisan
+   penjelasan: 25 kotak .note biasa, isinya rata-rata 202 karakter dan yang
+   terpanjang 604. Staf yang sudah hafal pekerjaannya membaca paragraf yang sama
+   setiap hari.
+
+   Yang dilipat HANYA .note biasa. .note.w (peringatan) dan .note.d (bahaya)
+   tetap terbuka — itu menjelaskan akibat sebuah tombol, dan menyembunyikan
+   akibat di balik satu klik adalah cara membuat orang menekan tombol yang
+   tidak ia pahami. Pembedaan itu sudah ada di markup sejak awal, jadi tidak
+   ada satu pun kotak yang perlu disunting manual. */
+.note.lipat{padding:0;overflow:hidden}
+.note.lipat > .note-judul{display:flex;align-items:center;gap:8px;width:100%;
+  background:none;border:0;font:inherit;font-weight:700;text-align:left;
+  color:inherit;padding:11px 13px;cursor:pointer}
+.note.lipat > .note-judul:hover{background:rgba(21,104,138,.07)}
+.note.lipat > .note-judul .tanda{margin-left:auto;flex:none;font-weight:700;
+  font-size:11px;letter-spacing:.3px;color:var(--sea);white-space:nowrap}
+.note.lipat > .note-isi{padding:0 13px 11px;display:none}
+.note.lipat.buka > .note-isi{display:block}
 .rank{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--garis-h)}
 .rank:last-child{border-bottom:0}
 .rank .no{width:28px;height:28px;border-radius:50%;background:var(--navy);color:#fff;
@@ -266,6 +287,57 @@ input:focus,select:focus{outline:2px solid var(--sea);outline-offset:1px;border-
 .uang:last-child{border-bottom:0}
 .uang b{font-variant-numeric:tabular-nums}
 @media (max-width:560px){ .lapis .aksi-bar .btn{flex:1} }
+
+/* ====================================================================
+   LAYAR SEMPIT (di bawah 640px)
+   Dashboard ini dipakai juga di dermaga lewat HP, terutama layar boarding.
+
+   Tata letaknya sebenarnya TIDAK rusak di HP — semua .grid memakai
+   auto-fit + minmax, jadi menyusut sendiri jadi satu kolom, dan .wrap
+   memakai max-width bukan width. Yang jadi masalah adalah BOROS TEMPAT:
+   diukur di lebar 375px, satu kartu KPI setinggi ~190px, jadi empat KPI
+   ≈ 760px — lebih tinggi dari satu layar HP. Akibatnya layar pertama
+   isinya KPI semua dan tabelnya baru kelihatan setelah menggulung sekali
+   penuh.
+
+   Jadi blok ini memadatkan, bukan menyembunyikan. Tidak ada satu pun
+   angka atau kolom yang dihilangkan — supaya tampilan dan hak akses tetap
+   sama persis dengan versi desktop.
+   ==================================================================== */
+@media (max-width:640px){
+  .wrap{padding:14px 10px 56px}
+
+  /* KPI dua per baris. minmax(195px,1fr) di .g4/.g3 memaksa satu kolom di
+     375px; ditimpa jadi dua kolom, angkanya masih terbaca karena ukuran
+     hurufnya ikut diturunkan di bawah ini. */
+  .g4,.g3{grid-template-columns:1fr 1fr}
+  .grid{gap:9px;margin-bottom:12px}
+  .kpi{padding:10px 11px;border-radius:10px}
+  .kpi .k{font-size:10px;letter-spacing:.4px}
+  .kpi .v{font-size:18px;letter-spacing:-.4px}
+  .kpi .d{font-size:11px;margin-top:1px}
+
+  .card{padding:13px;margin-bottom:11px;border-radius:10px}
+  .card h3{font-size:14.5px;margin-bottom:9px}
+  .card.tight{padding:10px}
+
+  /* Tabel dirapatkan supaya lebih banyak baris muat; kolomnya TIDAK
+     disembunyikan — yang disembunyikan membuat staf mengira datanya hilang,
+     dan .scrollx sudah menyediakan geser mendatar. */
+  table{font-size:12.5px}
+  th{padding:7px 6px}
+  td{padding:7px 6px}
+
+  .dbtabs{margin-bottom:12px}
+  .dbtab{padding:8px 10px;font-size:12.5px}
+  #bar-sub{margin:-6px 0 12px;gap:5px}
+  .subtab{padding:5px 11px;font-size:12px}
+
+  .note{font-size:12px;padding:9px 11px;margin:9px 0}
+  .note.lipat{padding:0}
+  .note.lipat > .note-judul{padding:9px 11px}
+  .note.lipat > .note-isi{padding:0 11px 9px}
+}
 
 #pesan{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--navy);color:#fff;
        padding:13px 17px;border-radius:10px;font-size:13px;max-width:min(520px,92vw);
@@ -769,6 +841,88 @@ function buka(tab, sub){
 
   gambarLayar(LAYAR[pilih[2]]);
 }
+
+/* ====================== MELIPAT PENJELASAN ======================
+   Dipasang sebagai pengamat DOM, bukan dipanggil dari tiap fungsi tab. Alasannya
+   sama dengan waktu menyatukan tab dulu: ketiga belas fungsi tab tidak disentuh
+   sama sekali, jadi kalau ada yang salah, salahnya di sini — bukan di layar yang
+   sudah jalan. Pop-up (.lapis) ikut kebagian tanpa perlu diurus terpisah.
+
+   Yang DILIPAT hanya .note biasa yang punya <b> judul di depan. Yang dibiarkan
+   terbuka:
+     - .note.w dan .note.d  -> menjelaskan akibat sebuah tombol
+     - .note tanpa <b> judul -> tidak punya ringkasan untuk dijadikan tombolnya
+
+   Kalau tidak ada judulnya, melipat berarti menyembunyikan isi di balik tombol
+   tanpa tulisan — yang justru lebih membingungkan daripada paragraf panjang. */
+const DILIPAT = new WeakSet();
+
+function lipatPenjelasan(akar){
+  const daftar = (akar || document).querySelectorAll
+    ? (akar || document).querySelectorAll('.note:not(.w):not(.d)') : [];
+  daftar.forEach(n => {
+    /* WeakSet ini penghemat kerja, BUKAN penjaga kebenaran. Yang sebenarnya
+       membuat fungsi ini aman dipanggil berkali-kali adalah pemeriksaan bentuk
+       di bawahnya: sesudah dilipat, anak pertama sebuah note adalah <button>,
+       bukan <b>, jadi sisiran berikutnya berhenti di situ. Dicatat supaya tidak
+       ada yang mengira penjaga ini boleh dihapus tanpa akibat — menghapusnya
+       memang tidak merusak apa pun, tapi membuat setiap sisiran memeriksa ulang
+       seluruh note. */
+    if (DILIPAT.has(n)) return;
+    const b = n.firstElementChild;
+    if (!b || b.tagName !== 'B') return;        /* tanpa judul: dibiarkan apa adanya */
+
+    /* Isi dipindah, bukan disalin lewat innerHTML: menyusun ulang dari string
+       akan membuang penangan klik yang sudah terpasang di dalam note (ada note
+       yang memuat tautan). Memindahkan simpulnya mempertahankan semuanya. */
+    const isi = document.createElement('div');
+    isi.className = 'note-isi';
+    while (b.nextSibling) isi.appendChild(b.nextSibling);
+
+    const tombol = document.createElement('button');
+    tombol.type = 'button';
+    tombol.className = 'note-judul';
+    tombol.setAttribute('aria-expanded', 'false');
+    while (b.firstChild) tombol.appendChild(b.firstChild);
+    const tanda = document.createElement('span');
+    tanda.className = 'tanda';
+    tanda.textContent = 'selengkapnya';
+    tombol.appendChild(tanda);
+
+    b.remove();
+    n.replaceChildren(tombol, isi);
+    n.classList.add('lipat');
+    DILIPAT.add(n);
+
+    tombol.onclick = () => {
+      const buka = n.classList.toggle('buka');
+      tombol.setAttribute('aria-expanded', buka ? 'true' : 'false');
+      tanda.textContent = buka ? 'tutup' : 'selengkapnya';
+    };
+  });
+}
+
+/* Satu pengamat untuk seluruh halaman, DITUNDA ke frame berikutnya.
+
+   Dua alasan penundaan itu, dua-duanya nyata:
+   1. Pengamat memicu dirinya sendiri — callback-nya menambah simpul, dan itu
+      mutasi juga. WeakSet mencegah pekerjaan ganda, tapi tanpa penundaan tetap
+      ada satu putaran mubazir per penyisipan.
+   2. Menggambar satu tab bisa menghasilkan puluhan mutasi beruntun (18 tabel di
+      berkas ini). Tanpa penundaan, SETIAP mutasi memicu querySelectorAll ke
+      seluruh dokumen 300 KB. Ditunda, seluruh letupan itu jadi satu sisiran. */
+if ('MutationObserver' in window){
+  let tertunda = false;
+  new MutationObserver(() => {
+    if (tertunda) return;
+    tertunda = true;
+    requestAnimationFrame(() => { tertunda = false; lipatPenjelasan(document); });
+  }).observe(document.body, { childList: true, subtree: true });
+}
+
+/* Sisiran pertama untuk note yang sudah ada di markup (di luar #isi) — pengamat
+   hanya terpicu oleh perubahan, jadi yang sejak awal ada tidak akan kebagian. */
+lipatPenjelasan(document);
 
 function gambarLayar(fn){
   $('isi').innerHTML = `<div class="card"><span class="spin"
