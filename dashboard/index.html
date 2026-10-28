@@ -902,6 +902,62 @@ function lipatPenjelasan(akar){
   });
 }
 
+/* ====================== YANG BERGULIR HANYA TABELNYA ======================
+   Bedanya halus tapi nyata:
+
+     <div class="card scrollx"> ... </div>   -> SELURUH isi kartu bergulir:
+        judulnya ikut bergeser keluar layar, dan di dua kartu (Armada Kapal,
+        Kelola Akses) kotak isian serta tombolnya ikut tergeser juga.
+
+     <div class="card"> <div class="scrollx"><table>…</table></div> ... </div>
+        -> hanya kolom tabelnya yang bergulir; judul, isian, dan tombol tetap
+           di tempat.
+
+   16 kartu memakai bentuk pertama. Diperbaiki di sini, bukan dengan menyunting
+   16 tempat di dalam template string: ketiga belas fungsi tab tetap tidak
+   disentuh, dan pop-up ikut kebagian tanpa diurus terpisah.
+
+   Tidak memakai trik CSS "display:block" pada <table> karena itu mengubah cara
+   tabel menghitung lebar kolom — lebar kolom bisa berubah diam-diam di seluruh
+   dashboard, dan itu terlalu luas akibatnya untuk soal segini. */
+const DIBUNGKUS = new WeakSet();
+
+function bungkusTabel(akar){
+  const kartu = (akar || document).querySelectorAll
+    ? (akar || document).querySelectorAll('.scrollx') : [];
+  kartu.forEach(k => {
+    if (DIBUNGKUS.has(k)) return;
+    /* Pembungkus khusus yang isinya memang cuma tabel: biarkan. Dikenali dari
+       tidak adanya kelas .card — itulah bentuk yang sudah benar. */
+    if (!k.classList.contains('card')) { DIBUNGKUS.add(k); return; }
+
+    const tabel = [...k.children].filter(x => x.tagName === 'TABLE');
+
+    /* Kartu yang tabelnya SUDAH dibungkus di markup (dua di layar Pembagian
+       kapal) tidak punya <table> sebagai anak langsung. Kelas scrollx-nya tetap
+       harus dicabut — kalau tidak, ada dua batang gulir bersarang dan yang luar
+       masih menggeser judul kartunya. Inilah yang terlewat di versi pertama
+       fungsi ini: "tidak ada tabel" dianggap "tidak ada yang perlu diurus". */
+    if (!tabel.length){
+      if (k.querySelector('.scrollx')) k.classList.remove('scrollx');
+      DIBUNGKUS.add(k);
+      return;
+    }
+
+    tabel.forEach(t => {
+      const bungkus = document.createElement('div');
+      bungkus.className = 'scrollx';
+      k.insertBefore(bungkus, t);
+      bungkus.appendChild(t);      /* dipindah, bukan disalin: penangan tetap */
+      DIBUNGKUS.add(bungkus);
+    });
+    /* Kartunya sendiri berhenti bergulir — kalau tidak, akan ada DUA batang
+       gulir bersarang dan yang luar tetap menggeser judulnya. */
+    k.classList.remove('scrollx');
+    DIBUNGKUS.add(k);
+  });
+}
+
 /* Satu pengamat untuk seluruh halaman, DITUNDA ke frame berikutnya.
 
    Dua alasan penundaan itu, dua-duanya nyata:
@@ -916,12 +972,20 @@ if ('MutationObserver' in window){
   new MutationObserver(() => {
     if (tertunda) return;
     tertunda = true;
-    requestAnimationFrame(() => { tertunda = false; lipatPenjelasan(document); });
+    requestAnimationFrame(() => {
+      tertunda = false;
+      /* Urutannya penting: bungkusTabel() dulu. Ia memindahkan <table> ke dalam
+         pembungkus baru — mutasi juga — dan kalau lipatPenjelasan() jalan
+         duluan, sisiran berikutnya terpicu oleh pekerjaan kita sendiri. */
+      bungkusTabel(document);
+      lipatPenjelasan(document);
+    });
   }).observe(document.body, { childList: true, subtree: true });
 }
 
-/* Sisiran pertama untuk note yang sudah ada di markup (di luar #isi) — pengamat
-   hanya terpicu oleh perubahan, jadi yang sejak awal ada tidak akan kebagian. */
+/* Sisiran pertama untuk yang sudah ada di markup (di luar #isi) — pengamat hanya
+   terpicu oleh perubahan, jadi yang sejak awal ada tidak akan kebagian. */
+bungkusTabel(document);
 lipatPenjelasan(document);
 
 function gambarLayar(fn){
