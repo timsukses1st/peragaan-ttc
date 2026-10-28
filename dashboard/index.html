@@ -4762,6 +4762,13 @@ async function tabKapal(){
       <h3 style="margin:0 0 4px">Armada Kapal</h3>
       <div class="hint" style="margin-bottom:12px">Kapasitas di sini yang dipakai
         kartu muatan di bawah. Isi sesuai <b>kapasitas izin</b> kapalnya, bukan perkiraan.</div>
+      <!-- Dibungkus .scrollx. Tanpa itu, tabel dengan kolom nowrap mendorong
+           lebar KARTUNYA, lalu kartu mendorong lebar halaman — dan begitu
+           halaman lebih lebar dari layar, seluruh isi ikut tergeser sehingga
+           kartu-kartu lain terpotong di tepi kiri. Bukan tabelnya saja yang
+           rusak, satu layar penuh ikut. 15 tabel lain sudah dibungkus; dua di
+           layar ini terlewat. -->
+      <div class="scrollx">
       <table data-papan="armada">
         <thead><tr><th class="nw">Nama</th><th class="num">Kapasitas</th>
           <th class="num">Urutan</th><th class="nw">Status</th><th></th></tr></thead>
@@ -4781,6 +4788,7 @@ async function tabKapal(){
                data-nilai="${k.aktif?0:1}">${k.aktif?'Nonaktifkan':'Aktifkan'}</a></span></td>
         </tr>`).join('')}</tbody>
       </table>
+      </div>
       <div class="grid g2" style="margin-top:14px">
         <div class="fld"><label for="kp-nama">Nama kapal baru</label>
           <input id="kp-nama" maxlength="60" placeholder="mis. Kapal 3" autocomplete="off"></div>
@@ -4822,6 +4830,10 @@ async function tabKapal(){
               : 'kapasitas belum diisi'}</div></div>`;
         }).join('')}
       </div>
+      <!-- Dibungkus .scrollx, sama seperti tabel armada di atas. Tabel ini yang
+           paling berat: enam kolom nowrap plus satu <select> selebar 132px di
+           tiap baris. -->
+      <div class="scrollx">
       <table>
         <thead><tr><th class="nw">Kode</th><th class="nw">Pemesan</th><th class="nw">Pelayaran</th>
           <th class="num">Pax</th><th class="nw">Status</th><th class="nw">Kapal</th></tr></thead>
@@ -4841,7 +4853,7 @@ async function tabKapal(){
                  k.id===o.kapal_id?' selected':''}>${esc(k.nama)}</option>`).join('')}
             </select></td></tr>`;
         }).join('')}</tbody>
-      </table></div>`;
+      </table></div></div>`;
   }).join('') + `
     <div class="note"><b>Kenapa total pesanan tidak bisa diubah dari sini</b>
       RLS menjaga per baris, bukan per kolom. Kalau sebuah peran diberi izin menulis
