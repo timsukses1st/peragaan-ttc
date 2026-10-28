@@ -1116,11 +1116,21 @@ footer{border-top-color:rgba(255,255,255,.1);color:var(--band-redup)}
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
 /* ====================================================================
-   SATU BARIS YANG WAJIB DIGANTI SEBELUM DIPUBLIKASIKAN
-   Nomor WhatsApp tujuan konfirmasi pesanan. Format internasional tanpa '+'.
+   Nomor WhatsApp layanan pusat. Format internasional tanpa '+'.
    Contoh: 081234567890 ditulis 6281234567890
+
+   Dipakai sebagai CADANGAN saja: pelanggan yang datang lewat kode agen
+   diarahkan ke nomor agennya sendiri (lihat tampilkanHasil). Nomor ini
+   dipakai kalau agen itu belum punya nomor terdaftar, dan di halaman
+   "Belum punya kode?".
+
+   Diisi 28 Okt 2026: 085113136509 -> 6285113136509.
+   WA_PLACEHOLDER sengaja DIBIARKAN berisi nomor contoh lama — ia cuma
+   pembanding untuk memeriksa "apakah nomornya sudah diganti", jadi kalau
+   ikut diubah, pemeriksaan itu kehilangan gunanya dan tombol WhatsApp
+   bisa aktif memakai nomor contoh tanpa ada yang sadar.
    ==================================================================== */
-const WA_ADMIN = '6281234567890';          // <-- GANTI NOMOR INI
+const WA_ADMIN = '6285113136509';
 const WA_PLACEHOLDER = '6281234567890';    // pembanding; jangan diubah
 
 /* Kunci publishable memang untuk dipakai di browser. Yang menjaga data bukan

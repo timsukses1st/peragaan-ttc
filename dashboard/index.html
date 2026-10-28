@@ -3940,9 +3940,24 @@ async function tabManifest(){
         Kalau syahbandar meminta daftar nama per penumpang, datanya tidak ada —
         jangan disanggupi sebelum cara pengumpulannya dibicarakan ulang.</div>
 
-      ${belumKapal ? `<div class="note"><b>${belumKapal} rombongan belum dapat kapal</b>
+      ${/* .note w, BUKAN .note biasa. Ini keadaan data yang perlu ditindak hari
+            itu juga, bukan penjelasan cara kerja sistem — dan .note biasa ikut
+            terlipat oleh lipatPenjelasan(), artinya masalah yang menunggu
+            tindakan justru disembunyikan di balik satu klik. Kelas .w membuatnya
+            tetap terbuka. */''}
+      ${belumKapal ? `<div class="note w"><b>${belumKapal} rombongan belum dapat kapal</b>
         Tempatkan dulu di tab Pembagian Kapal sebelum hari keberangkatan.</div>` : ''}
 
+      ${/* Dibiarkan .note biasa (terlipat), BUKAN .note w. Sempat kuubah jadi .w,
+            lalu kubatalkan: amber berarti "ada yang perlu diperhatikan", dan NIK
+            yang disamarkan itu justru sistem bekerja sebagaimana mestinya. Amber
+            pada hal yang normal membuat orang berhenti memperhatikan amber —
+            termasuk pada peringatan "belum dapat kapal" tepat di atasnya.
+
+            Terlipat sudah cukup karena JUDULNYA sendiri sudah menjawab
+            pertanyaannya ("kenapa kolom NIK isinya bintang-bintang"); isi yang
+            dilipat cuma menambahkan siapa yang boleh melihat dan di mana
+            mengubahnya. */''}
       ${!bolehNik && kol.nik ? `<div class="note"><b>NIK disamarkan untuk peran ini</b>
         Hanya ${atur.nik_siapa_boleh_lihat === 'super_owner' ? 'Super Admin & Owner' : 'Super Admin'}
         yang melihat NIK penuh. Pengaturannya ada di tab Pengaturan.</div>` : ''}
